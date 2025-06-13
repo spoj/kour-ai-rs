@@ -171,6 +171,11 @@ createApp({
       }
     };
 
+    const renderMarkdown = (content) => {
+      if (typeof content !== 'string') return '';
+      return marked.parse(content);
+    };
+
     const scrollToBottom = () => {
       nextTick(() => {
         if (chatContainer.value) {
@@ -201,6 +206,7 @@ createApp({
       restartSession,
       pastedFiles,
       removeFile,
+      renderMarkdown,
     };
   },
 }).mount("#app");

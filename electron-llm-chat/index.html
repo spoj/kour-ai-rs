@@ -48,7 +48,7 @@
                 </div>
               </template>
               <template v-else>
-                <div v-html="message.content"></div>
+                <div v-html="renderMarkdown(message.content)"></div>
               </template>
             </div>
           </div>
@@ -126,6 +126,7 @@
       </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="./node_modules/vue/dist/vue.global.js"></script>
     <script src="./renderer.js"></script>
   </body>
