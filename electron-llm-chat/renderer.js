@@ -115,6 +115,7 @@ createApp({
                 resolve({
                   type: "text",
                   text: `Content of "${file.name}":\n\n${e.target.result}`,
+                  isAttachment: true,
                 });
               };
               reader.readAsText(file);

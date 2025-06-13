@@ -35,15 +35,15 @@
             <div class="message-bubble">
               <template v-if="Array.isArray(message.content)">
                 <div v-for="part in message.content">
-                  <template v-if="part.type === 'text'">
+                  <template v-if="part.type === 'text' && !part.isAttachment">
                     {{ part.text }}
                   </template>
                 </div>
                 <div
-                  v-if="message.content.filter(m => m.type !=='text').length > 0"
+                  v-if="message.content.filter(m => m.type !=='text' || m.isAttachment).length > 0"
                   style="padding-top: 5px; font-size: 0.8em"
                 >
-                  {{message.content.filter(m => m.type !=='text').length}}
+                  {{message.content.filter(m => m.type !=='text' || m.isAttachment).length}}
                   file(s) attached
                 </div>
               </template>
