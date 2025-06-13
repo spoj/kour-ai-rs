@@ -32,7 +32,25 @@
             class="message"
             :class="message.role + '-message'"
           >
-            <div class="message-bubble" v-html="message.content"></div>
+            <div class="message-bubble">
+              <template v-if="Array.isArray(message.content)">
+                <div v-for="part in message.content">
+                  <template v-if="part.type === 'text'">
+                    {{ part.text }}
+                  </template>
+                </div>
+                <div
+                  v-if="message.content.filter(m => m.type !=='text').length > 0"
+                  style="padding-top: 5px; font-size: 0.8em"
+                >
+                  {{message.content.filter(m => m.type !=='text').length}}
+                  file(s) attached
+                </div>
+              </template>
+              <template v-else>
+                <div v-html="message.content"></div>
+              </template>
+            </div>
           </div>
           <div
             v-if="message.role === 'assistant' && message.tool_calls"
@@ -64,6 +82,16 @@
           >
             <div class="dot-flashing"></div>
           </div>
+        </div>
+      </div>
+      <div v-if="pastedFiles.length > 0" id="file-preview-container">
+        <div
+          v-for="(file, index) in pastedFiles"
+          :key="index"
+          class="file-preview"
+        >
+          <span>{{ file.name }}</span>
+          <button @click="removeFile(index)">&times;</button>
         </div>
       </div>
       <div id="input-container">
