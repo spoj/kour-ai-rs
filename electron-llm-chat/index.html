@@ -8,25 +8,33 @@
     <div id="app" class="container">
       <header>
         <h1>Coworker</h1>
-        <div>
-          <button
-            id="settings-button"
-            @click="restartSession"
-            title="Restart Session"
-          >
-            &#x21bb;
-          </button>
-          <button
-            id="settings-button"
-            @click="showSettings = true"
-            title="Settings"
-          >
-            &#9881;
-          </button>
-        </div>
-      </header>
-      <div id="chat-container" ref="chatContainer">
-        <template v-for="(message, index) in chatHistory" :key="index">
+       <div id="path-container">
+         <input
+           type="text"
+           id="path-input"
+           v-model="rootDir"
+           placeholder="Enter root directory..."
+         />
+       </div>
+       <div>
+         <button
+           id="settings-button"
+           @click="restartSession"
+           title="Restart Session"
+         >
+           &#x21bb;
+         </button>
+         <button
+           id="settings-button"
+           @click="showSettings = true"
+           title="Settings"
+         >
+           &#9881;
+         </button>
+       </div>
+     </header>
+     <div id="chat-container" ref="chatContainer">
+       <template v-for="(message, index) in chatHistory" :key="index">
           <div
             v-if="message.role === 'user' || (message.role === 'assistant' && message.content)"
             class="message"

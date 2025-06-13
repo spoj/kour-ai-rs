@@ -25,6 +25,22 @@ h1 {
   margin: 0;
   font-size: 20px;
 }
+#path-container {
+  flex-grow: 1;
+  margin: 0 20px;
+}
+#path-input {
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 5px;
+  color: white;
+  padding: 5px 10px;
+  font-size: 14px;
+}
+#path-input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
 #settings-button {
   background: none;
   border: none;

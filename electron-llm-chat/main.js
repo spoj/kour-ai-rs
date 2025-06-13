@@ -30,9 +30,11 @@ ipcMain.handle('get-api-key', () => store.get('apiKey'));
 ipcMain.handle('set-api-key', (event, apiKey) => store.set('apiKey', apiKey));
 ipcMain.handle('get-model-name', () => store.get('modelName', 'anthropic/claude-3-haiku'));
 ipcMain.handle('set-model-name', (event, modelName) => store.set('modelName', modelName));
+ipcMain.handle('get-root-dir', () => store.get('rootDir'));
+ipcMain.handle('set-root-dir', (event, rootDir) => store.set('rootDir', rootDir));
 
 
-ipcMain.handle('send-message', async (event, { apiKey, modelName, messages }) => {
+ipcMain.handle('send-message', async (event, { apiKey, modelName, messages, rootDir }) => {
   const logToRenderer = (payload) => mainWindow.webContents.send('debug-log', payload);
 
   logToRenderer({ type: 'API_REQUEST', data: { modelName, messages, tools } });
@@ -58,12 +60,14 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, messages }) =>
       for (const toolCall of toolCalls) {
         const functionName = toolCall.function.name;
         if (toolFunctions[functionName]) {
-          const result = toolFunctions[functionName]();
+          const functionArgs = JSON.parse(toolCall.function.arguments);
+          const result = toolFunctions[functionName](functionArgs, rootDir);
+          const content = typeof result === 'object' ? JSON.stringify(result) : result.toString();
           messages.push({
             tool_call_id: toolCall.id,
             role: 'tool',
             name: functionName,
-            content: result.toString(),
+            content: content,
           });
         }
       }

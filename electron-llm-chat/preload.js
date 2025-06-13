@@ -6,5 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setApiKey: (apiKey) => ipcRenderer.invoke('set-api-key', apiKey),
   getModelName: () => ipcRenderer.invoke('get-model-name'),
   setModelName: (modelName) => ipcRenderer.invoke('set-model-name', modelName),
+  getRootDir: () => ipcRenderer.invoke('get-root-dir'),
+  setRootDir: (rootDir) => ipcRenderer.invoke('set-root-dir', rootDir),
   onDebugLog: (callback) => ipcRenderer.on('debug-log', (_event, value) => callback(value)),
 });

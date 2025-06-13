@@ -7,6 +7,7 @@ createApp({
     const pastedFiles = ref([]);
     const apiKey = ref("");
     const modelName = ref("anthropic/claude-3-haiku");
+    const rootDir = ref("");
     const showSettings = ref(false);
     const isTyping = ref(false);
     const chatContainer = ref(null);
@@ -14,6 +15,7 @@ createApp({
     onMounted(async () => {
       apiKey.value = await window.electronAPI.getApiKey();
       modelName.value = await window.electronAPI.getModelName();
+      rootDir.value = await window.electronAPI.getRootDir();
 
       window.electronAPI.onDebugLog((payload) => {
         console.log(`[MAIN PROCESS] ${payload.type}:`, payload.data);
@@ -42,6 +44,10 @@ createApp({
 
     watch(modelName, (newModelName) => {
       window.electronAPI.setModelName(newModelName);
+    });
+
+    watch(rootDir, (newRootDir) => {
+      window.electronAPI.setRootDir(newRootDir);
     });
 
     const adjustTextareaHeight = (event) => {
@@ -154,6 +160,7 @@ createApp({
           apiKey: apiKey.value,
           modelName: modelName.value,
           messages: plainMessages,
+          rootDir: rootDir.value,
         });
 
         isTyping.value = false;
@@ -199,6 +206,7 @@ createApp({
       newMessage,
       apiKey,
       modelName,
+      rootDir,
       showSettings,
       isTyping,
       chatContainer,
