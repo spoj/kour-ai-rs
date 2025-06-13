@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Coworker</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: #f0f2f5; color: #333; display: flex; height: 100vh; }
+        .container { flex-grow: 1; display: flex; flex-direction: column; background-color: #fff; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background-color: #1c65e9; color: white; }
+        h1 { margin: 0; font-size: 20px; }
+        #settings-button { background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
+        #chat-container { flex-grow: 1; overflow-y: auto; padding: 20px; }
+        .message { display: flex; margin-bottom: 15px; }
+        .message-bubble { padding: 10px 15px; border-radius: 18px; max-width: 70%; }
+        .user-message { justify-content: flex-end; }
+        .user-message .message-bubble { background-color: #1c65e9; color: white; }
+        .assistant-message { justify-content: flex-start; }
+        .assistant-message .message-bubble { background-color: #e5e5ea; color: black; }
+        #input-container { display: flex; padding: 10px; border-top: 1px solid #ddd; align-items: flex-end; }
+        #message-input { font-family: inherit; flex-grow: 1; border: 1px solid #ccc; border-radius: 18px; padding: 10px 15px; font-size: 14px; resize: none; overflow-y: auto; max-height: 120px; box-sizing: border-box; height: 38px; line-height: 18px; }
+        #send-button { background-color: #1c65e9; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; margin-left: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .tool-name { font-weight: bold; }
+        .tool-message .message-bubble { background-color: transparent; border: 1px solid #ccc; color: #666; }
+        .modal { position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 500px; border-radius: 8px; }
+        .close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .dot-flashing { position: relative; width: 10px; height: 10px; border-radius: 5px; background-color: #9880ff; color: #9880ff; animation: dot-flashing 1s infinite linear alternate; animation-delay: 0.5s; }
+        .dot-flashing::before, .dot-flashing::after { content: ''; display: inline-block; position: absolute; top: 0; }
+        .dot-flashing::before { left: -15px; width: 10px; height: 10px; border-radius: 5px; background-color: #9880ff; color: #9880ff; animation: dot-flashing 1s infinite alternate; animation-delay: 0s; }
+        .dot-flashing::after { left: 15px; width: 10px; height: 10px; border-radius: 5px; background-color: #9880ff; color: #9880ff; animation: dot-flashing 1s infinite alternate; animation-delay: 1s; }
+        @keyframes dot-flashing { 0% { background-color: #9880ff; } 50%, 100% { background-color: rgba(152, 128, 255, 0.2); } }
+    </style>
+</head>
+<body>
+    <div id="app" class="container">
+        <header>
+            <h1>Coworker</h1>
+            <button id="settings-button" @click="showSettings = true">&#9881;</button>
+        </header>
+        <div id="chat-container" ref="chatContainer">
+            <template v-for="(message, index) in chatHistory" :key="index">
+                <div v-if="message.role === 'user' || (message.role === 'assistant' && message.content)" class="message" :class="message.role + '-message'">
+                    <div class="message-bubble" v-html="message.content"></div>
+                </div>
+                <div v-if="message.role === 'assistant' && message.tool_calls" v-for="toolCall in message.tool_calls" class="message assistant-message tool-message">
+                    <div class="message-bubble" :title="'Arguments: ' + toolCall.function.arguments">
+                        &#x1F527; Calling <span class="tool-name">{{ toolCall.function.name }}</span>
+                    </div>
+                </div>
+                <div v-if="message.role === 'tool'" class="message assistant-message tool-message">
+                    <div class="message-bubble" :title="'Result: ' + message.content">
+                        &#x26A1; Tool result: <span class="tool-name">{{ message.name }}</span>
+                    </div>
+                </div>
+            </template>
+            <div v-if="isTyping" class="message assistant-message">
+                <div class="message-bubble">
+                    <div class="dot-flashing"></div>
+                </div>
+            </div>
+        </div>
+        <div id="input-container">
+            <textarea id="message-input" v-model="newMessage" @input="adjustTextareaHeight" @keydown.enter.prevent.exact="sendMessage" placeholder="Type a message..." rows="1"></textarea>
+            <button id="send-button" @click="sendMessage">&#10148;</button>
+        </div>
+
+        <div v-show="showSettings" id="settings-modal" class="modal" style="display: none;" @click.self="showSettings = false">
+            <div class="modal-content">
+                <span class="close-button" @click="showSettings = false">&times;</span>
+                <h2>Settings</h2>
+                <label for="apiKey">OpenRouter API Key:</label>
+                <input type="password" v-model="apiKey" style="width: 100%;">
+                <label for="modelName">Model Name:</label>
+                <input type="text" v-model="modelName" style="width: 100%;">
+            </div>
+        </div>
+    </div>
+
+    <script src="./node_modules/vue/dist/vue.global.js"></script>
+    <script src="./renderer.js"></script>
+</body>
+</html>
