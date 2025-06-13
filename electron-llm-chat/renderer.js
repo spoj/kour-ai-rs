@@ -80,22 +80,58 @@ createApp({
         (file) =>
           new Promise((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = (e) => {
-              const base64 = e.target.result.split(",")[1];
-              resolve({
-                type: file.type,
-                data: base64,
-                name: file.name,
-              });
-            };
             reader.onerror = (error) => reject(error);
-            reader.readAsDataURL(file);
+
+            const textExtensions = [
+              '.txt', '.md', '.csv', '.js', '.py', '.html', '.css', '.json',
+              '.ts', '.jsx', '.tsx', '.yaml', '.yml', '.xml', 'Dockerfile'
+            ];
+            const isTextFile = textExtensions.some(ext => file.name.endsWith(ext)) || file.type.startsWith('text/');
+
+            // Handle PDF files
+            if (file.type === "application/pdf") {
+              reader.onload = (e) => {
+                const base64PDF = e.target.result;
+                resolve({
+                  type: 'file',
+                  file: { filename: file.name, file_data: base64PDF },
+                });
+              };
+              reader.readAsDataURL(file);
+
+            // Handle images
+            } else if (file.type.startsWith("image/")) {
+              reader.onload = (e) => {
+                resolve({
+                  type: "image_url",
+                  image_url: { url: e.target.result },
+                });
+              };
+              reader.readAsDataURL(file);
+
+            // Handle whitelisted text-based files
+            } else if (isTextFile) {
+              reader.onload = (e) => {
+                resolve({
+                  type: "text",
+                  text: `Content of "${file.name}":\n\n${e.target.result}`,
+                });
+              };
+              reader.readAsText(file);
+              
+            // Skip unsupported files
+            } else {
+              console.warn(`Unsupported file type: ${file.type || 'unknown'} for file ${file.name}. Skipping.`);
+              resolve(null);
+            }
           })
       );
 
       try {
         const fileContents = await Promise.all(filePromises);
-        userMessageContent.push(...fileContents);
+        // Filter out any null results from non-image files
+        const validFileContents = fileContents.filter(content => content !== null);
+        userMessageContent.push(...validFileContents);
 
         // 3. Add the complete message to chat history
         chatHistory.value.push({ role: "user", content: userMessageContent });
