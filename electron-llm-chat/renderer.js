@@ -90,7 +90,7 @@ createApp({
 
             const textExtensions = [
               '.txt', '.md', '.csv', '.js', '.py', '.html', '.css', '.json',
-              '.ts', '.jsx', '.tsx', '.yaml', '.yml', '.xml', 'Dockerfile'
+              '.ts', '.jsx', '.tsx', '.yaml', '.yml', '.xml', 'Dockerfile', '.xlsx', '.docx'
             ];
             const isTextFile = textExtensions.some(ext => file.name.endsWith(ext)) || file.type.startsWith('text/');
 
