@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const OpenAI = require('openai');
 const Store = require('electron-store');
+const { tools, toolFunctions } = require('./tools');
 
 const store = new Store();
 
@@ -26,30 +27,12 @@ ipcMain.handle('set-api-key', (event, apiKey) => store.set('apiKey', apiKey));
 ipcMain.handle('get-model-name', () => store.get('modelName', 'anthropic/claude-3-haiku'));
 ipcMain.handle('set-model-name', (event, modelName) => store.set('modelName', modelName));
 
-const tools = [
-  {
-    type: "function",
-    function: {
-      name: "roll_dice",
-      description: "Roll a six-sided die and get a random number from 1 to 6.",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
-      },
-    },
-  },
-];
-
-function roll_dice() {
-    return Math.floor(Math.random() * 6) + 1;
-}
 
 ipcMain.handle('send-message', async (event, { apiKey, modelName, messages }) => {
   const logToRenderer = (payload) => mainWindow.webContents.send('debug-log', payload);
 
   logToRenderer({ type: 'API_REQUEST', data: { modelName, messages, tools } });
-  
+
   const openai = new OpenAI({
     baseURL: 'https://openrouter.ai/api/v1',
     apiKey: apiKey,
@@ -69,12 +52,13 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, messages }) =>
     while (message.tool_calls) {
       const toolCalls = message.tool_calls;
       for (const toolCall of toolCalls) {
-        if (toolCall.function.name === 'roll_dice') {
-          const result = roll_dice();
+        const functionName = toolCall.function.name;
+        if (toolFunctions[functionName]) {
+          const result = toolFunctions[functionName]();
           messages.push({
             tool_call_id: toolCall.id,
             role: 'tool',
-            name: 'roll_dice',
+            name: functionName,
             content: result.toString(),
           });
         }
