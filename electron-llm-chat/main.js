@@ -61,7 +61,7 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, messages, root
         const functionName = toolCall.function.name;
         if (toolFunctions[functionName]) {
           const functionArgs = JSON.parse(toolCall.function.arguments);
-          const result = toolFunctions[functionName](functionArgs, rootDir);
+          const result = await toolFunctions[functionName](functionArgs, rootDir);
           const content = typeof result === 'object' ? JSON.stringify(result) : result.toString();
           messages.push({
             tool_call_id: toolCall.id,
