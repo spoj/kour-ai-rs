@@ -1,8 +1,12 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
-const path = require('path');
-const OpenAI = require('openai');
-const Store = require('electron-store');
-const { tools, toolFunctions } = require('./tools');
+import { app, BrowserWindow, ipcMain } from 'electron';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import OpenAI from 'openai';
+import Store from 'electron-store';
+import { tools, toolFunctions } from './tools/index.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const store = new Store();
 

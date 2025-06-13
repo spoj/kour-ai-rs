@@ -15,15 +15,10 @@ function roll_dice() {
     return Math.floor(Math.random() * 6) + 1;
 }
 
-const tools = [
+export const tools = [
   roll_dice_tool,
 ];
 
-const toolFunctions = {
+export const toolFunctions = {
   roll_dice,
-};
-
-module.exports = {
-  tools,
-  toolFunctions,
 };
