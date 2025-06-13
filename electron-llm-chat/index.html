@@ -8,13 +8,22 @@
     <div id="app" class="container">
       <header>
         <h1>Coworker</h1>
-        <button
-          id="settings-button"
-          @click="showSettings = true"
-          title="Settings"
-        >
-          &#9881;
-        </button>
+        <div>
+          <button
+            id="settings-button"
+            @click="restartSession"
+            title="Restart Session"
+          >
+            &#x21bb;
+          </button>
+          <button
+            id="settings-button"
+            @click="showSettings = true"
+            title="Settings"
+          >
+            &#9881;
+          </button>
+        </div>
       </header>
       <div id="chat-container" ref="chatContainer">
         <template v-for="(message, index) in chatHistory" :key="index">
