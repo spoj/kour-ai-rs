@@ -39,12 +39,12 @@ createApp({
       
       // If empty or very short content, use default height
       if (!textarea.value || textarea.value.length < 30) {
-        textarea.style.height = '38px';
+        textarea.style.height = '40px';
         return;
       }
       
       // Reset to default height to get accurate scrollHeight
-      textarea.style.height = '38px';
+      textarea.style.height = '40px';
       
       // If content requires more height, expand
       if (textarea.scrollHeight > textarea.clientHeight) {
@@ -63,7 +63,7 @@ createApp({
       await nextTick();
       const textarea = document.getElementById('message-input');
       if (textarea) {
-        textarea.style.height = '38px';
+        textarea.style.height = '40px';
       }
 
       isTyping.value = true;
@@ -107,6 +107,10 @@ createApp({
       });
     };
 
+    const restartSession = () => {
+      chatHistory.value = [];
+    }
+
     return {
       chatHistory,
       newMessage,
@@ -117,6 +121,7 @@ createApp({
       chatContainer,
       adjustTextareaHeight,
       sendMessage,
+      restartSession
     };
   },
 }).mount('#app');
