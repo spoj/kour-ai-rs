@@ -90,7 +90,7 @@ createApp({
 
             const textExtensions = [
               '.txt', '.md', '.csv', '.js', '.py', '.html', '.css', '.json',
-              '.ts', '.jsx', '.tsx', '.yaml', '.yml', '.xml', 'Dockerfile', '.xlsx', '.docx'
+              '.ts', '.jsx', '.tsx', '.yaml', '.yml', '.xml', 'Dockerfile'
             ];
             const isTextFile = textExtensions.some(ext => file.name.endsWith(ext)) || file.type.startsWith('text/');
 
@@ -120,11 +120,11 @@ createApp({
               reader.onload = (e) => {
                 resolve({
                   type: "text",
-                  text: `Content of "${file.name}":\n\n${e.target.result}`,
+                  text: `Content of "${file.name}" in base64 format: ${e.target.result}`,
                   isAttachment: true,
                 });
               };
-              reader.readAsText(file);
+              reader.readAsDataURL(file);
               
             // Skip unsupported files
             } else {
