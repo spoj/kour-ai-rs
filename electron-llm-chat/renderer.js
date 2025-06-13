@@ -90,9 +90,6 @@ createApp({
             };
             reader.onerror = (error) => reject(error);
             reader.readAsDataURL(file);
-
-            // For non-image files, create a text representation
-            console.log(file.type, file.kind);
           })
       );
 
