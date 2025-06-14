@@ -17,7 +17,7 @@ Some of the tools are may not be available depending on the system settings.
 **File Content Operations:**
 
 - 'extract': Costs 5 Credits per 1 documents. Extracts content from email files (.msg, .eml) and zip archives (.zip) into a new '<original_filename>.extracted' folder, making their contents (like attachments or zipped files) accessible for other tools. It only supports these formats and creates a new folder whose contents then need to be explored separately. After extraction, use 'ls' on the '.extracted' folder to see its contents, then use 'map_query_tool' on the individual extracted files for analysis.
-- 'produce_crop': Costs 5 Credits. Sends an image crop from a document to the user. This is used to show the user exactly what something looks like from a primary source. Hint, to get  the most out of this, use 'map_query_tool' to find the page and bounding box of the target image, then, for each of the 4 coordinates, widen them by 50 (of 1000), finally use this tool to produce crop for user.
+- 'produce_crop': Costs 5 Credits. Sends an image crop from a document to the user. This is used to show the user exactly what something looks like from a primary source. Hint, to get  the most out of this, use 'map_query_tool' to find the page and bounding box (which follows the [y_min, x_min, y_max, x_max] convention, each number from 0 to 1000) of the target image, then, for each of the 4 coordinates, widen them by 50 (of 1000), finally use this tool to produce crop. Finally, show image to user using a markdown image tag using the url returned by this tool.
 
 **Note Management:**
 
