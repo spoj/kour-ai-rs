@@ -2,6 +2,10 @@ import { ls, ls_tool } from "./ls.js";
 import { find, find_tool } from "./find.js";
 import { extract, extract_tool } from "./extract.js";
 import { map_query, map_query_tool } from "./mapQueryTool.js";
+import {
+  map_query_glob,
+  map_query_glob_tool,
+} from "./mapQueryGlobTool.js";
 
 const roll_dice_tool = {
   type: "function",
@@ -26,6 +30,7 @@ export const tools = [
   find_tool,
   extract_tool,
   map_query_tool,
+  map_query_glob_tool,
 ];
 
 export const toolFunctions = {
@@ -34,4 +39,5 @@ export const toolFunctions = {
   find,
   extract,
   map_query,
+  map_query_glob,
 };
