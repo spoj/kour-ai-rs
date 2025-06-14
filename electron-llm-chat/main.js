@@ -72,6 +72,7 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, 
       for (const toolCall of toolCalls) {
         const functionName = toolCall.function.name;
         if (toolFunctions[functionName]) {
+          try {
           const functionArgs = JSON.parse(toolCall.function.arguments);
           const result = await toolFunctions[functionName](functionArgs, rootDir);
           const content = typeof result === 'object' ? JSON.stringify(result) : result.toString();
@@ -81,6 +82,22 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, 
             name: functionName,
             content: content,
           });
+          } catch (parseError) {
+            logToRenderer({
+              type: 'TOOL_PARSE_ERROR',
+              data: {
+                functionName,
+                arguments: toolCall.function.arguments,
+                error: parseError.message
+              }
+            });
+            history.push({
+              tool_call_id: toolCall.id,
+              role: 'tool',
+              name: functionName,
+              content: JSON.stringify({ error: `Failed to parse tool arguments: ${parseError.message}` }),
+            });
+          }
         }
       }
     }
