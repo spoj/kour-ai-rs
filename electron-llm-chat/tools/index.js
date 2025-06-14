@@ -6,6 +6,12 @@ import {
   map_query_glob,
   map_query_glob_tool,
 } from "./mapQueryGlobTool.js";
+import {
+  read_notes,
+  read_notes_tool,
+  append_notes,
+  append_notes_tool,
+} from "./notesTool.js";
 
 const roll_dice_tool = {
   type: "function",
@@ -31,6 +37,8 @@ export const tools = [
   extract_tool,
   map_query_tool,
   map_query_glob_tool,
+  read_notes_tool,
+  append_notes_tool,
 ];
 
 export const toolFunctions = {
@@ -40,4 +48,6 @@ export const toolFunctions = {
   extract,
   map_query,
   map_query_glob,
+  read_notes,
+  append_notes,
 };
