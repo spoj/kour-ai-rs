@@ -120,11 +120,11 @@ createApp({
               reader.onload = (e) => {
                 resolve({
                   type: "text",
-                  text: `Content of "${file.name}" in base64 format: ${e.target.result}`,
+                  text: `Content of "${file.name}":\n\n${e.target.result}`,
                   isAttachment: true,
                 });
               };
-              reader.readAsDataURL(file);
+              reader.readAsText(file);
               
             // Skip unsupported files
             } else {
