@@ -33,35 +33,50 @@ async function convertOfficeToPdf(filePath, fileType) {
     const outputDir = tempDir;
     const command = `"${sofficePath}" --headless --invisible --nodefault --nolockcheck --nologo --norestore --convert-to pdf --outdir "${outputDir}" "-env:UserInstallation=file:///${tempProfileDir.replace(/\\/g, '/')}" "${filePath}"`;
     
+    // Execute conversion asynchronously without blocking
     await execAsync(command);
     
-    // Wait for file to be fully written
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Get the output PDF file
+    // Poll for the output file instead of using a fixed delay
     const baseName = path.basename(filePath, path.extname(filePath));
     const pdfPath = path.join(outputDir, `${baseName}.pdf`);
     
+    // Poll for file existence with exponential backoff
+    let attempts = 0;
+    const maxAttempts = 20;
+    while (attempts < maxAttempts) {
+      if (fs.existsSync(pdfPath)) {
+        // Check if file size is stable (conversion complete)
+        const size1 = fs.statSync(pdfPath).size;
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const size2 = fs.statSync(pdfPath).size;
+        
+        if (size1 === size2 && size1 > 0) {
+          break;
+        }
+      }
+      
+      // Exponential backoff: 50ms, 100ms, 200ms, etc.
+      await new Promise(resolve => setTimeout(resolve, Math.min(50 * Math.pow(2, attempts), 1000)));
+      attempts++;
+    }
+    
     if (!fs.existsSync(pdfPath)) {
-      throw new Error(`PDF conversion failed - output file not found: ${pdfPath}`);
+      throw new Error(`PDF conversion failed - output file not found after ${maxAttempts} attempts: ${pdfPath}`);
     }
     
     // Read the PDF file
     const pdfBuffer = await fs.promises.readFile(pdfPath);
     
-    // Cleanup temp files
-    await fs.promises.rm(tempDir, { recursive: true, force: true });
-    await fs.promises.rm(tempProfileDir, { recursive: true, force: true });
+    // Cleanup temp files asynchronously (don't wait)
+    fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    fs.promises.rm(tempProfileDir, { recursive: true, force: true }).catch(() => {});
     
     return pdfBuffer;
   } catch (error) {
-    // Cleanup on error
-    try {
-      await fs.promises.rm(tempDir, { recursive: true, force: true });
-      await fs.promises.rm(tempProfileDir, { recursive: true, force: true });
-    } catch (cleanupError) {
-      // Ignore cleanup errors
-    }
+    // Cleanup on error asynchronously (don't wait)
+    fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    fs.promises.rm(tempProfileDir, { recursive: true, force: true }).catch(() => {});
+    
     throw new Error(`Office to PDF conversion failed: ${error.message}`);
   }
 }
@@ -307,6 +322,7 @@ export async function map_query(args, rootDir) {
     baseURL: "https://openrouter.ai/api/v1",
     apiKey: apiKey,
   });
+  
   const processFile = async (filename) => {
     try {
       const filePath = path.join(resolvedRootDir, filename);
@@ -330,7 +346,7 @@ export async function map_query(args, rootDir) {
       }
 
       // Check file size to prevent memory issues
-      const stats = fs.statSync(resolvedFilePath);
+      const stats = await fs.promises.stat(resolvedFilePath);
       const maxFileSize = 50 * 1024 * 1024; // 50MB limit
       if (stats.size > maxFileSize) {
         results[filename] = {
@@ -342,7 +358,8 @@ export async function map_query(args, rootDir) {
         return;
       }
 
-      const fileBuffer = fs.readFileSync(resolvedFilePath);
+      // Read file asynchronously
+      const fileBuffer = await fs.promises.readFile(resolvedFilePath);
       const fileTypeResult = await fileTypeFromBuffer(fileBuffer);
 
       // Get message content using the handler system
