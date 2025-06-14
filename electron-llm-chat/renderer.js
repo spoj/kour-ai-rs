@@ -120,7 +120,7 @@ createApp({
               reader.onload = (e) => {
                 resolve({
                   type: "text",
-                  text: `Content of "${file.name}":\n\n${e.target.result}`,
+                  text: `Content of "${file.name}":\n\n${e.target.result}`,                  
                   isAttachment: true,
                 });
               };
