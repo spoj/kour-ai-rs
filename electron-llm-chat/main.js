@@ -36,6 +36,8 @@ ipcMain.handle('get-system-prompt', () => store.get('systemPrompt', ''));
 ipcMain.handle('set-system-prompt', (event, systemPrompt) => store.set('systemPrompt', systemPrompt));
 ipcMain.handle('get-soffice-path', () => store.get('sofficePath', ''));
 ipcMain.handle('set-soffice-path', (event, sofficePath) => store.set('sofficePath', sofficePath));
+ipcMain.handle('get-provider-order', () => store.get('providerOrder', 'google-vertex,anthropic,openai,amazon-bedrock'));
+ipcMain.handle('set-provider-order', (event, providerOrder) => store.set('providerOrder', providerOrder));
 
 
 ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, messages, rootDir }) => {
@@ -60,9 +62,13 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, 
 
       // Make API request
       logToRenderer({ type: 'API_REQUEST', data: { modelName, messages: requestMessages, tools } });
+       const providerOrder = store.get('providerOrder', '').split(',').map(p => p.trim());
       const response = await openai.chat.completions.create({
         model: modelName,
         messages: requestMessages,
+        provider: {
+          order: providerOrder,
+        },
         tools: tools,
       });
       logToRenderer({ type: 'API_SUCCESS', data: response });

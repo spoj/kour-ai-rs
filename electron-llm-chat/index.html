@@ -147,6 +147,13 @@
           <small style="color: #666; display: block; margin-top: 5px;">
             Optional: Set this to enable DOCX/PPTX support. Leave empty if LibreOffice is not installed.
           </small>
+            <label for="providerOrder">Provider Order:</label>
+            <input
+              type="text"
+              v-model="providerOrder"
+              style="width: 100%"
+              placeholder="e.g., google-vertex,anthropic,openai"
+            />
         </div>
       </div>
     </div>

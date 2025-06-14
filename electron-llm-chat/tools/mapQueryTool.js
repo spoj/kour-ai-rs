@@ -402,9 +402,13 @@ export async function map_query(args, rootDir) {
         messageContent,
       ];
       console.log(`sub_llm start: ${filename}`);
+      const providerOrder = store.get('providerOrder', '').split(',').map(p => p.trim());
       const response = await openai.chat.completions.create({
         model: MAP_MODEL_NAME,
         messages: messages,
+        provider: {
+          order: providerOrder
+        }
       });
       console.log(`sub_llm done: ${filename}`);
 

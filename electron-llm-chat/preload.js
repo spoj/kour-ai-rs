@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setSystemPrompt: (systemPrompt) => ipcRenderer.invoke('set-system-prompt', systemPrompt),
   getSofficePath: () => ipcRenderer.invoke('get-soffice-path'),
   setSofficePath: (sofficePath) => ipcRenderer.invoke('set-soffice-path', sofficePath),
+  getProviderOrder: () => ipcRenderer.invoke('get-provider-order'),
+  setProviderOrder: (providerOrder) => ipcRenderer.invoke('set-provider-order', providerOrder),
   onDebugLog: (callback) => ipcRenderer.on('debug-log', (_event, value) => callback(value)),
   onUpdateHistory: (callback) => ipcRenderer.on('update-history', (_event, value) => callback(value)),
 });

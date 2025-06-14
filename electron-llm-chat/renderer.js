@@ -10,6 +10,7 @@ createApp({
     const systemPrompt = ref("");
     const rootDir = ref("");
     const sofficePath = ref("");
+    const providerOrder = ref("google-vertex,anthropic,openai,amazon-bedrock");
     const showSettings = ref(false);
     const isTyping = ref(false);
     const chatContainer = ref(null);
@@ -21,6 +22,7 @@ createApp({
       systemPrompt.value = await window.electronAPI.getSystemPrompt();
       rootDir.value = await window.electronAPI.getRootDir();
       sofficePath.value = await window.electronAPI.getSofficePath();
+      providerOrder.value = await window.electronAPI.getProviderOrder();
 
       // Set up event listeners
       window.electronAPI.onDebugLog((payload) => {
@@ -68,6 +70,10 @@ createApp({
 
     watch(sofficePath, (newSofficePath) => {
       window.electronAPI.setSofficePath(newSofficePath);
+    });
+
+    watch(providerOrder, (newProviderOrder) => {
+      window.electronAPI.setProviderOrder(newProviderOrder);
     });
 
     const adjustTextareaHeight = (event) => {
@@ -253,6 +259,7 @@ const handleSendError = (error) => {
       systemPrompt,
       rootDir,
       sofficePath,
+      providerOrder,
       showSettings,
       isTyping,
       chatContainer,
