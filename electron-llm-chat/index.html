@@ -130,6 +130,13 @@
           <input type="password" v-model="apiKey" style="width: 100%" />
           <label for="modelName">Model Name:</label>
           <input type="text" v-model="modelName" style="width: 100%" />
+          <label for="system-prompt">System Prompt:</label>
+          <textarea
+            id="system-prompt"
+            v-model="systemPrompt"
+            rows="4"
+            style="width: 100%"
+          ></textarea>
         </div>
       </div>
     </div>

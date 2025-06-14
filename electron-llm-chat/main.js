@@ -32,30 +32,42 @@ ipcMain.handle('get-model-name', () => store.get('modelName', 'anthropic/claude-
 ipcMain.handle('set-model-name', (event, modelName) => store.set('modelName', modelName));
 ipcMain.handle('get-root-dir', () => store.get('rootDir'));
 ipcMain.handle('set-root-dir', (event, rootDir) => store.set('rootDir', rootDir));
+ipcMain.handle('get-system-prompt', () => store.get('systemPrompt', ''));
+ipcMain.handle('set-system-prompt', (event, systemPrompt) => store.set('systemPrompt', systemPrompt));
 
 
-ipcMain.handle('send-message', async (event, { apiKey, modelName, messages, rootDir }) => {
+ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, messages, rootDir }) => {
   const logToRenderer = (payload) => mainWindow.webContents.send('debug-log', payload);
-
-  logToRenderer({ type: 'API_REQUEST', data: { modelName, messages, tools } });
 
   const openai = new OpenAI({
     baseURL: 'https://openrouter.ai/api/v1',
     apiKey: apiKey,
   });
 
+  let history = [...messages];
+
   try {
-    let response = await openai.chat.completions.create({
-      model: modelName,
-      messages: messages,
-      tools: tools,
-    });
-    logToRenderer({ type: 'API_SUCCESS', data: response });
+    while (true) {
+      const requestMessages = [...history];
+      if (systemPrompt && (requestMessages.length === 0 || requestMessages[0].role !== 'system')) {
+        requestMessages.unshift({ role: 'system', content: systemPrompt });
+      }
 
-    let message = response.choices[0].message;
-    messages.push(message);
+      logToRenderer({ type: 'API_REQUEST', data: { modelName, messages: requestMessages, tools } });
+      const response = await openai.chat.completions.create({
+        model: modelName,
+        messages: requestMessages,
+        tools: tools,
+      });
+      logToRenderer({ type: 'API_SUCCESS', data: response });
 
-    while (message.tool_calls) {
+      const message = response.choices[0].message;
+      history.push(message);
+
+      if (!message.tool_calls) {
+        break;
+      }
+
       const toolCalls = message.tool_calls;
       for (const toolCall of toolCalls) {
         const functionName = toolCall.function.name;
@@ -63,7 +75,7 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, messages, root
           const functionArgs = JSON.parse(toolCall.function.arguments);
           const result = await toolFunctions[functionName](functionArgs, rootDir);
           const content = typeof result === 'object' ? JSON.stringify(result) : result.toString();
-          messages.push({
+          history.push({
             tool_call_id: toolCall.id,
             role: 'tool',
             name: functionName,
@@ -71,17 +83,8 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, messages, root
           });
         }
       }
-      logToRenderer({ type: 'API_REQUEST', data: { modelName, messages, tools } });
-      response = await openai.chat.completions.create({
-        model: modelName,
-        messages: messages,
-        tools: tools,
-      });
-      logToRenderer({ type: 'API_SUCCESS', data: response });
-      message = response.choices[0].message;
-      messages.push(message);
     }
-    return messages;
+    return history;
   } catch (error) {
     logToRenderer({ type: 'API_ERROR', data: error });
     throw new Error(`API Error: ${error.message || 'Could not get a response from the model.'}`);

@@ -7,6 +7,7 @@ createApp({
     const pastedFiles = ref([]);
     const apiKey = ref("");
     const modelName = ref("anthropic/claude-3-haiku");
+    const systemPrompt = ref("");
     const rootDir = ref("");
     const showSettings = ref(false);
     const isTyping = ref(false);
@@ -15,6 +16,7 @@ createApp({
     onMounted(async () => {
       apiKey.value = await window.electronAPI.getApiKey();
       modelName.value = await window.electronAPI.getModelName();
+      systemPrompt.value = await window.electronAPI.getSystemPrompt();
       rootDir.value = await window.electronAPI.getRootDir();
 
       window.electronAPI.onDebugLog((payload) => {
@@ -44,6 +46,10 @@ createApp({
 
     watch(modelName, (newModelName) => {
       window.electronAPI.setModelName(newModelName);
+    });
+
+    watch(systemPrompt, (newSystemPrompt) => {
+      window.electronAPI.setSystemPrompt(newSystemPrompt);
     });
 
     watch(rootDir, (newRootDir) => {
@@ -159,6 +165,7 @@ createApp({
         const response = await window.electronAPI.sendMessage({
           apiKey: apiKey.value,
           modelName: modelName.value,
+          systemPrompt: systemPrompt.value,
           messages: plainMessages,
           rootDir: rootDir.value,
         });
@@ -206,6 +213,7 @@ createApp({
       newMessage,
       apiKey,
       modelName,
+      systemPrompt,
       rootDir,
       showSettings,
       isTyping,
