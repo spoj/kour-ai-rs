@@ -3,16 +3,265 @@ import path from "path";
 import OpenAI from "openai";
 import Store from "electron-store";
 import { fileTypeFromBuffer } from "file-type";
+import { exec } from "child_process";
+import { promisify } from "util";
+import os from "os";
 
+const execAsync = promisify(exec);
 const store = new Store();
 const MAP_MODEL_NAME = "google/gemini-2.5-flash-preview-05-20:thinking";
+
+// Helper functions for Office document conversion
+async function convertOfficeToPdf(filePath, fileType) {
+  // Get soffice path from settings
+  const sofficePath = store.get('sofficePath');
+  
+  if (!sofficePath) {
+    throw new Error('LibreOffice (soffice.com) path is not configured. Please set it in the settings to enable DOCX/PPTX support.');
+  }
+  
+  // Check if the soffice path exists
+  if (!fs.existsSync(sofficePath)) {
+    throw new Error(`LibreOffice (soffice.com) not found at configured path: ${sofficePath}`);
+  }
+  
+  const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'office-convert-'));
+  const tempProfileDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'office-profile-'));
+  
+  try {
+    // Use soffice.com with headless mode and a temporary profile for parallelization
+    const outputDir = tempDir;
+    const command = `"${sofficePath}" --headless --invisible --nodefault --nolockcheck --nologo --norestore --convert-to pdf --outdir "${outputDir}" "-env:UserInstallation=file:///${tempProfileDir.replace(/\\/g, '/')}" "${filePath}"`;
+    
+    await execAsync(command);
+    
+    // Wait for file to be fully written
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Get the output PDF file
+    const baseName = path.basename(filePath, path.extname(filePath));
+    const pdfPath = path.join(outputDir, `${baseName}.pdf`);
+    
+    if (!fs.existsSync(pdfPath)) {
+      throw new Error(`PDF conversion failed - output file not found: ${pdfPath}`);
+    }
+    
+    // Read the PDF file
+    const pdfBuffer = await fs.promises.readFile(pdfPath);
+    
+    // Cleanup temp files
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
+    await fs.promises.rm(tempProfileDir, { recursive: true, force: true });
+    
+    return pdfBuffer;
+  } catch (error) {
+    // Cleanup on error
+    try {
+      await fs.promises.rm(tempDir, { recursive: true, force: true });
+      await fs.promises.rm(tempProfileDir, { recursive: true, force: true });
+    } catch (cleanupError) {
+      // Ignore cleanup errors
+    }
+    throw new Error(`Office to PDF conversion failed: ${error.message}`);
+  }
+}
+
+async function docxToPdf(filePath) {
+  return convertOfficeToPdf(filePath, 'docx');
+}
+
+async function pptxToPdf(filePath) {
+  return convertOfficeToPdf(filePath, 'pptx');
+}
+
+// File type handlers
+const fileHandlers = {
+  async handleImage(fileBuffer, filename, fileTypeResult, query, broader_context) {
+    const fileContent = fileBuffer.toString("base64");
+    return {
+      role: "user",
+      content: [
+        {
+          type: "image_url",
+          image_url: {
+            url: `data:${fileTypeResult.mime};base64,${fileContent}`,
+          },
+        },
+        { type: "text", text: `File: ${filename}` },
+        { type: "text", text: `Broader context:\n${broader_context}` },
+        {
+          type: "text",
+          text: `Based on the file and context, answer the below query. Your answer must be grounded.`,
+        },
+        { type: "text", text: `Query:\n${query}` },
+      ],
+    };
+  },
+
+  async handlePdf(fileBuffer, filename, fileTypeResult, query, broader_context) {
+    const fileContent = fileBuffer.toString("base64");
+    return {
+      role: "user",
+      content: [
+        {
+          type: "file",
+          file: {
+            filename: filename,
+            file_data: `data:${fileTypeResult.mime};base64,${fileContent}`,
+          },
+        },
+        { type: "text", text: `File: ${filename}` },
+        { type: "text", text: `Broader context:\n${broader_context}` },
+        {
+          type: "text",
+          text: `Based on the file and context, answer the below query. Your answer must be grounded.`,
+        },
+        { type: "text", text: `Query:\n${query}` },
+      ],
+    };
+  },
+
+  async handleText(fileBuffer, filename, query, broader_context) {
+    const content = fileBuffer.toString("utf-8");
+    return {
+      role: "user",
+      content: [
+        { type: "text", text: `File Content:\n${content}` },
+        { type: "text", text: `File: ${filename}` },
+        { type: "text", text: `Broader context:\n${broader_context}` },
+        {
+          type: "text",
+          text: `Based on the above file and context, answer the below query. Your answer must be grounded.`,
+        },
+        { type: "text", text: `Query:\n${query}` },
+      ],
+    };
+  },
+
+  async handleDocx(filePath, filename, query, broader_context) {
+    // Check if soffice is configured
+    const sofficePath = store.get('sofficePath');
+    if (!sofficePath) {
+      return { error: `DOCX files are not supported. Please configure LibreOffice (soffice.com) path in settings to enable DOCX support.` };
+    }
+    
+    try {
+      const pdfBuffer = await docxToPdf(filePath);
+      const pdfContent = pdfBuffer.toString("base64");
+      return {
+        role: "user",
+        content: [
+          {
+            type: "file",
+            file: {
+              filename: filename,
+              file_data: `data:application/pdf;base64,${pdfContent}`,
+            },
+          },
+          { type: "text", text: `File: ${filename} (converted from DOCX to PDF)` },
+          { type: "text", text: `Broader context:\n${broader_context}` },
+          {
+            type: "text",
+            text: `Based on the file and context, answer the below query. Your answer must be grounded.`,
+          },
+          { type: "text", text: `Query:\n${query}` },
+        ],
+      };
+    } catch (error) {
+      return { error: error.message };
+    }
+  },
+
+  async handlePptx(filePath, filename, query, broader_context) {
+    // Check if soffice is configured
+    const sofficePath = store.get('sofficePath');
+    if (!sofficePath) {
+      return { error: `PPTX files are not supported. Please configure LibreOffice (soffice.com) path in settings to enable PPTX support.` };
+    }
+    
+    try {
+      const pdfBuffer = await pptxToPdf(filePath);
+      const pdfContent = pdfBuffer.toString("base64");
+      return {
+        role: "user",
+        content: [
+          {
+            type: "file",
+            file: {
+              filename: filename,
+              file_data: `data:application/pdf;base64,${pdfContent}`,
+            },
+          },
+          { type: "text", text: `File: ${filename} (converted from PPTX to PDF)` },
+          { type: "text", text: `Broader context:\n${broader_context}` },
+          {
+            type: "text",
+            text: `Based on the file and context, answer the below query. Your answer must be grounded.`,
+          },
+          { type: "text", text: `Query:\n${query}` },
+        ],
+      };
+    } catch (error) {
+      return { error: error.message };
+    }
+  },
+};
+
+// Main handler dispatcher
+async function getMessageContent(fileBuffer, filename, filePath, fileTypeResult, query, broader_context) {
+  // Handle images
+  if (fileTypeResult && fileTypeResult.mime.startsWith("image/")) {
+    return fileHandlers.handleImage(fileBuffer, filename, fileTypeResult, query, broader_context);
+  }
+  
+  // Handle PDFs
+  if (fileTypeResult && fileTypeResult.mime === "application/pdf") {
+    return fileHandlers.handlePdf(fileBuffer, filename, fileTypeResult, query, broader_context);
+  }
+  
+  // Handle DOCX files
+  if (fileTypeResult && (
+    fileTypeResult.mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    fileTypeResult.ext === "docx"
+  )) {
+    return fileHandlers.handleDocx(filePath, filename, query, broader_context);
+  }
+  
+  // Handle PPTX files
+  if (fileTypeResult && (
+    fileTypeResult.mime === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+    fileTypeResult.ext === "pptx"
+  )) {
+    return fileHandlers.handlePptx(filePath, filename, query, broader_context);
+  }
+  
+  // Handle text files
+  if (fileTypeResult && fileTypeResult.mime.startsWith("text/")) {
+    return fileHandlers.handleText(fileBuffer, filename, query, broader_context);
+  }
+  
+  // Fallback for plain text files that file-type may not identify
+  if (!fileTypeResult) {
+    const content = fileBuffer.toString("utf-8");
+    // Basic check to see if it's likely binary gibberish
+    if (content.includes("\uFFFD")) {
+      return { error: "Unsupported file type. Appears to be a binary file." };
+    }
+    return fileHandlers.handleText(fileBuffer, filename, query, broader_context);
+  }
+  
+  // Unsupported file type
+  return {
+    error: `Unsupported file type: ${fileTypeResult.mime}. Only images, PDFs, DOCX, PPTX, and text-based files are supported.`,
+  };
+}
 
 export const map_query_tool = {
   type: "function",
   function: {
     name: "map_query",
     description:
-      "Answers a query about individual files in a directory, processed concurrently. Supports text-based files, PDFs, and images (png, jpg, jpeg)",
+      "Answers a query about individual files in a directory, processed concurrently. Supports text-based files, PDFs, images (png, jpg, jpeg), DOCX, and PPTX files",
     parameters: {
       type: "object",
       properties: {
@@ -93,60 +342,36 @@ export async function map_query(args, rootDir) {
         return;
       }
 
-      let messages = [
+      const fileBuffer = fs.readFileSync(resolvedFilePath);
+      const fileTypeResult = await fileTypeFromBuffer(fileBuffer);
+
+      // Get message content using the handler system
+      const messageContent = await getMessageContent(
+        fileBuffer,
+        filename,
+        resolvedFilePath,
+        fileTypeResult,
+        query,
+        broader_context
+      );
+
+      // Check if there was an error
+      if (messageContent.error) {
+        results[filename] = {
+          ans: `Error: ${messageContent.error}`,
+          relevant_extracts: [],
+        };
+        return;
+      }
+
+      const messages = [
         {
           role: "system",
           content:
             "You are a helpful assistant that answers questions about files. Your answer must be grounded.",
         },
+        messageContent,
       ];
-
-      const fileBuffer = fs.readFileSync(resolvedFilePath);
-      const fileTypeResult = await fileTypeFromBuffer(fileBuffer);
-
-      if (
-        fileTypeResult &&
-        (fileTypeResult.mime.startsWith("image/") ||
-          fileTypeResult.mime === "application/pdf")
-      ) {
-        const fileContent = fileBuffer.toString("base64");
-        messages.push({
-          role: "user",
-          content: [
-            {
-              type: fileTypeResult.mime === "application/pdf" ? "file": "image_url",
-              file: {
-                filename: filename,
-                file_data: `data:${fileTypeResult.mime};base64,${fileContent}`,
-              },
-            },
-            { type: "text", text: `File: ${filename}` },
-            { type: "text", text: `Broader context:\n${broader_context}` },
-            {
-              type: "text",
-              text: `Based on the file and context, answer the below query. Your answer must be grounded.`,
-            },
-            { type: "text", text: `Query:\n${query}` },
-          ],
-        });
-      } else {
-        // Assume text
-        const content = fileBuffer.toString("utf-8");
-        messages.push({
-          role: "user",
-          content: [
-            { type: "text", text: `File Content:\n${content}` },
-            { type: "text", text: `File: ${filename}` },
-            { type: "text", text: `Broader context:\n${broader_context}` },
-            {
-              type: "text",
-              text: `Based on the above file and context, answer the below query. Your answer must be grounded.`,
-            },
-            { type: "text", text: `Query:\n${query}` },
-          ],
-        });
-      }
-
       console.log(`sub_llm start: ${filename}`);
       const response = await openai.chat.completions.create({
         model: MAP_MODEL_NAME,

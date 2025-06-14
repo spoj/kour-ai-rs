@@ -10,5 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setRootDir: (rootDir) => ipcRenderer.invoke('set-root-dir', rootDir),
   getSystemPrompt: () => ipcRenderer.invoke('get-system-prompt'),
   setSystemPrompt: (systemPrompt) => ipcRenderer.invoke('set-system-prompt', systemPrompt),
+  getSofficePath: () => ipcRenderer.invoke('get-soffice-path'),
+  setSofficePath: (sofficePath) => ipcRenderer.invoke('set-soffice-path', sofficePath),
   onDebugLog: (callback) => ipcRenderer.on('debug-log', (_event, value) => callback(value)),
 });

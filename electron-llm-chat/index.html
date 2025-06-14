@@ -137,6 +137,16 @@
             rows="4"
             style="width: 100%"
           ></textarea>
+          <label for="sofficePath">LibreOffice Path (soffice.com):</label>
+          <input
+            type="text"
+            v-model="sofficePath"
+            style="width: 100%"
+            placeholder="e.g., C:\Program Files\LibreOffice\program\soffice.com"
+          />
+          <small style="color: #666; display: block; margin-top: 5px;">
+            Optional: Set this to enable DOCX/PPTX support. Leave empty if LibreOffice is not installed.
+          </small>
         </div>
       </div>
     </div>

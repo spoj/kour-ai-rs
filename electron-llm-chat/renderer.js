@@ -9,6 +9,7 @@ createApp({
     const modelName = ref("anthropic/claude-3-haiku");
     const systemPrompt = ref("");
     const rootDir = ref("");
+    const sofficePath = ref("");
     const showSettings = ref(false);
     const isTyping = ref(false);
     const chatContainer = ref(null);
@@ -18,6 +19,7 @@ createApp({
       modelName.value = await window.electronAPI.getModelName();
       systemPrompt.value = await window.electronAPI.getSystemPrompt();
       rootDir.value = await window.electronAPI.getRootDir();
+      sofficePath.value = await window.electronAPI.getSofficePath();
 
       window.electronAPI.onDebugLog((payload) => {
         console.log(`[MAIN PROCESS] ${payload.type}:`, payload.data);
@@ -54,6 +56,10 @@ createApp({
 
     watch(rootDir, (newRootDir) => {
       window.electronAPI.setRootDir(newRootDir);
+    });
+
+    watch(sofficePath, (newSofficePath) => {
+      window.electronAPI.setSofficePath(newSofficePath);
     });
 
     const adjustTextareaHeight = (event) => {
@@ -215,6 +221,7 @@ createApp({
       modelName,
       systemPrompt,
       rootDir,
+      sofficePath,
       showSettings,
       isTyping,
       chatContainer,

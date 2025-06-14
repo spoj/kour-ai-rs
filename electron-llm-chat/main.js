@@ -34,6 +34,8 @@ ipcMain.handle('get-root-dir', () => store.get('rootDir'));
 ipcMain.handle('set-root-dir', (event, rootDir) => store.set('rootDir', rootDir));
 ipcMain.handle('get-system-prompt', () => store.get('systemPrompt', ''));
 ipcMain.handle('set-system-prompt', (event, systemPrompt) => store.set('systemPrompt', systemPrompt));
+ipcMain.handle('get-soffice-path', () => store.get('sofficePath', ''));
+ipcMain.handle('set-soffice-path', (event, sofficePath) => store.set('sofficePath', sofficePath));
 
 
 ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, messages, rootDir }) => {
@@ -73,15 +75,15 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, 
         const functionName = toolCall.function.name;
         if (toolFunctions[functionName]) {
           try {
-          const functionArgs = JSON.parse(toolCall.function.arguments);
-          const result = await toolFunctions[functionName](functionArgs, rootDir);
-          const content = typeof result === 'object' ? JSON.stringify(result) : result.toString();
-          history.push({
-            tool_call_id: toolCall.id,
-            role: 'tool',
-            name: functionName,
-            content: content,
-          });
+            const functionArgs = JSON.parse(toolCall.function.arguments);
+            const result = await toolFunctions[functionName](functionArgs, rootDir);
+            const content = typeof result === 'object' ? JSON.stringify(result) : result.toString();
+            history.push({
+              tool_call_id: toolCall.id,
+              role: 'tool',
+              name: functionName,
+              content: content,
+            });
           } catch (parseError) {
             logToRenderer({
               type: 'TOOL_PARSE_ERROR',
