@@ -114,7 +114,7 @@ export async function map_query(args, rootDir) {
           role: "user",
           content: [
             {
-              type: "file",
+              type: fileTypeResult.mime === "application/pdf" ? "file": "image_url",
               file: {
                 filename: filename,
                 file_data: `data:${fileTypeResult.mime};base64,${fileContent}`,
