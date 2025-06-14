@@ -1,11 +1,11 @@
 import { find } from "./find.js";
 import { map_query } from "./mapQueryTool.js";
 
-export async function map_query_glob(args, rootDir) {
+export async function map_query_glob(args, toolContext) {
   const { glob_pattern, query, broader_context } = args;
 
   const find_args = { glob_pattern };
-  const find_result = await find(find_args, rootDir);
+  const find_result = await find(find_args, toolContext);
 
   // Directly return if find encountered an error (e.g., rootDir not specified)
   if (typeof find_result === "string" && find_result.startsWith("Error:")) {
@@ -23,7 +23,7 @@ export async function map_query_glob(args, rootDir) {
   }
 
   const map_query_args = { filenames, query, broader_context };
-  const result = await map_query(map_query_args, rootDir);
+  const result = await map_query(map_query_args, toolContext);
   return result;
 }
 

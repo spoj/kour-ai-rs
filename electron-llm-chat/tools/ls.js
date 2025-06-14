@@ -1,7 +1,8 @@
 import fs from "fs";
 import path from "path";
 
-export function ls(args, rootDir) {
+export function ls(args, toolContext) {
+  const { rootDir } = toolContext;
   if (!rootDir) {
     return "Error: Root directory is not specified. Please specify a root directory.";
   }

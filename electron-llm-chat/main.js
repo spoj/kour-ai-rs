@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol } from 'electron';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import OpenAI from 'openai';
 import Store from 'electron-store';
@@ -24,7 +25,25 @@ const createWindow = () => {
   mainWindow.loadFile('index.html');
 };
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  // Register sandbox protocol
+  protocol.registerFileProtocol('sandbox', (request, callback) => {
+    const url = request.url.substr(10); // Remove 'sandbox://'
+    const sandboxDir = path.join(app.getPath('userData'), 'sandbox');
+    const filePath = path.join(sandboxDir, url);
+    
+    // Security check: ensure the file is within sandbox directory
+    const normalizedPath = path.normalize(filePath);
+    if (!normalizedPath.startsWith(sandboxDir)) {
+      callback({ error: -6 }); // net::ERR_FILE_NOT_FOUND
+      return;
+    }
+    
+    callback({ path: filePath });
+  });
+  
+  createWindow();
+});
 
 ipcMain.handle('get-api-key', () => store.get('apiKey'));
 ipcMain.handle('set-api-key', (event, apiKey) => store.set('apiKey', apiKey));
@@ -106,6 +125,13 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, 
 // Helper function to execute a single tool call
 async function executeToolCall(toolCall, rootDir, logToRenderer) {
   const functionName = toolCall.function.name;
+
+  const sandboxDir = path.join(app.getPath('userData'), 'sandbox');
+  if (!fs.existsSync(sandboxDir)) {
+    fs.mkdirSync(sandboxDir, { recursive: true });
+  }
+
+  const toolContext = { rootDir, sandboxDir };
   
   if (!toolFunctions[functionName]) {
     return {
@@ -136,7 +162,7 @@ async function executeToolCall(toolCall, rootDir, logToRenderer) {
       }
     }
     
-    const result = await toolFunctions[functionName](functionArgs, rootDir);
+    const result = await toolFunctions[functionName](functionArgs, toolContext);
     const content = typeof result === 'object' ? JSON.stringify(result) : result.toString();
     
     return {

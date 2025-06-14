@@ -10,7 +10,8 @@ async function getNotesPath(rootDir) {
   return path.join(path.resolve(rootDir), "_NOTES.md");
 }
 
-export async function read_notes(args, rootDir) {
+export async function read_notes(args, toolContext) {
+  const { rootDir } = toolContext;
   try {
     const notesPath = await getNotesPath(rootDir);
     try {
@@ -27,7 +28,8 @@ export async function read_notes(args, rootDir) {
   }
 }
 
-export async function append_notes(args, rootDir) {
+export async function append_notes(args, toolContext) {
+  const { rootDir } = toolContext;
   const { markdown_content } = args;
   if (!markdown_content) {
     return "Error: markdown_content is required.";

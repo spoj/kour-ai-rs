@@ -1,7 +1,8 @@
 import { glob } from "glob";
 import path from "path";
 
-export async function find(args, rootDir) {
+export async function find(args, toolContext) {
+  const { rootDir } = toolContext;
   if (!rootDir) {
     return "Error: Root directory is not specified. Please specify a root directory.";
   }
