@@ -8,6 +8,18 @@ import { promisify } from "util";
 import os from "os";
 import * as XLSX from "xlsx";
 import { convertOfficeToPdf } from "./utils.js";
+import { z } from "zod";
+import { zodResponseFormat } from "openai/helpers/zod";
+
+
+const ResultSchema = z.object({
+  ans: z
+    .string()
+    .describe("The answer to the query based on the file content."),
+  relevant_extracts: z
+    .array(z.string())
+    .describe("Relevant extracts from the file that support the answer."),
+});
 
 const execAsync = promisify(exec);
 const store = new Store();
@@ -363,19 +375,16 @@ export async function map_query(args, toolContext) {
       ];
       console.log(`sub_llm start: ${filename}`);
       const providerOrder = store.get('providerOrder', '').split(',').map(p => p.trim());
-      const response = await openai.chat.completions.create({
+      const response = await openai.chat.completions.parse({
         model: MAP_MODEL_NAME,
         messages: messages,
+        response_format: zodResponseFormat(ResultSchema, "result"),
         provider: {
-          order: providerOrder
-        }
+          order: providerOrder,
+        },
       });
       console.log(`sub_llm done: ${filename}`);
-
-      results[filename] = {
-        ans: response.choices[0].message.content,
-        relevant_extracts: [],
-      };
+      results[filename] = response.choices[0].message?.parsed;
     } catch (error) {
       results[filename] = {
         ans: `Error processing file: ${error.message}`,
