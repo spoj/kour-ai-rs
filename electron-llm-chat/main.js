@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, protocol } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, net } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -26,20 +26,22 @@ const createWindow = () => {
 };
 
 app.whenReady().then(() => {
-  // Register sandbox protocol
-  protocol.registerFileProtocol('sandbox', (request, callback) => {
-    const url = request.url.substr(10); // Remove 'sandbox://'
+  // Register sandbox protocol using modern API
+  protocol.handle('sandbox', (request) => {
+    // Parse URL properly instead of using deprecated substr
+    const parsedUrl = new URL(request.url);
+    const relativePath = parsedUrl.hostname + parsedUrl.pathname;
     const sandboxDir = path.join(app.getPath('userData'), 'sandbox');
-    const filePath = path.join(sandboxDir, url);
+    const filePath = path.join(sandboxDir, relativePath);
     
     // Security check: ensure the file is within sandbox directory
     const normalizedPath = path.normalize(filePath);
     if (!normalizedPath.startsWith(sandboxDir)) {
-      callback({ error: -6 }); // net::ERR_FILE_NOT_FOUND
-      return;
+      return new Response('File not found', { status: 404 });
     }
     
-    callback({ path: filePath });
+    // Return file response
+    return net.fetch(`file://${filePath}`);
   });
   
   createWindow();
