@@ -6,6 +6,7 @@ import { fileTypeFromBuffer } from "file-type";
 import { exec } from "child_process";
 import { promisify } from "util";
 import os from "os";
+import * as XLSX from "xlsx";
 
 const execAsync = promisify(exec);
 const store = new Store();
@@ -232,6 +233,35 @@ const fileHandlers = {
       return { error: error.message };
     }
   },
+
+  async handleSpreadsheet(fileBuffer, filename, query, broader_context) {
+    try {
+      const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+      let fullText = '';
+      workbook.SheetNames.forEach(sheetName => {
+        const worksheet = workbook.Sheets[sheetName];
+        const csv = XLSX.utils.sheet_to_csv(worksheet);
+        fullText += `Sheet: ${sheetName}\n\n${csv}\n\n`;
+      });
+
+      return {
+        role: "user",
+        content: [
+          { type: "text", text: `File Content (converted from spreadsheet):\n${fullText}` },
+          { type: "text", text: `File: ${filename}` },
+          { type: "text", text: `Broader context:\n${broader_context}` },
+          {
+            type: "text",
+            text: `Based on the above file and context, answer the below query. Your answer must be grounded.`,
+          },
+          { type: "text", text: `Query:\n${query}` },
+        ],
+      };
+    } catch (error) {
+      console.error(`Error processing spreadsheet ${filename}:`, error);
+      return { error: `Failed to process spreadsheet file: ${error.message}` };
+    }
+  },
 };
 
 // Main handler dispatcher
@@ -262,6 +292,16 @@ async function getMessageContent(fileBuffer, filename, filePath, fileTypeResult,
     return fileHandlers.handlePptx(filePath, filename, query, broader_context);
   }
 
+  // Handle spreadsheet files (XLSX, XLS)
+  if (fileTypeResult && (
+    fileTypeResult.mime === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    fileTypeResult.mime === 'application/vnd.ms-excel' ||
+    fileTypeResult.ext === 'xlsx' ||
+    fileTypeResult.ext === 'xls'
+  )) {
+    return fileHandlers.handleSpreadsheet(fileBuffer, filename, query, broader_context);
+  }
+
   // Handle text files
   if (fileTypeResult && fileTypeResult.mime.startsWith("text/")) {
     return fileHandlers.handleText(fileBuffer, filename, query, broader_context);
@@ -279,7 +319,7 @@ async function getMessageContent(fileBuffer, filename, filePath, fileTypeResult,
 
   // Unsupported file type
   return {
-    error: `Unsupported file type: ${fileTypeResult.mime}. Only images, PDFs, DOCX, PPTX, and text-based files are supported.`,
+    error: `Unsupported file type: ${fileTypeResult.mime}. Only images, PDFs, DOCX, PPTX, XLSX, XLS, and text-based files are supported.`,
   };
 }
 
@@ -288,7 +328,7 @@ export const map_query_tool = {
   function: {
     name: "map_query",
     description:
-      "Answers a query about individual files in a directory, processed concurrently. Supports text-based files, PDFs, images (png, jpg, jpeg), DOCX, and PPTX files",
+      "Answers a query about individual files in a directory, processed concurrently. Supports text-based files, PDFs, images (png, jpg, jpeg), DOCX, PPTX, XLSX, and XLS files",
     parameters: {
       type: "object",
       properties: {
