@@ -40,6 +40,7 @@ ipcMain.handle('set-soffice-path', (event, sofficePath) => store.set('sofficePat
 
 ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, messages, rootDir }) => {
   const logToRenderer = (payload) => mainWindow.webContents.send('debug-log', payload);
+  const updateHistory = (newHistory) => mainWindow.webContents.send('update-history', newHistory);
 
   const openai = new OpenAI({
     baseURL: 'https://openrouter.ai/api/v1',
@@ -49,12 +50,15 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, 
   let history = [...messages];
 
   try {
+    // Main conversation loop
     while (true) {
+      // Prepare messages with system prompt
       const requestMessages = [...history];
       if (systemPrompt && (requestMessages.length === 0 || requestMessages[0].role !== 'system')) {
         requestMessages.unshift({ role: 'system', content: systemPrompt });
       }
 
+      // Make API request
       logToRenderer({ type: 'API_REQUEST', data: { modelName, messages: requestMessages, tools } });
       const response = await openai.chat.completions.create({
         model: modelName,
@@ -63,52 +67,96 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, 
       });
       logToRenderer({ type: 'API_SUCCESS', data: response });
 
-      const message = response.choices[0].message;
-      history.push(message);
-
-      if (!message.tool_calls) {
+      // Add assistant message to history
+      const assistantMessage = response.choices[0].message;
+      history.push(assistantMessage);
+      
+      // If no tool calls, we're done
+      if (!assistantMessage.tool_calls) {
+        updateHistory(history);
         break;
       }
 
-      const toolCalls = message.tool_calls;
-      for (const toolCall of toolCalls) {
-        const functionName = toolCall.function.name;
-        if (toolFunctions[functionName]) {
-          try {
-            const functionArgs = JSON.parse(toolCall.function.arguments);
-            const result = await toolFunctions[functionName](functionArgs, rootDir);
-            const content = typeof result === 'object' ? JSON.stringify(result) : result.toString();
-            history.push({
-              tool_call_id: toolCall.id,
-              role: 'tool',
-              name: functionName,
-              content: content,
-            });
-          } catch (parseError) {
-            logToRenderer({
-              type: 'TOOL_PARSE_ERROR',
-              data: {
-                functionName,
-                arguments: toolCall.function.arguments,
-                error: parseError.message
-              }
-            });
-            history.push({
-              tool_call_id: toolCall.id,
-              role: 'tool',
-              name: functionName,
-              content: JSON.stringify({ error: `Failed to parse tool arguments: ${parseError.message}` }),
-            });
-          }
-        }
+      // Show assistant message with tool calls immediately
+      updateHistory(history);
+
+      // Process tool calls
+      for (const toolCall of assistantMessage.tool_calls) {
+        const toolResult = await executeToolCall(toolCall, rootDir, logToRenderer);
+        history.push(toolResult);
+        
+        // Update UI after each tool result
+        updateHistory(history);
       }
     }
+    
     return history;
   } catch (error) {
     logToRenderer({ type: 'API_ERROR', data: error });
     throw new Error(`API Error: ${error.message || 'Could not get a response from the model.'}`);
   }
 });
+
+// Helper function to execute a single tool call
+async function executeToolCall(toolCall, rootDir, logToRenderer) {
+  const functionName = toolCall.function.name;
+  
+  if (!toolFunctions[functionName]) {
+    return {
+      tool_call_id: toolCall.id,
+      role: 'tool',
+      name: functionName,
+      content: JSON.stringify({ error: `Unknown tool: ${functionName}` }),
+    };
+  }
+
+  try {
+    // Handle cases where arguments might be undefined, null, or empty string
+    let functionArgs = {};
+    if (toolCall.function.arguments) {
+      try {
+        functionArgs = JSON.parse(toolCall.function.arguments);
+      } catch (parseError) {
+        // If parsing fails, default to empty object
+        logToRenderer({
+          type: 'TOOL_PARSE_WARNING',
+          data: {
+            functionName,
+            arguments: toolCall.function.arguments,
+            warning: 'Failed to parse arguments, using empty object'
+          }
+        });
+        functionArgs = {};
+      }
+    }
+    
+    const result = await toolFunctions[functionName](functionArgs, rootDir);
+    const content = typeof result === 'object' ? JSON.stringify(result) : result.toString();
+    
+    return {
+      tool_call_id: toolCall.id,
+      role: 'tool',
+      name: functionName,
+      content: content,
+    };
+  } catch (error) {
+    logToRenderer({
+      type: 'TOOL_ERROR',
+      data: {
+        functionName,
+        arguments: toolCall.function.arguments,
+        error: error.message
+      }
+    });
+    
+    return {
+      tool_call_id: toolCall.id,
+      role: 'tool',
+      name: functionName,
+      content: JSON.stringify({ error: `Tool execution failed: ${error.message}` }),
+    };
+  }
+}
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {

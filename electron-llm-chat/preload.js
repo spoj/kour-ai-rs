@@ -13,4 +13,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSofficePath: () => ipcRenderer.invoke('get-soffice-path'),
   setSofficePath: (sofficePath) => ipcRenderer.invoke('set-soffice-path', sofficePath),
   onDebugLog: (callback) => ipcRenderer.on('debug-log', (_event, value) => callback(value)),
+  onUpdateHistory: (callback) => ipcRenderer.on('update-history', (_event, value) => callback(value)),
 });
