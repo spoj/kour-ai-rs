@@ -6,6 +6,7 @@ import OpenAI from 'openai';
 import Store from 'electron-store';
 import { tools, toolFunctions } from './tools/index.js';
 import { getFileContentForLLM, processFileBufferForLLM } from './fileManager.js';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -67,6 +68,7 @@ ipcMain.handle('process-attachment', async (event, { fileBuffer, fileName }) => 
       // rootDir is not strictly needed for buffer processing, but good to have
       rootDir: store.get('rootDir'), 
       sofficePath: store.get('sofficePath'),
+      appDataDir: app.getPath('appData'),
     };
     try {
       // Use the new buffer-based processing function
@@ -174,7 +176,8 @@ async function executeToolCall(toolCall, rootDir, logToRenderer) {
     sandboxDir,
     apiKey: store.get('apiKey'),
     sofficePath: store.get('sofficePath'),
-    providerOrder: store.get('providerOrder', 'google-vertex,anthropic,openai,amazon-bedrock').split(',').map(p => p.trim())
+    providerOrder: store.get('providerOrder', 'google-vertex,anthropic,openai,amazon-bedrock').split(',').map(p => p.trim()),
+    appDataDir: app.getPath('appData')
   };
   
   if (!toolFunctions[functionName]) {

@@ -5,10 +5,57 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as XLSX from 'xlsx';
 import os from 'os';
+import crypto from 'crypto';
 
 const execAsync = promisify(exec);
 
-// Custom Error Classes
+// Internal helper function to get the cache path. Not exported.
+function _getCachePathInternal(fileBuffer, originalExtension, targetExtension, context) {
+    const { appDataDir } = context;
+    if (!appDataDir) return null;
+
+    const hash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+    const cacheDir = path.join(appDataDir, 'conversion_cache');
+    const subDir = hash.substring(0, 2);
+    const cacheFileName = `${hash.substring(2)}.${targetExtension}`;
+
+    return path.join(cacheDir, subDir, cacheFileName);
+}
+
+/**
+ * Reads a converted file from the cache.
+ * @param {Buffer} fileBuffer The buffer of the original file.
+ * @param {string} fromExt The original file extension.
+ * @param {string} toExt The target file extension of the converted file.
+ * @param {object} context The tool context.
+ * @returns {Promise<Buffer|null>} The buffer of the cached converted file, or null if not found.
+ */
+async function readConversionCache(fileBuffer, fromExt, toExt, context) {
+    const cachePath = _getCachePathInternal(fileBuffer, fromExt, toExt, context);
+    if (cachePath && fs.existsSync(cachePath)) {
+        return fs.promises.readFile(cachePath);
+    }
+    return null;
+}
+
+/**
+ * Writes a converted file to the cache.
+ * @param {Buffer} origFileBuffer The buffer of the original file.
+ * @param {string} fromExt The original file extension.
+ * @param {Buffer} convertedFileBuf The buffer of the converted file to be cached.
+ * @param {string} toExt The target file extension of the converted file.
+ * @param {object} context The tool context.
+ */
+async function writeConversionCache(origFileBuffer, fromExt, convertedFileBuf, toExt, context) {
+    const cachePath = _getCachePathInternal(origFileBuffer, fromExt, toExt, context);
+    if (cachePath) {
+        await fs.promises.mkdir(path.dirname(cachePath), { recursive: true });
+        await fs.promises.writeFile(cachePath, convertedFileBuf);
+    }
+}
+
+
+// --- Custom Error Classes ---
 export class SecurityError extends Error {
   constructor(message) {
     super(message);
@@ -84,6 +131,11 @@ export async function determineFileType(buffer, filePath) {
 }
 
 export async function convertToPdf(buffer, fileExtension, context) {
+    const cachedBuffer = await readConversionCache(buffer, fileExtension, 'pdf', context);
+    if (cachedBuffer) {
+        return cachedBuffer;
+    }
+
     const { sofficePath } = context;
     if (!sofficePath) {
         throw new ConfigurationError(`${fileExtension.toUpperCase()} files are not supported. Please configure LibreOffice (soffice.com) path in settings.`);
@@ -105,9 +157,11 @@ export async function convertToPdf(buffer, fileExtension, context) {
         }
 
         const pdfBuffer = await fs.promises.readFile(pdfPath);
+        
+        await writeConversionCache(buffer, fileExtension, pdfBuffer, 'pdf', context);
+
         return pdfBuffer;
     } finally {
-        // Clean up temporary files
         const pdfFileName = path.basename(tempFilePath, `.${fileExtension}`) + '.pdf';
         const pdfPath = path.join(tempDir, pdfFileName);
         if (fs.existsSync(tempFilePath)) await fs.promises.unlink(tempFilePath);
@@ -115,7 +169,12 @@ export async function convertToPdf(buffer, fileExtension, context) {
     }
 }
 
-export function extractTextFromSpreadsheet(buffer) {
+export async function extractTextFromSpreadsheet(buffer, context) {
+    const cachedBuffer = await readConversionCache(buffer, 'xlsx', 'csv', context);
+    if (cachedBuffer) {
+        return cachedBuffer.toString('utf-8');
+    }
+    
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     let fullText = '';
     workbook.SheetNames.forEach(sheetName => {
@@ -123,6 +182,9 @@ export function extractTextFromSpreadsheet(buffer) {
         const csv = XLSX.utils.sheet_to_csv(worksheet);
         fullText += `Sheet: ${sheetName}\n\n${csv}\n\n`;
     });
+
+    await writeConversionCache(buffer, 'xlsx', Buffer.from(fullText, 'utf-8'), 'csv', context);
+
     return fullText;
 }
 
@@ -181,7 +243,7 @@ export async function processFileBufferForLLM(fileBuffer, filename, context) {
         'application/vnd.ms-excel' // .xls
     ];
     if (spreadsheetMimes.includes(fileType.mime) || fileType.ext === 'xlsx' || fileType.ext === 'xls') {
-        const textContent = extractTextFromSpreadsheet(fileBuffer);
+        const textContent = await extractTextFromSpreadsheet(fileBuffer, context);
         return {
             type: 'text',
             content: textContent,
