@@ -57,6 +57,16 @@ createApp({
           event.preventDefault();
         }
       });
+
+      window.addEventListener("keydown", (event) => {
+        if ((event.ctrlKey && event.key === "l") || (event.altKey && event.key === "d")) {
+          event.preventDefault();
+          const pathInput = document.getElementById("path-input");
+          if (pathInput) {
+            pathInput.focus();
+          }
+        }
+      });
     });
 
     watch(apiKey, (newApiKey) => {
