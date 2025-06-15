@@ -190,6 +190,19 @@ export async function extractTextFromSpreadsheet(buffer, context) {
 
 
 // --- High-Level Abstractions ---
+
+const WELL_KNOWN_TEXT_EXTENSIONS = [
+    // Data formats
+    'csv', 'tsv', 'json', 'xml', 'yaml', 'toml', 'ini',
+    // Plain text & docs
+    'txt', 'md', 'log', 'rst',
+    // Web
+    'html', 'css', 'js', 'jsx', 'ts', 'tsx', 'vue',
+    // Scripting & Backend
+    'py', 'rb', 'php', 'java', 'c', 'cpp', 'h', 'hpp', 'cs', 'go', 'swift',
+    'kt', 'kts', 'scala', 'sh', 'bat', 'ps1', 'pl', 'sql'
+];
+
 export async function processFileBufferForLLM(fileBuffer, filename, context) {
     const fileType = await determineFileType(fileBuffer, filename);
 
@@ -252,8 +265,9 @@ export async function processFileBufferForLLM(fileBuffer, filename, context) {
         };
     }
     
-    // Handle Text-based files
-    if (fileType.mime.startsWith('text/')) {
+    // Handle well-known text-based files by extension
+    const fileExtension = path.extname(filename).substring(1).toLowerCase();
+    if (WELL_KNOWN_TEXT_EXTENSIONS.includes(fileExtension)) {
         const textContent = fileBuffer.toString('utf-8');
         return {
             type: 'text',
@@ -262,7 +276,7 @@ export async function processFileBufferForLLM(fileBuffer, filename, context) {
         };
     }
     
-    throw new UnsupportedFileTypeError(`Unsupported file type: ${fileType.mime || 'unknown'}`);
+    throw new UnsupportedFileTypeError(`Unsupported file type: ${fileType.mime || 'unknown'} or extension: .${fileExtension}`);
 }
 
 export async function getFileContentForLLM(filePath, context) {
