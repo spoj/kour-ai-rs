@@ -129,7 +129,7 @@ export function extractTextFromSpreadsheet(buffer) {
 
 // --- High-Level Abstractions ---
 
-export async function prepareFileForLLM(filePath, context, query, broader_context) {
+export async function getFileContentForLLM(filePath, context) {
     const fileBuffer = await safelyReadFile(filePath, context);
     const fileType = await determineFileType(fileBuffer, filePath);
     const filename = path.basename(filePath);
@@ -142,14 +142,10 @@ export async function prepareFileForLLM(filePath, context, query, broader_contex
     if (fileType.mime.startsWith('image/')) {
         const fileContent = fileBuffer.toString('base64');
         return {
-            role: "user",
-            content: [
-                { type: "image_url", image_url: { url: `data:${fileType.mime};base64,${fileContent}` } },
-                { type: "text", text: `File: ${filename}` },
-                { type: "text", text: `Broader context:\n${broader_context}` },
-                { type: "text", text: `Based on the file and context, answer the below query. Your answer must be grounded.` },
-                { type: "text", text: `Query:\n${query}` },
-            ],
+            type: 'image',
+            mime: fileType.mime,
+            content: fileContent,
+            filename: filename,
         };
     }
     
@@ -157,14 +153,10 @@ export async function prepareFileForLLM(filePath, context, query, broader_contex
     if (fileType.mime === 'application/pdf') {
          const fileContent = fileBuffer.toString("base64");
          return {
-            role: "user",
-            content: [
-                { type: "file", file: { filename: filename, file_data: `data:${fileType.mime};base64,${fileContent}` } },
-                { type: "text", text: `File: ${filename}` },
-                { type: "text", text: `Broader context:\n${broader_context}` },
-                { type: "text", text: `Based on the file and context, answer the below query. Your answer must be grounded.` },
-                { type: "text", text: `Query:\n${query}` },
-            ],
+            type: 'pdf',
+            mime: fileType.mime,
+            content: fileContent,
+            filename: filename,
         };
     }
 
@@ -178,14 +170,11 @@ export async function prepareFileForLLM(filePath, context, query, broader_contex
         const pdfBuffer = await convertToPdf(fileBuffer, ext, context);
         const pdfContent = pdfBuffer.toString("base64");
         return {
-             role: "user",
-             content: [
-                { type: "file", file: { filename: filename, file_data: `data:application/pdf;base64,${pdfContent}` } },
-                { type: "text", text: `File: ${filename} (converted from ${ext.toUpperCase()})` },
-                { type: "text", text: `Broader context:\n${broader_context}` },
-                { type: "text", text: `Based on the file and context, answer the below query. Your answer must be grounded.` },
-                { type: "text", text: `Query:\n${query}` },
-            ],
+            type: 'pdf',
+            mime: 'application/pdf',
+            content: pdfContent,
+            filename: filename,
+            originalExtension: ext
         };
     }
 
@@ -197,14 +186,10 @@ export async function prepareFileForLLM(filePath, context, query, broader_contex
     if (spreadsheetMimes.includes(fileType.mime) || fileType.ext === 'xlsx' || fileType.ext === 'xls') {
         const textContent = extractTextFromSpreadsheet(fileBuffer);
         return {
-            role: "user",
-            content: [
-                { type: "text", text: `File Content (from spreadsheet):\n${textContent}` },
-                { type: "text", text: `File: ${filename}` },
-                { type: "text", text: `Broader context:\n${broader_context}` },
-                { type: "text", text: `Based on the file and context, answer the below query. Your answer must be grounded.` },
-                { type: "text", text: `Query:\n${query}` },
-            ],
+            type: 'text',
+            content: textContent,
+            filename: filename,
+            isSpreadsheet: true
         };
     }
     
@@ -212,14 +197,9 @@ export async function prepareFileForLLM(filePath, context, query, broader_contex
     if (fileType.mime.startsWith('text/')) {
         const textContent = fileBuffer.toString('utf-8');
         return {
-            role: "user",
-            content: [
-                { type: "text", text: `File Content:\n${textContent}` },
-                { type: "text", text: `File: ${filename}` },
-                { type: "text", text: `Broader context:\n${broader_context}` },
-                { type: "text", text: `Based on the file and context, answer the below query. Your answer must be grounded.` },
-                { type: "text", text: `Query:\n${query}` },
-            ],
+            type: 'text',
+            content: textContent,
+            filename: filename,
         };
     }
     

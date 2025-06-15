@@ -14,6 +14,7 @@ import {
   append_notes_tool,
 } from "./notesTool.js";
 import { check_online, check_online_tool } from "./checkOnline.js";
+import { load_file, load_file_tool } from "./loadFileTool.js";
 
 const roll_dice_tool = {
   type: "function",
@@ -43,6 +44,7 @@ export const tools = [
   append_notes_tool,
   produce_crop_tool,
   check_online_tool,
+  load_file_tool,
 ];
 
 export const toolFunctions = {
@@ -56,4 +58,5 @@ export const toolFunctions = {
   append_notes,
   produce_crop,
   check_online,
+  load_file,
 };
