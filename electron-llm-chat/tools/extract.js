@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import AdmZip from "adm-zip";
 import { extractEmail } from "./email-extractor.js";
+
 export async function extract(args, toolContext) {
   const { rootDir } = toolContext;
   if (!rootDir) {

@@ -13,6 +13,7 @@ import {
   append_notes,
   append_notes_tool,
 } from "./notesTool.js";
+import { check_online, check_online_tool } from "./checkOnline.js";
 
 const roll_dice_tool = {
   type: "function",
@@ -40,7 +41,8 @@ export const tools = [
   map_query_glob_tool,
   read_notes_tool,
   append_notes_tool,
-  produce_crop_tool
+  produce_crop_tool,
+  check_online_tool,
 ];
 
 export const toolFunctions = {
@@ -53,4 +55,5 @@ export const toolFunctions = {
   read_notes,
   append_notes,
   produce_crop,
+  check_online,
 };

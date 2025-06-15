@@ -56,6 +56,9 @@ h1 {
 .message {
   display: flex;
   margin-bottom: 15px;
+  word-wrap: break-word;
+  hyphens: auto;
+  word-break: break-word;
 }
 .message-bubble {
   padding: 10px 15px;
