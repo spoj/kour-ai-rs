@@ -36,7 +36,7 @@
      <div id="chat-container" ref="chatContainer">
        <template v-for="(message, index) in chatHistory" :key="index">
           <div
-            v-if="message.role === 'user' || (message.role === 'assistant' && message.content)"
+            v-if="(message.role === 'user' && !message.is_system_notification) || (message.role === 'assistant' && message.content)"
             class="message"
             :class="getMessageClass(message)"
           >

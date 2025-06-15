@@ -14,6 +14,8 @@ const __dirname = path.dirname(__filename);
 const store = new Store();
 
 let mainWindow;
+// Track the last known root directory to detect changes.
+let lastKnownRootDir = null;
 
 const createWindow = () => {
   mainWindow = new BrowserWindow({
@@ -35,17 +37,17 @@ app.whenReady().then(() => {
     const relativePath = parsedUrl.hostname + parsedUrl.pathname;
     const sandboxDir = path.join(app.getPath('userData'), 'sandbox');
     const filePath = path.join(sandboxDir, relativePath);
-    
+
     // Security check: ensure the file is within sandbox directory
     const normalizedPath = path.normalize(filePath);
     if (!normalizedPath.startsWith(sandboxDir)) {
       return new Response('File not found', { status: 404 });
     }
-    
+
     // Return file response
     return net.fetch(`file://${filePath}`);
   });
-  
+
   createWindow();
 });
 
@@ -54,7 +56,9 @@ ipcMain.handle('set-api-key', (event, apiKey) => store.set('apiKey', apiKey));
 ipcMain.handle('get-model-name', () => store.get('modelName', 'anthropic/claude-3-haiku'));
 ipcMain.handle('set-model-name', (event, modelName) => store.set('modelName', modelName));
 ipcMain.handle('get-root-dir', () => store.get('rootDir'));
-ipcMain.handle('set-root-dir', (event, rootDir) => store.set('rootDir', rootDir));
+ipcMain.handle('set-root-dir', (event, rootDir) => {
+  store.set('rootDir', rootDir);
+});
 ipcMain.handle('get-system-prompt', () => store.get('systemPrompt', ''));
 ipcMain.handle('set-system-prompt', (event, systemPrompt) => store.set('systemPrompt', systemPrompt));
 ipcMain.handle('get-soffice-path', () => store.get('sofficePath', ''));
@@ -66,7 +70,7 @@ ipcMain.handle('set-provider-order', (event, providerOrder) => store.set('provid
 ipcMain.handle('process-attachment', async (event, { fileBuffer, fileName }) => {
     const toolContext = {
       // rootDir is not strictly needed for buffer processing, but good to have
-      rootDir: store.get('rootDir'), 
+      rootDir: store.get('rootDir'),
       sofficePath: store.get('sofficePath'),
       appDataDir: app.getPath('appData'),
     };
@@ -89,6 +93,18 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, 
   });
 
   let history = [...messages];
+  const currentRootDir = store.get('rootDir');
+
+  // Check if the root directory has changed since the last message.
+  if (currentRootDir !== lastKnownRootDir) {
+    history.push({
+      role: 'user',
+      content: `Note: root directory has been changed to: "${currentRootDir}".`,
+      is_system_notification: true
+    });
+    lastKnownRootDir = currentRootDir; // Update the last known state.
+    updateHistory(history); // Update the UI with the notification.
+  }
 
   try {
     // Main conversation loop
@@ -115,7 +131,7 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, 
       // Add assistant message to history
       const assistantMessage = response.choices[0].message;
       history.push(assistantMessage);
-      
+
       // If no tool calls, we're done
       if (!assistantMessage.tool_calls) {
         updateHistory(history);
@@ -128,7 +144,7 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, 
       // Process tool calls
       for (const toolCall of assistantMessage.tool_calls) {
         const toolResult = await executeToolCall(toolCall, rootDir, logToRenderer);
-        
+
         if (toolResult && toolResult.is_file_content) {
           // This is a result from load_file, handle it specially
           // Add the content message to history.
@@ -149,12 +165,12 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, 
           // This is a regular tool result
           history.push(toolResult);
         }
-        
+
         // Update UI after each tool result
         updateHistory(history);
       }
     }
-    
+
     return history;
   } catch (error) {
     logToRenderer({ type: 'API_ERROR', data: error });
@@ -179,7 +195,7 @@ async function executeToolCall(toolCall, rootDir, logToRenderer) {
     providerOrder: store.get('providerOrder', 'google-vertex,anthropic,openai,amazon-bedrock').split(',').map(p => p.trim()),
     appDataDir: app.getPath('appData')
   };
-  
+
   if (!toolFunctions[functionName]) {
     return {
       tool_call_id: toolCall.id,
@@ -206,7 +222,7 @@ async function executeToolCall(toolCall, rootDir, logToRenderer) {
         functionArgs = {};
       }
     }
-    
+
     const result = await toolFunctions[functionName](functionArgs, toolContext);
 
     // This is the special handler for the raw file content from load_file
@@ -225,7 +241,7 @@ async function executeToolCall(toolCall, rootDir, logToRenderer) {
 
     // For all other tools, stringify the result
     const content = typeof result === 'object' ? JSON.stringify(result) : result.toString();
-    
+
     return {
       tool_call_id: toolCall.id,
       role: 'tool',
