@@ -130,6 +130,30 @@
           <input type="password" v-model="apiKey" style="width: 100%" />
           <label for="modelName">Model Name:</label>
           <input type="text" v-model="modelName" style="width: 100%" />
+          <label for="system-prompt">System Prompt:</label>
+          <textarea
+            id="system-prompt"
+            v-model="systemPrompt"
+            rows="4"
+            style="width: 100%"
+          ></textarea>
+          <label for="sofficePath">LibreOffice Path (soffice.com):</label>
+          <input
+            type="text"
+            v-model="sofficePath"
+            style="width: 100%"
+            placeholder="e.g., C:\Program Files\LibreOffice\program\soffice.com"
+          />
+          <small style="color: #666; display: block; margin-top: 5px;">
+            Optional: Set this to enable DOCX/PPTX support. Leave empty if LibreOffice is not installed.
+          </small>
+            <label for="providerOrder">Provider Order:</label>
+            <input
+              type="text"
+              v-model="providerOrder"
+              style="width: 100%"
+              placeholder="e.g., google-vertex,anthropic,openai"
+            />
         </div>
       </div>
     </div>

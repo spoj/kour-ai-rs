@@ -1,58 +1,38 @@
-import fs from "fs";
+import { glob } from "glob";
 import path from "path";
 
-export function find(args, rootDir) {
+export async function find(args, toolContext) {
+  const { rootDir } = toolContext;
   if (!rootDir) {
     return "Error: Root directory is not specified. Please specify a root directory.";
   }
-
-  const resolvedRootDir = path.resolve(rootDir);
-
-  const regex = new RegExp(args.filename_regex);
-  const allFiles = [];
-
-  function recursiveFind(dir) {
-    const currentPath = path.resolve(dir);
-    if (!currentPath.startsWith(resolvedRootDir)) {
-      return;
-    }
-
-    const items = fs.readdirSync(dir);
-    for (const item of items) {
-      const fullPath = path.join(dir, item);
-      if (fs.statSync(fullPath).isDirectory()) {
-        recursiveFind(fullPath);
-      } else {
-        allFiles.push(path.relative(resolvedRootDir, fullPath));
-      }
-    }
-  }
-
-  recursiveFind(resolvedRootDir);
-
-  const matchingFiles = allFiles.filter((f) => regex.test(path.basename(f)));
-
+  const options = {
+    cwd: rootDir,
+    nodir: true,
+  };
+  const files = await glob(args.glob_pattern, options);
   return {
-    showing: matchingFiles.length,
-    total: matchingFiles.length,
-    files: matchingFiles.sort(),
+    showing: files.length,
+    total: files.length,
+    files: files.sort(),
   };
 }
+
 
 export const find_tool = {
   type: "function",
   function: {
     name: "find",
-    description: "Find files matching regex pattern.",
+    description: "Find files matching a glob pattern.",
     parameters: {
       type: "object",
       properties: {
-        filename_regex: {
+        glob_pattern: {
           type: "string",
-          description: "The regex pattern to search for in file names.",
+          description: "The glob pattern to search for.",
         },
       },
-      required: ["filename_regex"],
+      required: ["glob_pattern"],
     },
   },
 };
