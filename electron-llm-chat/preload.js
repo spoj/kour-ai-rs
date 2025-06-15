@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setSofficePath: (sofficePath) => ipcRenderer.invoke('set-soffice-path', sofficePath),
   getProviderOrder: () => ipcRenderer.invoke('get-provider-order'),
   setProviderOrder: (providerOrder) => ipcRenderer.invoke('set-provider-order', providerOrder),
+  processAttachment: (fileData) => ipcRenderer.invoke('process-attachment', fileData),
   onDebugLog: (callback) => ipcRenderer.on('debug-log', (_event, value) => callback(value)),
   onUpdateHistory: (callback) => ipcRenderer.on('update-history', (_event, value) => callback(value)),
 });

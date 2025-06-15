@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import OpenAI from 'openai';
 import Store from 'electron-store';
 import { tools, toolFunctions } from './tools/index.js';
+import { getFileContentForLLM, processFileBufferForLLM } from './fileManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,6 +61,21 @@ ipcMain.handle('set-soffice-path', (event, sofficePath) => store.set('sofficePat
 ipcMain.handle('get-provider-order', () => store.get('providerOrder', 'google-vertex,anthropic,openai,amazon-bedrock'));
 ipcMain.handle('set-provider-order', (event, providerOrder) => store.set('providerOrder', providerOrder));
 
+// IPC handler for processing pasted attachments
+ipcMain.handle('process-attachment', async (event, { fileBuffer, fileName }) => {
+    const toolContext = {
+      // rootDir is not strictly needed for buffer processing, but good to have
+      rootDir: store.get('rootDir'), 
+      sofficePath: store.get('sofficePath'),
+    };
+    try {
+      // Use the new buffer-based processing function
+      return await processFileBufferForLLM(Buffer.from(fileBuffer), fileName, toolContext);
+    } catch (error) {
+      // Propagate the error back to the renderer
+      throw new Error(error.message || "An unknown error occurred during file processing.");
+    }
+});
 
 ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, messages, rootDir }) => {
   const logToRenderer = (payload) => mainWindow.webContents.send('debug-log', payload);

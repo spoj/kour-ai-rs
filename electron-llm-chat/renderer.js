@@ -1,4 +1,4 @@
-const { createApp, ref, nextTick, onMounted, watch } = Vue;
+const { createApp, ref, nextTick, onMounted, watch, computed } = Vue;
 
 createApp({
   setup() {
@@ -14,6 +14,13 @@ createApp({
     const showSettings = ref(false);
     const isTyping = ref(false);
     const chatContainer = ref(null);
+
+    const getMessageClass = (message) => {
+      if (message.is_file_viewer) {
+        return 'assistant-message file-viewer-message';
+      }
+      return `${message.role}-message`;
+    };
 
     onMounted(async () => {
       // Load settings
@@ -156,56 +163,57 @@ const buildUserMessageContent = async (text, files) => {
 // Helper function to process files
 const processFiles = async (files) => {
   const filePromises = files.map(file => processFile(file));
-  const results = await Promise.all(filePromises);
+  const results = await Promise.all(await Promise.all(filePromises));
   return results.filter(content => content !== null);
 };
 
 // Helper function to process a single file
 const processFile = (file) => {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => {
       console.error(`Failed to read file: ${file.name}`);
-      resolve(null);
+      reject(new Error(`Failed to read file: ${file.name}`));
     };
-
-    const textExtensions = [
-      '.txt', '.md', '.csv', '.js', '.py', '.html', '.css', '.json',
-      '.ts', '.jsx', '.tsx', '.yaml', '.yml', '.xml', 'Dockerfile'
-    ];
-    const isTextFile = textExtensions.some(ext => file.name.endsWith(ext)) ||
-                      file.type.startsWith('text/');
-
-    // Handle different file types
-    if (file.type === "application/pdf") {
-      reader.onload = (e) => {
-        resolve({
-          type: 'file',
-          file: { filename: file.name, file_data: e.target.result },
+    
+    reader.onload = async (e) => {
+      try {
+        const fileBuffer = e.target.result;
+        const result = await window.electronAPI.processAttachment({
+          fileBuffer,
+          fileName: file.name
         });
-      };
-      reader.readAsDataURL(file);
-    } else if (file.type.startsWith("image/")) {
-      reader.onload = (e) => {
-        resolve({
-          type: "image_url",
-          image_url: { url: e.target.result },
-        });
-      };
-      reader.readAsDataURL(file);
-    } else if (isTextFile) {
-      reader.onload = (e) => {
-        resolve({
-          type: "text",
-          text: `Content of "${file.name}":\n\n${e.target.result}`,
-          isAttachment: true,
-        });
-      };
-      reader.readAsText(file);
-    } else {
-      console.warn(`Unsupported file type: ${file.type || 'unknown'} for file ${file.name}`);
-      resolve(null);
-    }
+        
+        // Format the result for the message content
+        if (result.type === 'image') {
+          resolve({
+            type: 'image_url',
+            image_url: { url: `data:${result.mime};base64,${result.content}` },
+          });
+        } else if (result.type === 'pdf') {
+          resolve({
+            type: 'file',
+            file: { filename: result.filename, file_data: `data:${result.mime};base64,${result.content}` },
+          });
+        } else if (result.type === 'text') {
+          const prefix = result.isSpreadsheet ? 'File Content (from spreadsheet):\n' : `Content of "${result.filename}":\n\n`;
+          resolve({
+            type: 'text',
+            text: `${prefix}${result.content}`,
+            isAttachment: true,
+          });
+        } else {
+            console.warn(`Unsupported file type processed: ${result.type}`);
+            resolve(null);
+        }
+      } catch (error) {
+          console.error(`Failed to process file: ${file.name}`, error);
+          handleSendError(error);
+          resolve(null);
+      }
+    };
+    
+    reader.readAsArrayBuffer(file);
   });
 };
 
@@ -269,6 +277,7 @@ const handleSendError = (error) => {
       pastedFiles,
       removeFile,
       renderMarkdown,
+      getMessageClass,
     };
   },
 }).mount("#app");

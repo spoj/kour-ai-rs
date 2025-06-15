@@ -79,6 +79,11 @@ h1 {
   background-color: #e5e5ea;
   color: black;
 }
+.file-viewer-message .message-bubble {
+  background-color: #f0f0f0; /* Lighter grey background */
+  border: 1px solid #ddd;
+  color: #333;
+}
 #input-container {
   display: flex;
   padding: 10px;

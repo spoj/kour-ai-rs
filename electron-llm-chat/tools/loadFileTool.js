@@ -41,8 +41,9 @@ function createFileMessage(fileData) {
     messageContent.push({ type: "text", text: fileText });
 
     return {
-        role: "user",
+        role: "assistant", // Changed from "user" to "assistant"
         content: messageContent,
+        is_file_viewer: true, // Add a flag for special UI rendering
     };
 }
 

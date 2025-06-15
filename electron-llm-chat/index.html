@@ -38,7 +38,7 @@
           <div
             v-if="message.role === 'user' || (message.role === 'assistant' && message.content)"
             class="message"
-            :class="message.role + '-message'"
+            :class="getMessageClass(message)"
           >
             <div class="message-bubble">
               <template v-if="Array.isArray(message.content)">

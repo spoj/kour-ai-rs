@@ -128,11 +128,8 @@ export function extractTextFromSpreadsheet(buffer) {
 
 
 // --- High-Level Abstractions ---
-
-export async function getFileContentForLLM(filePath, context) {
-    const fileBuffer = await safelyReadFile(filePath, context);
-    const fileType = await determineFileType(fileBuffer, filePath);
-    const filename = path.basename(filePath);
+export async function processFileBufferForLLM(fileBuffer, filename, context) {
+    const fileType = await determineFileType(fileBuffer, filename);
 
     if (!fileType) {
         throw new UnsupportedFileTypeError("Unsupported file type or file appears to be binary.");
@@ -204,6 +201,12 @@ export async function getFileContentForLLM(filePath, context) {
     }
     
     throw new UnsupportedFileTypeError(`Unsupported file type: ${fileType.mime || 'unknown'}`);
+}
+
+export async function getFileContentForLLM(filePath, context) {
+    const fileBuffer = await safelyReadFile(filePath, context);
+    const filename = path.basename(filePath);
+    return await processFileBufferForLLM(fileBuffer, filename, context);
 }
 export async function safelyReadDir(dirPath, context) {
   const { rootDir } = context;
