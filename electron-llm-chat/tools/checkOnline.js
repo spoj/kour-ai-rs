@@ -3,8 +3,8 @@ import Store from "electron-store";
 
 const store = new Store();
 
-export async function check_online(args) {
-  const apiKey = store.get("apiKey");
+export async function check_online(args, toolContext) {
+  const { apiKey } = toolContext;
 
   const { query, broader_context = "" } = args;
 

@@ -133,7 +133,13 @@ async function executeToolCall(toolCall, rootDir, logToRenderer) {
     fs.mkdirSync(sandboxDir, { recursive: true });
   }
 
-  const toolContext = { rootDir, sandboxDir };
+  const toolContext = {
+    rootDir,
+    sandboxDir,
+    apiKey: store.get('apiKey'),
+    sofficePath: store.get('sofficePath'),
+    providerOrder: store.get('providerOrder', 'google-vertex,anthropic,openai,amazon-bedrock').split(',').map(p => p.trim())
+  };
   
   if (!toolFunctions[functionName]) {
     return {
@@ -174,20 +180,30 @@ async function executeToolCall(toolCall, rootDir, logToRenderer) {
       content: content,
     };
   } catch (error) {
-    logToRenderer({
-      type: 'TOOL_ERROR',
-      data: {
+    const errorInfo = {
         functionName,
-        arguments: toolCall.function.arguments,
-        error: error.message
-      }
-    });
-    
+        args: toolCall.function.arguments,
+        message: error.message,
+        stack: error.stack
+    };
+
+    logToRenderer({ type: 'TOOL_ERROR', data: errorInfo });
+
+    // Provide a more user-friendly error message
+    let userErrorMessage = `Tool execution failed: ${error.message}`;
+    if (error.name === 'SecurityError') {
+        userErrorMessage = `Security Error: ${error.message}`;
+    } else if (error.name === 'NotFoundError') {
+        userErrorMessage = `File Not Found: ${error.message}`;
+    } else if (error.name === 'ConfigurationError') {
+        userErrorMessage = `Configuration Error: ${error.message}. Please check your settings.`;
+    }
+
     return {
-      tool_call_id: toolCall.id,
-      role: 'tool',
-      name: functionName,
-      content: JSON.stringify({ error: `Tool execution failed: ${error.message}` }),
+        tool_call_id: toolCall.id,
+        role: 'tool',
+        name: functionName,
+        content: JSON.stringify({ error: userErrorMessage }),
     };
   }
 }

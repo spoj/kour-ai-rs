@@ -1,46 +1,53 @@
-import fs from "fs/promises";
 import path from "path";
+import { safelyReadFile, safelyWriteFile } from "../fileManager.js";
 
-async function getNotesPath(rootDir) {
+async function getNotesPath(toolContext) {
+  const { rootDir } = toolContext;
   if (!rootDir) {
     throw new Error(
       "Root directory is not specified. Please specify a root directory."
     );
   }
-  return path.join(path.resolve(rootDir), "_NOTES.md");
+  return path.join(rootDir, "_NOTES.md");
 }
 
 export async function read_notes(args, toolContext) {
-  const { rootDir } = toolContext;
   try {
-    const notesPath = await getNotesPath(rootDir);
-    try {
-      const content = await fs.readFile(notesPath, "utf-8");
-      return content || "No notes found.";
-    } catch (error) {
-      if (error.code === "ENOENT") {
-        return "No notes found.";
-      }
-      throw error;
+    const notesPath = await getNotesPath(toolContext);
+    const content = await safelyReadFile(notesPath, toolContext);
+    return content.toString('utf-8') || "No notes found.";
+  } catch (error) {
+    if (error.name === 'NotFoundError') {
+      return "No notes found.";
     }
-  } catch (e) {
-    return `Error reading notes: ${e.message}`;
+    return `Error reading notes: ${error.message}`;
   }
 }
 
 export async function append_notes(args, toolContext) {
-  const { rootDir } = toolContext;
   const { markdown_content } = args;
   if (!markdown_content) {
     return "Error: markdown_content is required.";
   }
 
   try {
-    const notesPath = await getNotesPath(rootDir);
+    const notesPath = await getNotesPath(toolContext);
+    let existingContent = '';
+    try {
+      const buffer = await safelyReadFile(notesPath, toolContext);
+      existingContent = buffer.toString('utf-8');
+    } catch (error) {
+      if (error.name !== 'NotFoundError') {
+        throw error; // Re-throw unexpected errors
+      }
+      // If file doesn't exist, existingContent remains empty
+    }
+
     const timestamp = new Date().toISOString();
     const noteEntry = `# Note entry on [${timestamp}]\n${markdown_content}\n\n`;
+    const newContent = existingContent + noteEntry;
 
-    await fs.appendFile(notesPath, noteEntry);
+    await safelyWriteFile(notesPath, newContent, toolContext);
     return "Note appended successfully.";
   } catch (e) {
     return `Error appending note: ${e.message}`;

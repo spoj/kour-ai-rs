@@ -1,35 +1,13 @@
-import fs from "fs";
 import path from "path";
+import { safelyReadDir } from "../fileManager.js";
 
-export function ls(args, toolContext) {
+export async function ls(args, toolContext) {
   const { rootDir } = toolContext;
-  if (!rootDir) {
-    return "Error: Root directory is not specified. Please specify a root directory.";
-  }
-
-  const resolvedRootDir = path.resolve(rootDir);
-  const targetPath = args.path
-    ? path.join(resolvedRootDir, args.path)
-    : resolvedRootDir;
-  const resolvedTargetPath = path.resolve(targetPath);
-
-  if (!resolvedTargetPath.startsWith(resolvedRootDir)) {
-    return `Error: Access denied. Path is outside of the root directory.`;
-  }
-
-  if (
-    !fs.existsSync(resolvedTargetPath) ||
-    !fs.statSync(resolvedTargetPath).isDirectory()
-  ) {
-    return `Error: ${resolvedTargetPath} is not a directory or does not exist.`;
-  }
-
-  const items = fs.readdirSync(resolvedTargetPath).map((item) => {
-    const itemPath = path.join(resolvedTargetPath, item);
-    return fs.statSync(itemPath).isDirectory() ? `${item}/` : item;
-  });
-
-  return items.sort();
+  const targetPath = args.path ? path.join(rootDir, args.path) : rootDir;
+  
+  // The safelyReadDir function now handles all validation and logic.
+  // Note: The function is async, so this function must be async too.
+  return await safelyReadDir(targetPath, toolContext);
 }
 
 export const ls_tool = {
@@ -44,7 +22,7 @@ export const ls_tool = {
         path: {
           type: "string",
           description:
-            "The path to list files and directories in. Defaults to the current directory.",
+            "The path to list files and directories in. Defaults to the root directory.",
         },
       },
       required: [],

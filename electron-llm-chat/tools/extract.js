@@ -2,24 +2,16 @@ import fs from "fs";
 import path from "path";
 import AdmZip from "adm-zip";
 import { extractEmail } from "./email-extractor.js";
+import { safelyReadFile } from "../fileManager.js";
 
 export async function extract(args, toolContext) {
   const { rootDir } = toolContext;
-  if (!rootDir) {
-    return "Error: Root directory is not specified. Please specify a root directory.";
-  }
+  const { filename } = args;
+  const filePath = path.join(rootDir, filename);
 
-  const resolvedRootDir = path.resolve(rootDir);
-  const filePath = path.join(resolvedRootDir, args.filename);
+  // Use the file manager to read the file securely
+  const fileBuffer = await safelyReadFile(filePath, toolContext);
   const resolvedFilePath = path.resolve(filePath);
-
-  if (!resolvedFilePath.startsWith(resolvedRootDir)) {
-    return `Error: Access denied. Path is outside of the root directory.`;
-  }
-
-  if (!fs.existsSync(resolvedFilePath)) {
-    return `Error: File not found: ${args.filename}`;
-  }
 
   const fileExtension = path.extname(resolvedFilePath).toLowerCase();
   const extractionFolder = resolvedFilePath + ".extracted";
@@ -29,16 +21,24 @@ export async function extract(args, toolContext) {
 
   if (fileExtension === ".zip") {
     try {
-      const zip = new AdmZip(resolvedFilePath);
+      const zip = new AdmZip(fileBuffer); // Use buffer instead of path
       zip.extractAllTo(extractionFolder, true);
     } catch (e) {
       return `Error extracting zip file: ${e.message}`;
     }
   } else if (fileExtension === ".eml" || fileExtension === ".msg") {
+    // extractEmail requires a filePath, so we write the buffer to a temp file
+    // This is not ideal, but avoids a larger refactor of email-extractor.js for now.
+    const tempFilePath = path.join(extractionFolder, `temp_${filename}`);
     try {
-      await extractEmail(resolvedFilePath, extractionFolder);
+        await fs.promises.writeFile(tempFilePath, fileBuffer);
+        await extractEmail(tempFilePath, extractionFolder);
     } catch (err) {
-      return `Error parsing email file: ${err.message}`;
+        return `Error parsing email file: ${err.message}`;
+    } finally {
+        if(fs.existsSync(tempFilePath)) {
+            await fs.promises.unlink(tempFilePath);
+        }
     }
   } else {
     return `Error: Unsupported file type for extraction: ${fileExtension}.`;
@@ -47,7 +47,7 @@ export async function extract(args, toolContext) {
   const extractedFiles = fs.readdirSync(extractionFolder);
   return {
     status: "success",
-    extraction_folder: path.relative(resolvedRootDir, extractionFolder),
+    extraction_folder: path.relative(rootDir, extractionFolder),
     extracted_files: extractedFiles,
     total_files: extractedFiles.length,
   };

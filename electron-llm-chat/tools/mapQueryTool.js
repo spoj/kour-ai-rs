@@ -1,16 +1,8 @@
-import fs from "fs";
 import path from "path";
 import OpenAI from "openai";
-import Store from "electron-store";
-import { fileTypeFromBuffer } from "file-type";
-import { exec } from "child_process";
-import { promisify } from "util";
-import os from "os";
-import * as XLSX from "xlsx";
-import { convertOfficeToPdf } from "./utils.js";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
-
+import { prepareFileForLLM } from "../fileManager.js";
 
 const ResultSchema = z.object({
   ans: z
@@ -21,238 +13,7 @@ const ResultSchema = z.object({
     .describe("Relevant extracts from the file that support the answer."),
 });
 
-const execAsync = promisify(exec);
-const store = new Store();
 const MAP_MODEL_NAME = "google/gemini-2.5-flash-preview-05-20:thinking";
-
-async function docxToPdf(filePath) {
-  return convertOfficeToPdf(filePath, 'docx');
-}
-
-async function pptxToPdf(filePath) {
-  return convertOfficeToPdf(filePath, 'pptx');
-}
-
-// File type handlers
-const fileHandlers = {
-  async handleImage(fileBuffer, filename, fileTypeResult, query, broader_context) {
-    const fileContent = fileBuffer.toString("base64");
-    return {
-      role: "user",
-      content: [
-        {
-          type: "image_url",
-          image_url: {
-            url: `data:${fileTypeResult.mime};base64,${fileContent}`,
-          },
-        },
-        { type: "text", text: `File: ${filename}` },
-        { type: "text", text: `Broader context:\n${broader_context}` },
-        {
-          type: "text",
-          text: `Based on the file and context, answer the below query. Your answer must be grounded.`,
-        },
-        { type: "text", text: `Query:\n${query}` },
-      ],
-    };
-  },
-
-  async handlePdf(fileBuffer, filename, fileTypeResult, query, broader_context) {
-    const fileContent = fileBuffer.toString("base64");
-    return {
-      role: "user",
-      content: [
-        {
-          type: "file",
-          file: {
-            filename: filename,
-            file_data: `data:${fileTypeResult.mime};base64,${fileContent}`,
-          },
-        },
-        { type: "text", text: `File: ${filename}` },
-        { type: "text", text: `Broader context:\n${broader_context}` },
-        {
-          type: "text",
-          text: `Based on the file and context, answer the below query. Your answer must be grounded.`,
-        },
-        { type: "text", text: `Query:\n${query}` },
-      ],
-    };
-  },
-
-  async handleText(fileBuffer, filename, query, broader_context) {
-    const content = fileBuffer.toString("utf-8");
-    return {
-      role: "user",
-      content: [
-        { type: "text", text: `File Content:\n${content}` },
-        { type: "text", text: `File: ${filename}` },
-        { type: "text", text: `Broader context:\n${broader_context}` },
-        {
-          type: "text",
-          text: `Based on the above file and context, answer the below query. Your answer must be grounded.`,
-        },
-        { type: "text", text: `Query:\n${query}` },
-      ],
-    };
-  },
-
-  async handleDocx(filePath, filename, query, broader_context) {
-    // Check if soffice is configured
-    const sofficePath = store.get('sofficePath');
-    if (!sofficePath) {
-      return { error: `DOCX files are not supported. Please configure LibreOffice (soffice.com) path in settings to enable DOCX support.` };
-    }
-
-    try {
-      const pdfBuffer = await docxToPdf(filePath);
-      const pdfContent = pdfBuffer.toString("base64");
-      return {
-        role: "user",
-        content: [
-          {
-            type: "file",
-            file: {
-              filename: filename,
-              file_data: `data:application/pdf;base64,${pdfContent}`,
-            },
-          },
-          { type: "text", text: `File: ${filename} (converted from DOCX to PDF)` },
-          { type: "text", text: `Broader context:\n${broader_context}` },
-          {
-            type: "text",
-            text: `Based on the file and context, answer the below query. Your answer must be grounded.`,
-          },
-          { type: "text", text: `Query:\n${query}` },
-        ],
-      };
-    } catch (error) {
-      return { error: error.message };
-    }
-  },
-
-  async handlePptx(filePath, filename, query, broader_context) {
-    // Check if soffice is configured
-    const sofficePath = store.get('sofficePath');
-    if (!sofficePath) {
-      return { error: `PPTX files are not supported. Please configure LibreOffice (soffice.com) path in settings to enable PPTX support.` };
-    }
-
-    try {
-      const pdfBuffer = await pptxToPdf(filePath);
-      const pdfContent = pdfBuffer.toString("base64");
-      return {
-        role: "user",
-        content: [
-          {
-            type: "file",
-            file: {
-              filename: filename,
-              file_data: `data:application/pdf;base64,${pdfContent}`,
-            },
-          },
-          { type: "text", text: `File: ${filename} (converted from PPTX to PDF)` },
-          { type: "text", text: `Broader context:\n${broader_context}` },
-          {
-            type: "text",
-            text: `Based on the file and context, answer the below query. Your answer must be grounded.`,
-          },
-          { type: "text", text: `Query:\n${query}` },
-        ],
-      };
-    } catch (error) {
-      return { error: error.message };
-    }
-  },
-
-  async handleSpreadsheet(fileBuffer, filename, query, broader_context) {
-    try {
-      const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-      let fullText = '';
-      workbook.SheetNames.forEach(sheetName => {
-        const worksheet = workbook.Sheets[sheetName];
-        const csv = XLSX.utils.sheet_to_csv(worksheet);
-        fullText += `Sheet: ${sheetName}\n\n${csv}\n\n`;
-      });
-
-      return {
-        role: "user",
-        content: [
-          { type: "text", text: `File Content (converted from spreadsheet):\n${fullText}` },
-          { type: "text", text: `File: ${filename}` },
-          { type: "text", text: `Broader context:\n${broader_context}` },
-          {
-            type: "text",
-            text: `Based on the above file and context, answer the below query. Your answer must be grounded.`,
-          },
-          { type: "text", text: `Query:\n${query}` },
-        ],
-      };
-    } catch (error) {
-      console.error(`Error processing spreadsheet ${filename}:`, error);
-      return { error: `Failed to process spreadsheet file: ${error.message}` };
-    }
-  },
-};
-
-// Main handler dispatcher
-async function getMessageContent(fileBuffer, filename, filePath, fileTypeResult, query, broader_context) {
-  // Handle images
-  if (fileTypeResult && fileTypeResult.mime.startsWith("image/")) {
-    return fileHandlers.handleImage(fileBuffer, filename, fileTypeResult, query, broader_context);
-  }
-
-  // Handle PDFs
-  if (fileTypeResult && fileTypeResult.mime === "application/pdf") {
-    return fileHandlers.handlePdf(fileBuffer, filename, fileTypeResult, query, broader_context);
-  }
-
-  // Handle DOCX files
-  if (fileTypeResult && (
-    fileTypeResult.mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-    fileTypeResult.ext === "docx"
-  )) {
-    return fileHandlers.handleDocx(filePath, filename, query, broader_context);
-  }
-
-  // Handle PPTX files
-  if (fileTypeResult && (
-    fileTypeResult.mime === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
-    fileTypeResult.ext === "pptx"
-  )) {
-    return fileHandlers.handlePptx(filePath, filename, query, broader_context);
-  }
-
-  // Handle spreadsheet files (XLSX, XLS)
-  if (fileTypeResult && (
-    fileTypeResult.mime === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-    fileTypeResult.mime === 'application/vnd.ms-excel' ||
-    fileTypeResult.ext === 'xlsx' ||
-    fileTypeResult.ext === 'xls'
-  )) {
-    return fileHandlers.handleSpreadsheet(fileBuffer, filename, query, broader_context);
-  }
-
-  // Handle text files
-  if (fileTypeResult && fileTypeResult.mime.startsWith("text/")) {
-    return fileHandlers.handleText(fileBuffer, filename, query, broader_context);
-  }
-
-  // Fallback for plain text files that file-type may not identify
-  if (!fileTypeResult) {
-    const content = fileBuffer.toString("utf-8");
-    // Basic check to see if it's likely binary gibberish
-    if (content.includes("\uFFFD")) {
-      return { error: "Unsupported file type. Appears to be a binary file." };
-    }
-    return fileHandlers.handleText(fileBuffer, filename, query, broader_context);
-  }
-
-  // Unsupported file type
-  return {
-    error: `Unsupported file type: ${fileTypeResult.mime}. Only images, PDFs, DOCX, PPTX, XLSX, XLS, and text-based files are supported.`,
-  };
-}
 
 export const map_query_tool = {
   type: "function",
@@ -286,22 +47,17 @@ export const map_query_tool = {
 };
 
 export async function map_query(args, toolContext) {
-  const { rootDir } = toolContext;
-  if (!rootDir) {
-    return "Error: Root directory is not specified. Please specify a root directory.";
-  }
+  const { apiKey, providerOrder, rootDir } = toolContext;
+  const { filenames, query, broader_context } = args;
 
-  const apiKey = store.get("apiKey");
   if (!apiKey) {
     return "Error: API key is not configured. Please set it in the settings.";
   }
-  const { filenames, query, broader_context } = args;
-  const resolvedRootDir = path.resolve(rootDir);
-  const concurrencyLimit = 50;
+
+  const concurrencyLimit = 10; // Reduced for stability with new file processing
   const results = {};
   const queue = [...filenames];
 
-  // Initialize OpenAI client once
   const openai = new OpenAI({
     baseURL: "https://openrouter.ai/api/v1",
     apiKey: apiKey,
@@ -309,61 +65,8 @@ export async function map_query(args, toolContext) {
 
   const processFile = async (filename) => {
     try {
-      const filePath = path.join(resolvedRootDir, filename);
-      const resolvedFilePath = path.resolve(filePath);
-
-      // Security check: ensure file is within rootDir
-      if (!resolvedFilePath.startsWith(resolvedRootDir)) {
-        results[filename] = {
-          ans: `Error: Access denied. Path is outside of the root directory.`,
-          relevant_extracts: [],
-        };
-        return;
-      }
-
-      if (!fs.existsSync(resolvedFilePath)) {
-        results[filename] = {
-          ans: `File not found: ${filename}`,
-          relevant_extracts: [],
-        };
-        return;
-      }
-
-      // Check file size to prevent memory issues
-      const stats = await fs.promises.stat(resolvedFilePath);
-      const maxFileSize = 50 * 1024 * 1024; // 50MB limit
-      if (stats.size > maxFileSize) {
-        results[filename] = {
-          ans: `Error: File too large (${(stats.size / 1024 / 1024).toFixed(
-            2
-          )}MB). Maximum size is 50MB.`,
-          relevant_extracts: [],
-        };
-        return;
-      }
-
-      // Read file asynchronously
-      const fileBuffer = await fs.promises.readFile(resolvedFilePath);
-      const fileTypeResult = await fileTypeFromBuffer(fileBuffer);
-
-      // Get message content using the handler system
-      const messageContent = await getMessageContent(
-        fileBuffer,
-        filename,
-        resolvedFilePath,
-        fileTypeResult,
-        query,
-        broader_context
-      );
-
-      // Check if there was an error
-      if (messageContent.error) {
-        results[filename] = {
-          ans: `Error: ${messageContent.error}`,
-          relevant_extracts: [],
-        };
-        return;
-      }
+      const filePath = path.join(rootDir, filename);
+      const llmContent = await prepareFileForLLM(filePath, toolContext, query, broader_context);
 
       const messages = [
         {
@@ -371,10 +74,10 @@ export async function map_query(args, toolContext) {
           content:
             "You are a helpful assistant that answers questions about files. Your answer must be grounded.",
         },
-        messageContent,
+        llmContent,
       ];
+
       console.log(`sub_llm start: ${filename}`);
-      const providerOrder = store.get('providerOrder', '').split(',').map(p => p.trim());
       const response = await openai.chat.completions.parse({
         model: MAP_MODEL_NAME,
         messages: messages,
@@ -385,6 +88,7 @@ export async function map_query(args, toolContext) {
       });
       console.log(`sub_llm done: ${filename}`);
       results[filename] = response.choices[0].message?.parsed;
+
     } catch (error) {
       results[filename] = {
         ans: `Error processing file: ${error.message}`,
