@@ -14,6 +14,7 @@ const ResultSchema = z.object({
 });
 
 const MAP_MODEL_NAME = "google/gemini-2.5-flash-preview-05-20:thinking";
+const CONCURRENCY_LIMIT = 50;
 
 export const map_query_tool = {
   type: "function",
@@ -87,7 +88,6 @@ export async function map_query(args, toolContext) {
     return "Error: API key is not configured. Please set it in the settings.";
   }
 
-  const concurrencyLimit = 10;
   const results = {};
   const queue = [...filenames];
 
@@ -140,7 +140,7 @@ export async function map_query(args, toolContext) {
     }
   };
 
-  const workers = Array(concurrencyLimit)
+  const workers = Array(CONCURRENCY_LIMIT)
     .fill(null)
     .map(() => worker());
   await Promise.all(workers);

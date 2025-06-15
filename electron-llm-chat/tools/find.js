@@ -1,6 +1,8 @@
 import { glob } from "glob";
 import path from "path";
 
+const MAX_RESULTS = 1000;
+
 export async function find(args, toolContext) {
   const { rootDir } = toolContext;
   if (!rootDir) {
@@ -11,6 +13,9 @@ export async function find(args, toolContext) {
     nodir: true,
   };
   const files = await glob(args.glob_pattern, options);
+  if (files.length > MAX_RESULTS) {
+    return "Error: Too many files found. Please use `ls` or `find` with more specific patterns iteratively.";
+  }
   return {
     showing: files.length,
     total: files.length,

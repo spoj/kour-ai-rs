@@ -1,6 +1,8 @@
 import { find } from "./find.js";
 import { map_query } from "./mapQueryTool.js";
 
+const MAX_FILES = 200;
+
 export async function map_query_glob(args, toolContext) {
   const { glob_pattern, query, broader_context } = args;
 
@@ -13,6 +15,10 @@ export async function map_query_glob(args, toolContext) {
   }
 
   const filenames = find_result.files;
+
+  if (filenames.length > MAX_FILES) {
+    return "Error: Too many files matched. Please use the map_query tool directly or use more specific patterns iteratively.";
+  }
 
   if (!filenames || filenames.length === 0) {
     return {
