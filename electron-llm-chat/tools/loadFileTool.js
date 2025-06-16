@@ -1,5 +1,5 @@
 import path from "path";
-import { getFileContentForLLM } from "../fileManager.js";
+import { getFileContentForLLM } from "../helper/fileManager.js";
 
 export const load_file_tool = {
   type: "function",
@@ -21,32 +21,44 @@ export const load_file_tool = {
 };
 
 function createFileMessage(fileData) {
-    const { type, mime, content, filename, originalExtension, isSpreadsheet } = fileData;
-    const messageContent = [];
+  const { type, mime, content, filename, originalExtension, isSpreadsheet } =
+    fileData;
+  const messageContent = [];
 
-    const fileText = `File: ${filename}` + (originalExtension ? ` (converted from ${originalExtension.toUpperCase()})` : '');
+  const fileText =
+    `File: ${filename}` +
+    (originalExtension
+      ? ` (converted from ${originalExtension.toUpperCase()})`
+      : "");
 
-    // Add content based on file type
-    if (type === 'image') {
-        messageContent.push({ type: "image_url", image_url: { url: `data:${mime};base64,${content}` } });
-    } else if (type === 'pdf') {
-        // Assuming your model/API supports a 'file' type for PDFs
-        messageContent.push({ type: "file", file: { filename: filename, file_data: `data:${mime};base64,${content}` } });
-    } else if (type === 'text') {
-        const prefix = isSpreadsheet ? 'File Content (from spreadsheet):\n' : 'File Content:\n';
-        messageContent.push({ type: "text", text: `${prefix}${content}` });
-    }
+  // Add content based on file type
+  if (type === "image") {
+    messageContent.push({
+      type: "image_url",
+      image_url: { url: `data:${mime};base64,${content}` },
+    });
+  } else if (type === "pdf") {
+    // Assuming your model/API supports a 'file' type for PDFs
+    messageContent.push({
+      type: "file",
+      file: { filename: filename, file_data: `data:${mime};base64,${content}` },
+    });
+  } else if (type === "text") {
+    const prefix = isSpreadsheet
+      ? "File Content (from spreadsheet):\n"
+      : "File Content:\n";
+    messageContent.push({ type: "text", text: `${prefix}${content}` });
+  }
 
-    // Add the file name text part
-    messageContent.push({ type: "text", text: fileText });
+  // Add the file name text part
+  messageContent.push({ type: "text", text: fileText });
 
-    return {
-        role: "assistant", // Changed from "user" to "assistant"
-        content: messageContent,
-        is_file_viewer: true, // Add a flag for special UI rendering
-    };
+  return {
+    role: "assistant", // Changed from "user" to "assistant"
+    content: messageContent,
+    is_file_viewer: true, // Add a flag for special UI rendering
+  };
 }
-
 
 export async function load_file(args, toolContext) {
   const { filename } = args;

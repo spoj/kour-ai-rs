@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import AdmZip from "adm-zip";
 import { extractEmail } from "./email-extractor.js";
-import { safelyReadFile } from "../fileManager.js";
+import { safelyReadFile } from "../helper/fileManager.js";
 
 export async function extract(args, toolContext) {
   const { rootDir } = toolContext;
@@ -31,14 +31,14 @@ export async function extract(args, toolContext) {
     // This is not ideal, but avoids a larger refactor of email-extractor.js for now.
     const tempFilePath = path.join(extractionFolder, `temp_${filename}`);
     try {
-        await fs.promises.writeFile(tempFilePath, fileBuffer);
-        await extractEmail(tempFilePath, extractionFolder);
+      await fs.promises.writeFile(tempFilePath, fileBuffer);
+      await extractEmail(tempFilePath, extractionFolder);
     } catch (err) {
-        return `Error parsing email file: ${err.message}`;
+      return `Error parsing email file: ${err.message}`;
     } finally {
-        if(fs.existsSync(tempFilePath)) {
-            await fs.promises.unlink(tempFilePath);
-        }
+      if (fs.existsSync(tempFilePath)) {
+        await fs.promises.unlink(tempFilePath);
+      }
     }
   } else {
     return `Error: Unsupported file type for extraction: ${fileExtension}.`;
