@@ -11,6 +11,8 @@ import crypto from 'crypto';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+if (require('electron-squirrel-startup')) app.quit();
+
 let mainWindow;
 // Track the last known root directory to detect changes.
 let lastKnownRootDir = null;
