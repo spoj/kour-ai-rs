@@ -47,14 +47,14 @@ function createFileMessage(fileData) {
     const prefix = isSpreadsheet
       ? "File Content (from spreadsheet):\n"
       : "File Content:\n";
-    messageContent.push({ type: "text", text: `${prefix}${content}` });
+    messageContent.push({ type: "text", text: `${prefix}${content}`, isAttachment: true });
   }
 
   // Add the file name text part
   messageContent.push({ type: "text", text: fileText });
 
   return {
-    role: "assistant", // Changed from "user" to "assistant"
+    role: "user",
     content: messageContent,
     is_file_viewer: true, // Add a flag for special UI rendering
   };
@@ -69,16 +69,9 @@ export async function load_file(args, toolContext) {
     const fileData = await getFileContentForLLM(filePath, toolContext);
     const fileMessage = createFileMessage(fileData);
 
-    // This custom flag will be used in main.js to identify this special tool result
-    fileMessage.is_file_content = true;
-
-    // The function will return the file content in a format that the main model can understand.
-    // The main thread will then inject this into the conversation history.
     return fileMessage;
   } catch (error) {
-    // Return a structured error for the main process to handle
     return {
-      is_file_content: false, // Ensure this flag is false on error
       error: `Error loading file: ${error.message}`,
     };
   }

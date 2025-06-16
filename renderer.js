@@ -19,7 +19,7 @@ createApp({
 
     const getMessageClass = (message) => {
       if (message.is_file_viewer) {
-        return 'assistant-message file-viewer-message';
+        return 'file-viewer-message';
       }
       return `${message.role}-message`;
     };
