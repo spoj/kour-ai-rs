@@ -11,11 +11,31 @@ import crypto from 'crypto';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const store = new Store();
-
 let mainWindow;
 // Track the last known root directory to detect changes.
 let lastKnownRootDir = null;
+
+// Read default system prompt before initializing store
+let defaultSystemPrompt = '';
+try {
+  defaultSystemPrompt = fs.readFileSync(path.join(__dirname, 'DEFAULT_PROMPT.md'), 'utf-8');
+} catch (error) {
+  console.error('Failed to read default system prompt:', error);
+}
+
+const store = new Store({
+  defaults: {
+    settings: {
+      apiKey: '',
+      modelName: 'google/gemini-2.5-pro-preview',
+      rootDir: '',
+      systemPrompt: defaultSystemPrompt,
+      sofficePath: '',
+      providerOrder: ''
+    }
+  }
+});
+
 
 const createWindow = () => {
   mainWindow = new BrowserWindow({
@@ -51,27 +71,20 @@ app.whenReady().then(() => {
   createWindow();
 });
 
-ipcMain.handle('get-api-key', () => store.get('apiKey'));
-ipcMain.handle('set-api-key', (event, apiKey) => store.set('apiKey', apiKey));
-ipcMain.handle('get-model-name', () => store.get('modelName', 'anthropic/claude-3-haiku'));
-ipcMain.handle('set-model-name', (event, modelName) => store.set('modelName', modelName));
-ipcMain.handle('get-root-dir', () => store.get('rootDir'));
-ipcMain.handle('set-root-dir', (event, rootDir) => {
-  store.set('rootDir', rootDir);
+ipcMain.handle('get-settings', () => {
+  return store.get('settings');
 });
-ipcMain.handle('get-system-prompt', () => store.get('systemPrompt', ''));
-ipcMain.handle('set-system-prompt', (event, systemPrompt) => store.set('systemPrompt', systemPrompt));
-ipcMain.handle('get-soffice-path', () => store.get('sofficePath', ''));
-ipcMain.handle('set-soffice-path', (event, sofficePath) => store.set('sofficePath', sofficePath));
-ipcMain.handle('get-provider-order', () => store.get('providerOrder', 'google-vertex,anthropic,openai,amazon-bedrock'));
-ipcMain.handle('set-provider-order', (event, providerOrder) => store.set('providerOrder', providerOrder));
+ipcMain.handle('set-settings', (event, settings) => {
+  store.set('settings', settings);
+});
 
 // IPC handler for processing pasted attachments
 ipcMain.handle('process-attachment', async (event, { fileBuffer, fileName }) => {
+    const settings = store.get('settings');
     const toolContext = {
       // rootDir is not strictly needed for buffer processing, but good to have
-      rootDir: store.get('rootDir'),
-      sofficePath: store.get('sofficePath'),
+      rootDir: settings.rootDir,
+      sofficePath: settings.sofficePath,
       appDataDir: app.getPath('appData'),
     };
     try {
@@ -83,7 +96,9 @@ ipcMain.handle('process-attachment', async (event, { fileBuffer, fileName }) => 
     }
 });
 
-ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, messages, rootDir }) => {
+ipcMain.handle('send-message', async (event, { messages }) => {
+  const settings = store.get('settings');
+  const { apiKey, modelName, systemPrompt, rootDir, providerOrder } = settings;
   const logToRenderer = (payload) => mainWindow.webContents.send('debug-log', payload);
   const updateHistory = (newHistory) => mainWindow.webContents.send('update-history', newHistory);
 
@@ -93,7 +108,7 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, 
   });
 
   let history = [...messages];
-  const currentRootDir = store.get('rootDir');
+  const currentRootDir = rootDir;
 
   // Check if the root directory has changed since the last message.
   if (currentRootDir !== lastKnownRootDir) {
@@ -117,12 +132,12 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, 
 
       // Make API request
       logToRenderer({ type: 'API_REQUEST', data: { modelName, messages: requestMessages, tools } });
-       const providerOrder = store.get('providerOrder', '').split(',').map(p => p.trim());
+       const providerOrderArr = providerOrder.split(',').map(p => p.trim());
       const response = await openai.chat.completions.create({
         model: modelName,
         messages: requestMessages,
         provider: {
-          order: providerOrder,
+          order: providerOrderArr,
         },
         tools: tools,
       });
@@ -143,7 +158,7 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, 
 
       // Process tool calls
       for (const toolCall of assistantMessage.tool_calls) {
-        const toolResult = await executeToolCall(toolCall, rootDir, logToRenderer);
+        const toolResult = await executeToolCall(toolCall, settings, logToRenderer);
 
         if (toolResult && toolResult.is_file_content) {
           // This is a result from load_file, handle it specially
@@ -179,7 +194,7 @@ ipcMain.handle('send-message', async (event, { apiKey, modelName, systemPrompt, 
 });
 
 // Helper function to execute a single tool call
-async function executeToolCall(toolCall, rootDir, logToRenderer) {
+async function executeToolCall(toolCall, settings, logToRenderer) {
   const functionName = toolCall.function.name;
 
   const sandboxDir = path.join(app.getPath('userData'), 'sandbox');
@@ -188,11 +203,9 @@ async function executeToolCall(toolCall, rootDir, logToRenderer) {
   }
 
   const toolContext = {
-    rootDir,
+    ...settings,
     sandboxDir,
-    apiKey: store.get('apiKey'),
-    sofficePath: store.get('sofficePath'),
-    providerOrder: store.get('providerOrder', 'google-vertex,anthropic,openai,amazon-bedrock').split(',').map(p => p.trim()),
+    providerOrder: settings.providerOrder.split(',').map(p => p.trim()),
     appDataDir: app.getPath('appData')
   };
 

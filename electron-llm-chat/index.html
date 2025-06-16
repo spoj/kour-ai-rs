@@ -12,7 +12,7 @@
          <input
            type="text"
            id="path-input"
-           v-model="rootDir"
+           v-model="settings.rootDir"
            placeholder="Enter root directory..."
          />
        </div>
@@ -118,7 +118,6 @@
         v-show="showSettings"
         id="settings-modal"
         class="modal"
-        style="display: none"
         @click.self="showSettings = false"
       >
         <div class="modal-content">
@@ -127,20 +126,20 @@
           >
           <h2>Settings</h2>
           <label for="apiKey">OpenRouter API Key:</label>
-          <input type="password" v-model="apiKey" style="width: 100%" />
+          <input type="password" v-model="settings.apiKey" style="width: 100%" />
           <label for="modelName">Model Name:</label>
-          <input type="text" v-model="modelName" style="width: 100%" />
+          <input type="text" v-model="settings.modelName" style="width: 100%" />
           <label for="system-prompt">System Prompt:</label>
           <textarea
             id="system-prompt"
-            v-model="systemPrompt"
+            v-model="settings.systemPrompt"
             rows="4"
             style="width: 100%"
           ></textarea>
           <label for="sofficePath">LibreOffice Path (soffice.com):</label>
           <input
             type="text"
-            v-model="sofficePath"
+            v-model="settings.sofficePath"
             style="width: 100%"
             placeholder="e.g., C:\Program Files\LibreOffice\program\soffice.com"
           />
@@ -150,7 +149,7 @@
             <label for="providerOrder">Provider Order:</label>
             <input
               type="text"
-              v-model="providerOrder"
+              v-model="settings.providerOrder"
               style="width: 100%"
               placeholder="e.g., google-vertex,anthropic,openai"
             />
