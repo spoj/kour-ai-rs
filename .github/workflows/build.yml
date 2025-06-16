@@ -1,8 +1,11 @@
-name: Build Windows
+name: Build Windows and configure LFS
 
-on:
+on: 
   push:
-    branches: [ "master" ]
+    branches: ["master"]
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -10,28 +13,32 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+      with:
+        lfs: true
 
-    - name: Use Node.js 20
+    - name: Use Node.js 22
       uses: actions/setup-node@v3
       with:
-        node-version: 20
+        node-version: 22
 
     - name: Install dependencies
       run: npm install
 
-    - name: Build windows
+    - name: Build windows for verification
       run: npm run make -- --platform=win32
 
-    - name: Organize build files
-      run: |
-        mkdir build
-        move dist\make\* build\
-    - name: Commit files
+    - name: Setup Git LFS tracking
+      shell: bash
       run: |
         git config --global user.name 'github-actions'
         git config --global user.email 'github-actions@github.com'
-        git fetch
-        git checkout -b build
-        git add -f build
-        git commit -m "Add build files"
-        git push -f origin build
+        git lfs install
+        git lfs track "dist/make/**"
+        git add .gitattributes
+        # Commit and push only if .gitattributes changed
+        if git diff --staged --quiet; then
+          echo ".gitattributes is already up-to-date."
+        else
+          git commit -m "ci: Configure Git LFS for build artifacts"
+          git push -f origin master
+        fi
