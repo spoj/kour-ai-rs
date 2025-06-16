@@ -3,7 +3,7 @@ import path from 'path';
 import { fileTypeFromBuffer } from 'file-type';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import os from 'os';
 import crypto from 'crypto';
 
@@ -175,12 +175,43 @@ export async function extractTextFromSpreadsheet(buffer, context) {
         return cachedBuffer.toString('utf-8');
     }
     
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    
     let fullText = '';
-    workbook.SheetNames.forEach(sheetName => {
-        const worksheet = workbook.Sheets[sheetName];
-        const csv = XLSX.utils.sheet_to_csv(worksheet);
-        fullText += `Sheet: ${sheetName}\n\n${csv}\n\n`;
+    
+    workbook.eachSheet((worksheet, sheetId) => {
+        const sheetName = worksheet.name;
+        fullText += `Sheet: ${sheetName}\n\n`;
+        
+        const csvRows = [];
+        worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+            const csvCells = [];
+            row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                const value = cell.value;
+                let cellText = '';
+                
+                if (value === null || value === undefined) {
+                    cellText = '';
+                } else if (typeof value === 'object' && value.formula) {
+                    cellText = value.result?.toString() || '';
+                } else if (typeof value === 'object' && value.hyperlink) {
+                    cellText = value.text || value.hyperlink;
+                } else if (value instanceof Date) {
+                    cellText = value.toISOString().split('T')[0];
+                } else {
+                    cellText = value.toString();
+                }
+                
+                if (cellText.includes(',') || cellText.includes('"') || cellText.includes('\n')) {
+                    cellText = `"${cellText.replace(/"/g, '""')}"`;
+                }
+                csvCells.push(cellText);
+            });
+            csvRows.push(csvCells.join(','));
+        });
+        
+        fullText += csvRows.join('\n') + '\n\n';
     });
 
     await writeConversionCache(buffer, 'xlsx', Buffer.from(fullText, 'utf-8'), 'csv', context);
