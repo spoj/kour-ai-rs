@@ -14,7 +14,7 @@ export async function check_online(args, toolContext) {
   });
 
   const response = await openai.chat.completions.create({
-    model: "openai/gpt-4o-search-preview",
+    model: "perplexity/sonar",
     messages: [
       {
         role: "user",
