@@ -1,8 +1,10 @@
 import path from "path";
 import sharp from "sharp";
 import fs from "fs";
-import pkg from "pdfjs-dist/legacy/build/pdf.js";
-const { getDocument } = pkg;
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+
+// Configure the worker source for PDF.js legacy build
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.mjs';
 import { createCanvas } from "canvas";
 import {
   safelyReadFile,
@@ -76,8 +78,8 @@ async function getPageAsImageBuffer(buffer, fileType, page, context) {
       throw new Error(`Unsupported file type for cropping: ${fileType.mime}`);
     }
 
-    const doc = await getDocument({ data: pdfBuffer, useSystemFonts: true })
-      .promise;
+    const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer });
+    const doc = await loadingTask.promise;
     if (page < 1 || page > doc.numPages) {
       throw new Error(
         `Invalid page number: ${page}. File has ${doc.numPages} pages.`
