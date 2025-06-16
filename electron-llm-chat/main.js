@@ -7,9 +7,12 @@ import Store from 'electron-store';
 import { tools, toolFunctions } from './tools/index.js';
 import { getFileContentForLLM, processFileBufferForLLM } from './fileManager.js';
 import crypto from 'crypto';
+import squirrelStartup from 'electron-squirrel-startup';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+if (squirrelStartup) app.quit();
 
 let mainWindow;
 // Track the last known root directory to detect changes.
