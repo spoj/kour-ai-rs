@@ -193,12 +193,24 @@ export async function extractTextFromSpreadsheet(buffer, context) {
                 
                 if (value === null || value === undefined) {
                     cellText = '';
-                } else if (typeof value === 'object' && value.formula) {
-                    cellText = value.result?.toString() || '';
-                } else if (typeof value === 'object' && value.hyperlink) {
-                    cellText = value.text || value.hyperlink;
-                } else if (value instanceof Date) {
-                    cellText = value.toISOString().split('T')[0];
+                } else if (typeof value === 'object') {
+                    if (value.formula) {
+                        cellText = value.result?.toString() || '';
+                    } else if (value.hyperlink) {
+                        cellText = value.text || value.hyperlink;
+                    } else if (value.richText && Array.isArray(value.richText)) {
+                        cellText = value.richText.map(rt => rt.text || '').join('');
+                    } else if (value.error) {
+                        cellText = `#${value.error}`;
+                    } else if (value instanceof Date) {
+                        cellText = value.toISOString().split('T')[0];
+                    } else if (value.text !== undefined) {
+                        cellText = value.text.toString();
+                    } else if (value.result !== undefined) {
+                        cellText = value.result.toString();
+                    } else {
+                        cellText = JSON.stringify(value);
+                    }
                 } else {
                     cellText = value.toString();
                 }

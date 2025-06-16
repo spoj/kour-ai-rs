@@ -200,12 +200,13 @@ ipcMain.handle("send-message", async (event, { messages }) => {
           logToRenderer
         );
 
-        if (toolResult && toolResult.is_file_content) {
+        if (toolResult && toolResult.is_file_viewer) {
           // This is a result from load_file, handle it specially
           // Add the content message to history.
           history.push({
             role: toolResult.role,
             content: toolResult.content,
+            is_file_viewer: true
           });
 
           // Also add a simplified success message for the tool call itself
@@ -216,7 +217,7 @@ ipcMain.handle("send-message", async (event, { messages }) => {
             name: toolCall.function.name,
             content: JSON.stringify({
               success: true,
-              message: `File ${toolCall.function.arguments.filename} loaded into context.`,
+              message: `File loaded into context.`,
             }),
           });
         } else {
@@ -233,8 +234,7 @@ ipcMain.handle("send-message", async (event, { messages }) => {
   } catch (error) {
     logToRenderer({ type: "API_ERROR", data: error });
     throw new Error(
-      `API Error: ${
-        error.message || "Could not get a response from the model."
+      `API Error: ${error.message || "Could not get a response from the model."
       }`
     );
   }
@@ -286,7 +286,7 @@ async function executeToolCall(toolCall, settings, logToRenderer) {
     const result = await toolFunctions[functionName](functionArgs, toolContext);
 
     // This is the special handler for the raw file content from load_file
-    if (result && result.is_file_content) {
+    if (result && result.is_file_viewer) {
       if (result.error) {
         // If the tool returned an error object, format it for the model
         return {
