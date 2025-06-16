@@ -56,7 +56,7 @@ function createFileMessage(fileData) {
   return {
     role: "user",
     content: messageContent,
-    is_file_viewer: true, // Add a flag for special UI rendering
+    is_file_viewer: true, // Flag for special handling and UI rendering
   };
 }
 
