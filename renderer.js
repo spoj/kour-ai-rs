@@ -56,6 +56,22 @@ createApp({
         }
       });
 
+      // Handle external link clicks
+      window.addEventListener("click", async (event) => {
+        if (event.target.tagName === "A" && event.target.href) {
+          const url = event.target.href;
+          // Check if it's an external URL (http/https)
+          if (url.startsWith("http://") || url.startsWith("https://")) {
+            event.preventDefault();
+            try {
+              await window.electronAPI.openExternalUrl(url);
+            } catch (error) {
+              console.error("Failed to open external URL:", error);
+            }
+          }
+        }
+      });
+
       window.addEventListener("keydown", (event) => {
         if ((event.ctrlKey && event.key === "l") || (event.altKey && event.key === "d")) {
           event.preventDefault();

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, protocol, net } from "electron";
+import { app, BrowserWindow, ipcMain, protocol, net, shell } from "electron";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -86,6 +86,17 @@ ipcMain.handle("set-settings", (event, settings) => {
   store.set("settings", settings);
 });
 
+// IPC handler for opening external URLs
+ipcMain.handle("open-external-url", async (event, url) => {
+  try {
+    await shell.openExternal(url);
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to open external URL:", error);
+    return { success: false, error: error.message };
+  }
+});
+
 // IPC handler for processing pasted attachments
 ipcMain.handle(
   "process-attachment",
@@ -133,7 +144,7 @@ ipcMain.handle("send-message", async (event, { messages }) => {
   if (currentRootDir !== lastKnownRootDir) {
     history.push({
       role: "user",
-      content: `Note: root directory has been changed to: "${currentRootDir}".`,
+      content: `\nNote: root directory has been changed to: "${currentRootDir}".`,
       is_system_notification: true,
     });
     lastKnownRootDir = currentRootDir; // Update the last known state.
