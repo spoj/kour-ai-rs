@@ -1,8 +1,9 @@
 name: Build Windows and publish
 
 on: 
-  push:
-    branches: ["master"]
+  release:
+    types:
+      - created
 
 permissions:
   contents: write
@@ -27,8 +28,6 @@ jobs:
     - name: Build and publish for windows
       env:
         GITHUB_TOKEN: ${{github.token}}
-      run: |
-        npm version patch --no-git-tag-version
-        npm run publish -- --platform=win32
+      run: npm run publish -- --platform=win32
 
       
