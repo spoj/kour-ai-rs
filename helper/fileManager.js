@@ -3,9 +3,9 @@ import path from 'path';
 import { fileTypeFromBuffer } from 'file-type';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import ExcelJS from 'exceljs';
 import os from 'os';
 import crypto from 'crypto';
+import { processXlsxInWorker } from './xlsxWorker.js';
 
 const execAsync = promisify(exec);
 
@@ -175,56 +175,7 @@ export async function extractTextFromSpreadsheet(buffer, context) {
         return cachedBuffer.toString('utf-8');
     }
     
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
-    
-    let fullText = '';
-    
-    workbook.eachSheet((worksheet, sheetId) => {
-        const sheetName = worksheet.name;
-        fullText += `Sheet: ${sheetName}\n\n`;
-        
-        const csvRows = [];
-        worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-            const csvCells = [];
-            row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-                const value = cell.value;
-                let cellText = '';
-                
-                if (value === null || value === undefined) {
-                    cellText = '';
-                } else if (typeof value === 'object') {
-                    if (value.formula) {
-                        cellText = value.result?.toString() || '';
-                    } else if (value.hyperlink) {
-                        cellText = value.text || value.hyperlink;
-                    } else if (value.richText && Array.isArray(value.richText)) {
-                        cellText = value.richText.map(rt => rt.text || '').join('');
-                    } else if (value.error) {
-                        cellText = `#${value.error}`;
-                    } else if (value instanceof Date) {
-                        cellText = value.toISOString().split('T')[0];
-                    } else if (value.text !== undefined) {
-                        cellText = value.text.toString();
-                    } else if (value.result !== undefined) {
-                        cellText = value.result.toString();
-                    } else {
-                        cellText = JSON.stringify(value);
-                    }
-                } else {
-                    cellText = value.toString();
-                }
-                
-                if (cellText.includes(',') || cellText.includes('"') || cellText.includes('\n')) {
-                    cellText = `"${cellText.replace(/"/g, '""')}"`;
-                }
-                csvCells.push(cellText);
-            });
-            csvRows.push(csvCells.join(','));
-        });
-        
-        fullText += csvRows.join('\n') + '\n\n';
-    });
+    const fullText = await processXlsxInWorker(buffer);
 
     await writeConversionCache(buffer, 'xlsx', Buffer.from(fullText, 'utf-8'), 'csv', context);
 
