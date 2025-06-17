@@ -19,8 +19,8 @@ export default {
       name: "@electron-forge/publisher-github",
       config: {
         repository: {
-          owner: "sankomil",
-          name: "coworker",
+          owner: "spoj",
+          name: "kour-ai",
         },
       },
       prerelease: true,
