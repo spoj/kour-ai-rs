@@ -15,7 +15,7 @@ function _getCachePathInternal(fileBuffer, originalExtension, targetExtension, c
     if (!appDataDir) return null;
 
     const hash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
-    const cacheDir = path.join(appDataDir, 'conversion_cache');
+    const cacheDir = path.join(appDataDir, 'coworker', 'conversion_cache');
     const subDir = hash.substring(0, 2);
     const cacheFileName = `${hash.substring(2)}.${targetExtension}`;
 
@@ -176,7 +176,7 @@ export async function extractTextFromSpreadsheet(buffer, context) {
     }
     
     const fullText = await processXlsxInWorker(buffer);
-
+    
     await writeConversionCache(buffer, 'xlsx', Buffer.from(fullText, 'utf-8'), 'csv', context);
 
     return fullText;
