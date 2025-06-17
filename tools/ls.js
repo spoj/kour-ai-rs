@@ -1,10 +1,10 @@
 import path from "path";
-import { safelyReadDir } from "../fileManager.js";
+import { safelyReadDir } from "../helper/fileManager.js";
 
 export async function ls(args, toolContext) {
   const { rootDir } = toolContext;
   const targetPath = args.path ? path.join(rootDir, args.path) : rootDir;
-  
+
   // The safelyReadDir function now handles all validation and logic.
   // Note: The function is async, so this function must be async too.
   return await safelyReadDir(targetPath, toolContext);

@@ -19,7 +19,7 @@ createApp({
 
     const getMessageClass = (message) => {
       if (message.is_file_viewer) {
-        return 'assistant-message file-viewer-message';
+        return 'file-viewer-message';
       }
       return `${message.role}-message`;
     };
@@ -53,6 +53,22 @@ createApp({
         if (files.length > 0) {
           pastedFiles.value = [...pastedFiles.value, ...Array.from(files)];
           event.preventDefault();
+        }
+      });
+
+      // Handle external link clicks
+      window.addEventListener("click", async (event) => {
+        if (event.target.tagName === "A" && event.target.href) {
+          const url = event.target.href;
+          // Check if it's an external URL (http/https)
+          if (url.startsWith("http://") || url.startsWith("https://")) {
+            event.preventDefault();
+            try {
+              await window.electronAPI.openExternalUrl(url);
+            } catch (error) {
+              console.error("Failed to open external URL:", error);
+            }
+          }
         }
       });
 

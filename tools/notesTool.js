@@ -1,5 +1,5 @@
 import path from "path";
-import { safelyReadFile, safelyWriteFile } from "../fileManager.js";
+import { safelyReadFile, safelyWriteFile } from "../helper/fileManager.js";
 
 async function getNotesPath(toolContext) {
   const { rootDir } = toolContext;
@@ -15,9 +15,9 @@ export async function read_notes(args, toolContext) {
   try {
     const notesPath = await getNotesPath(toolContext);
     const content = await safelyReadFile(notesPath, toolContext);
-    return content.toString('utf-8') || "No notes found.";
+    return content.toString("utf-8") || "No notes found.";
   } catch (error) {
-    if (error.name === 'NotFoundError') {
+    if (error.name === "NotFoundError") {
       return "No notes found.";
     }
     return `Error reading notes: ${error.message}`;
@@ -32,12 +32,12 @@ export async function append_notes(args, toolContext) {
 
   try {
     const notesPath = await getNotesPath(toolContext);
-    let existingContent = '';
+    let existingContent = "";
     try {
       const buffer = await safelyReadFile(notesPath, toolContext);
-      existingContent = buffer.toString('utf-8');
+      existingContent = buffer.toString("utf-8");
     } catch (error) {
-      if (error.name !== 'NotFoundError') {
+      if (error.name !== "NotFoundError") {
         throw error; // Re-throw unexpected errors
       }
       // If file doesn't exist, existingContent remains empty
