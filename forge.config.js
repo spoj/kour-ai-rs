@@ -10,8 +10,20 @@ export default {
       platforms: ["linux"],
     },
     {
-      name: '@electron-forge/maker-squirrel',
-    }
+      name: "@electron-forge/maker-squirrel",
+    },
   ],
   outDir: "dist",
+  publishers: [
+    {
+      name: "@electron-forge/publisher-github",
+      config: {
+        repository: {
+          owner: "sankomil",
+          name: "coworker",
+        },
+      },
+      prerelease: true,
+    },
+  ],
 };

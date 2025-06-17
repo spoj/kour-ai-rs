@@ -1,4 +1,4 @@
-name: Build Windows and configure LFS
+name: Build Windows and publish
 
 on: 
   push:
@@ -24,21 +24,11 @@ jobs:
     - name: Install dependencies
       run: npm install
 
-    - name: Build windows for verification
-      run: npm run make -- --platform=win32
-
-    - name: Setup Git LFS tracking
-      shell: bash
+    - name: Build and publish for windows
+      env:
+        GITHUB_TOKEN: ${{github.token}}
       run: |
-        git config --global user.name 'github-actions'
-        git config --global user.email 'github-actions@github.com'
-        git lfs install
-        git lfs track "dist/make/**"
-        git add .gitattributes
-        # Commit and push only if .gitattributes changed
-        if git diff --staged --quiet; then
-          echo ".gitattributes is already up-to-date."
-        else
-          git commit -m "ci: Configure Git LFS for build artifacts"
-          git push -f origin master
-        fi
+        npm version patch --no-git-tag-version
+        npm run publish -- --platform=win32
+
+      
