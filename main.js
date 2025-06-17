@@ -36,7 +36,7 @@ const store = new Store({
   defaults: {
     settings: {
       apiKey: "",
-      modelName: "google/gemini-2.5-pro-preview",
+      modelName: "google/gemini-2.5-pro",
       rootDir: "",
       systemPrompt: defaultSystemPrompt,
       sofficePath: "",

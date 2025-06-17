@@ -13,7 +13,7 @@ const ResultSchema = z.object({
     .describe("Relevant extracts from the file that support the answer."),
 });
 
-const MAP_MODEL_NAME = "google/gemini-2.5-flash-preview-05-20:thinking";
+const MAP_MODEL_NAME = "google/gemini-2.5-flash";
 const CONCURRENCY_LIMIT = 50;
 
 export const map_query_tool = {
