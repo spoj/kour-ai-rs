@@ -47,6 +47,11 @@ h1 {
   color: white;
   font-size: 24px;
   cursor: pointer;
+  transition: transform 0.5s ease-in-out;
+  margin-right: 5px;
+}
+#settings-button:hover {
+  transform: rotate(360deg);
 }
 #chat-container {
   flex-grow: 1;
@@ -79,6 +84,11 @@ h1 {
   background-color: #e5e5ea;
   color: black;
 }
+
+.assistant-message .message-bubble p {
+  margin: 0;
+  padding: 0;
+}
 .file-viewer-message {
   justify-content: flex-start;
 }
@@ -108,7 +118,7 @@ h1 {
   line-height: 18px;
 }
 #send-button {
-  background-color: #1c65e9;
+  background-color: hsl(219, 82%, 51%);
   color: white;
   border: none;
   border-radius: 50%;
@@ -121,6 +131,9 @@ h1 {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+#send-button:hover {
+  background-color: hsl(219, 82%, 45%);
 }
 .tool-name {
   font-weight: bold;
@@ -139,6 +152,9 @@ h1 {
   height: 100%;
   overflow: auto;
   background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 .modal-content {
   background-color: #fefefe;
@@ -149,12 +165,37 @@ h1 {
   max-width: 700px;
   border-radius: 8px;
 }
+
+.modal-content input {
+  border-radius: 20px;
+  height: 30px;
+  border: 1px solid #aaa;
+  padding-left: 10px;
+  margin-bottom: 10px;
+}
+
+.modal-content textarea {
+  border-radius: 5px;
+  border: 1px solid #aaa;
+  padding-left: 10px;
+  padding-top: 5px;
+  margin-bottom: 10px;
+}
+
+.modal-content label {
+  margin-bottom: 5px;
+}
+
 .close-button {
-  color: #aaa;
+  color: hsl(0, 0%, 67%);
   float: right;
   font-size: 28px;
   font-weight: bold;
   cursor: pointer;
+  transition: color 0.2s ease-in-out 0s;
+}
+.close-button:hover {
+  color: hsl(0, 0%, 20%);
 }
 .dot-flashing {
   position: relative;
