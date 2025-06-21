@@ -1,7 +1,11 @@
+import { useState } from "react";
 import { createRoot } from "react-dom/client";
+import { SettingsModal } from "../components";
 import "./app.css";
 
 export const App = () => {
+  const [openSettingsModal, setOpenSettingsModal] = useState(false);
+
   return (
     <div className="container">
       <header>
@@ -10,7 +14,6 @@ export const App = () => {
           <input
             type="text"
             id="path-input"
-            v-model="settings.rootDir"
             placeholder="Enter root directory..."
           />
         </div>
@@ -18,7 +21,11 @@ export const App = () => {
           <button id="header-button" title="Restart Session">
             Restart
           </button>
-          <button id="header-button" title="Settings">
+          <button
+            id="header-button"
+            title="Settings"
+            onClick={() => setOpenSettingsModal(!openSettingsModal)}
+          >
             Settings
           </button>
         </div>
@@ -28,9 +35,10 @@ export const App = () => {
         <textarea id="message-input" placeholder="Type a message..."></textarea>
         <button id="send-button">Send</button>
       </div>
+      {openSettingsModal && <SettingsModal onClose={setOpenSettingsModal} />}
     </div>
   );
 };
 
 const root = createRoot(document.body);
-root.render(App());
+root.render(<App />);
