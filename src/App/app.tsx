@@ -5,6 +5,19 @@ import "./app.css";
 
 export const App = () => {
   const [openSettingsModal, setOpenSettingsModal] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const handleSendMessage = () => {
+    console.log("Sending message:", message);
+    setMessage("");
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      handleSendMessage();
+    }
+  };
 
   return (
     <div className="container">
@@ -31,10 +44,16 @@ export const App = () => {
         </div>
       </header>
       <div id="chat-container"></div>
-      <div id="input-container">
-        <textarea id="message-input" placeholder="Type a message..."></textarea>
-        <button id="send-button">Send</button>
-      </div>
+        <div id="input-container">
+          <textarea
+            id="message-input"
+            placeholder="Type a message..."
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+          ></textarea>
+          <button id="send-button" onClick={handleSendMessage}>Send</button>
+        </div>
       {openSettingsModal && <SettingsModal onClose={setOpenSettingsModal} />}
     </div>
   );

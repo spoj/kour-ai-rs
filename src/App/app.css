@@ -78,10 +78,11 @@ h1 {
   font-size: 14px;
   resize: none;
   overflow-y: auto;
-  max-height: 120px;
   box-sizing: border-box;
-  height: 40px;
+  min-height: 40px;
+  max-height: 120px;
   line-height: 18px;
+  field-sizing: content;
 }
 #send-button {
   background-color: hsl(219, 82%, 51%);
