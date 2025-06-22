@@ -5,6 +5,8 @@ declare global {
     electron: {
       get: (key: string) => any;
       set: (key: string, val: any) => void;
+      getSettings: () => any;
+      setSettings: (val: any) => void;
       // any other methods you've defined...
     };
   }

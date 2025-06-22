@@ -7,6 +7,10 @@ contextBridge.exposeInMainWorld("electron", {
     return ipcRenderer.sendSync("settings-get", key);
   },
   set: (key: string, val: any) => {
-    return ipcRenderer.sendSync("settings-set", key, val);
+    return ipcRenderer.send("settings-set", key, val);
   },
+  getSettings: () => {
+    return ipcRenderer.sendSync("all-settings-get");
+  },
+  setSettings: (val: any) => ipcRenderer.send("all-settings-set", val),
 });
