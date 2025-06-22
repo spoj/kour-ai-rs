@@ -16,5 +16,8 @@
     },
     "jsx": "react-jsx"
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "files": [
+    "src/preload.d.ts"
+  ]
 }

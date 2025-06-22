@@ -29,6 +29,7 @@
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "@vercel/webpack-asset-relocator-loader": "^1.7.3",
+    "copy-webpack-plugin": "^13.0.0",
     "css-loader": "^6.11.0",
     "electron": "36.5.0",
     "eslint": "^8.57.1",
@@ -42,7 +43,7 @@
   },
   "dependencies": {
     "electron-squirrel-startup": "^1.0.1",
-    "electron-store": "^10.1.0",
+    "electron-store": "^8.2.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   }
