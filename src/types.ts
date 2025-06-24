@@ -19,9 +19,7 @@ export interface IChatCompletionOptions {
   messages: IChatCompletionMessage[];
 }
 
-export interface IChatCompletionUpdate {
-  type: "start" | "update" | "end";
-  success: boolean;
-  message?: string;
-  isNotification?: boolean;
-}
+export type IChatCompletionUpdate =
+  | { type: "Start" }
+  | { type: "End" }
+  | { type: "Update"; message: string; is_notification: boolean };

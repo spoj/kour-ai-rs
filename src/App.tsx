@@ -36,24 +36,31 @@ function App() {
     ];
     setMessages(newMessages);
     setInput("");
-    chatCompletion({
-      apiKey: settings.apiKey,
-      modelName: settings.modelName,
-      messages: newMessages,
-    }, (update) => {
-      if (update.type === 'start') {
-        setIsTyping(true);
-      } else if (update.type === 'end') {
-        setIsTyping(false);
-      } else if (update.type === 'update') {
-        const botMessage: IChatCompletionMessage = {
-          role: 'assistant',
-          content: update.message || "",
-          isNotification: update.isNotification,
-        };
-        setMessages(prev => [...prev, botMessage]);
+    chatCompletion(
+      {
+        apiKey: settings.apiKey,
+        modelName: settings.modelName,
+        messages: newMessages,
+      },
+      (update) => {
+        switch (update.type) {
+          case "Start":
+            setIsTyping(true);
+            break;
+          case "End":
+            setIsTyping(false);
+            break;
+          case "Update":
+            const botMessage: IChatCompletionMessage = {
+              role: "assistant",
+              content: update.message,
+              isNotification: update.is_notification,
+            };
+            setMessages((prev) => [...prev, botMessage]);
+            break;
+        }
       }
-    });
+    );
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
