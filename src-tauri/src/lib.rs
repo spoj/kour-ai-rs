@@ -1,6 +1,8 @@
+mod chat;
 mod error;
 mod settings;
 
+use self::chat::IChatCompletionOptions;
 use self::error::Error;
 use self::settings::Settings;
 use serde_json::{from_value, to_value};
@@ -34,12 +36,21 @@ fn set_settings(store: State<'_, Store<Wry>>, settings: Settings) -> Result<()> 
     Ok(())
 }
 
+#[tauri::command]
+fn chat_completion(_options: IChatCompletionOptions) -> Result<String> {
+    Ok("this is a dummy response".to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![get_settings, set_settings])
+        .invoke_handler(tauri::generate_handler![
+            get_settings,
+            set_settings,
+            chat_completion
+        ])
         .setup(|app| {
             let builder = StoreBuilder::new(app, "store.bin");
             let store = builder.build();

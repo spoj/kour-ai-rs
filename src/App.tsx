@@ -1,49 +1,57 @@
 import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
+import { chatCompletion, getSettings, setSettings } from "./commands";
+import { IChatCompletionMessage } from "./types";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [messages, setMessages] = useState<IChatCompletionMessage[]>([]);
+  const [input, setInput] = useState("");
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  const handleSend = async () => {
+    const newMessages: IChatCompletionMessage[] = [
+      ...messages,
+      { role: "user", content: input },
+    ];
+    setMessages(newMessages);
+    setInput("");
+    const response = await chatCompletion({
+      apiKey: "dummy",
+      modelName: "dummy",
+      messages: newMessages,
+    });
+    setMessages([...newMessages, { role: "assistant", content: response }]);
+  };
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <main
+      style={{
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        margin: "auto",
+        maxWidth: "768px",
+      }}
+    >
+      <div style={{ flex: "1 1 auto", overflowY: "auto" }}>
+        {messages.map((m, i) => (
+          <div key={i}>
+            <b>{m.role}</b>: {m.content}
+          </div>
+        ))}
       </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
+      <div style={{ display: "flex" }}>
         <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          style={{ flex: "1 1 auto" }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              handleSend();
+            }
+          }}
         />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
+        <button onClick={handleSend}>send</button>
+      </div>
     </main>
   );
 }
