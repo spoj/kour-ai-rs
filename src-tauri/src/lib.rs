@@ -94,7 +94,7 @@ impl ChatProcessor {
                 self.messages.extend(new_messages);
             } else {
                 let content = message.content;
-                if let Some(chat::Content::Text { text }) = content.get(0) {
+                if let Some(chat::Content::Text { text }) = content.first() {
                     self.window.emit(
                         "chat_completion_update",
                         EventPayload::new_update(text, false),

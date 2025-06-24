@@ -17,13 +17,11 @@ pub struct ImageUrl {
     pub url: String,
 }
 
-pub type MessageContent = Vec<Content>;
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatCompletionMessage {
     pub role: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub content: MessageContent,
+    pub content: Vec<Content>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -32,23 +30,19 @@ pub struct ChatCompletionMessage {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
-enum FlexibleContent {
+#[derive(Default)]
+enum MessageContent {
     Text(String),
-    Parts(MessageContent),
+    Parts(Vec<Content>),
+    #[default]
     None,
-}
-
-impl Default for FlexibleContent {
-    fn default() -> Self {
-        FlexibleContent::None
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct IncomingMessage {
     pub role: String,
     #[serde(default)]
-    pub content: FlexibleContent,
+    content: MessageContent,
     #[serde(default)]
     pub tool_calls: Option<Vec<ToolCall>>,
 }
@@ -56,9 +50,9 @@ pub struct IncomingMessage {
 impl From<IncomingMessage> for ChatCompletionMessage {
     fn from(msg: IncomingMessage) -> Self {
         let content = match msg.content {
-            FlexibleContent::Text(text) => vec![Content::Text { text }],
-            FlexibleContent::Parts(parts) => parts,
-            FlexibleContent::None => vec![],
+            MessageContent::Text(text) => vec![Content::Text { text }],
+            MessageContent::Parts(parts) => parts,
+            MessageContent::None => vec![],
         };
 
         ChatCompletionMessage {
@@ -71,7 +65,7 @@ impl From<IncomingMessage> for ChatCompletionMessage {
 }
 
 impl ChatCompletionMessage {
-    pub fn new(role: &str, content: MessageContent) -> Self {
+    pub fn new(role: &str, content: Vec<Content>) -> Self {
         Self {
             role: role.to_string(),
             content,
@@ -158,7 +152,7 @@ pub async fn call_openrouter(
                 choices: vec![Choice {
                     message: IncomingMessage {
                         role: "assistant".to_string(),
-                        content: FlexibleContent::Text(text),
+                        content: MessageContent::Text(text),
                         tool_calls: None,
                     },
                 }],
@@ -197,9 +191,8 @@ pub async fn handle_tool_calls(
 ) -> super::Result<Vec<ChatCompletionMessage>> {
     let mut new_messages = Vec::new();
 
-    new_messages.push(
-        ChatCompletionMessage::new("assistant", Vec::new()).tool_calls(tool_calls.clone()),
-    );
+    new_messages
+        .push(ChatCompletionMessage::new("assistant", Vec::new()).tool_calls(tool_calls.clone()));
 
     let tool_futs = tool_calls
         .into_iter()
