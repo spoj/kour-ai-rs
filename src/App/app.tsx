@@ -1,15 +1,37 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
-import { SettingsModal } from "../components";
+import { ChatBubble, SettingsModal } from "../components";
 import "./app.css";
+import { IMessage } from "../components/components";
 
 export const App = () => {
   const [openSettingsModal, setOpenSettingsModal] = useState(false);
   const [message, setMessage] = useState("");
+  const [chatHistory, setChatHistory] = useState<IMessage[]>([]);
 
   const handleSendMessage = () => {
-    console.log("Sending message:", message);
-    setMessage("");
+    if (message.trim()) {
+      const userMessage: IMessage = { role: 'user', content: message };
+      setChatHistory(prevChatHistory => [...prevChatHistory, userMessage]);
+      setMessage('');
+
+      // Add a hardcoded response after a short delay
+      setTimeout(() => {
+        const responses = [
+          "I'm just a demo, so I don't have much to say.",
+          "That's interesting! Tell me more.",
+          "I see. What else is on your mind?",
+          "Thanks for sharing.",
+        ];
+        const randomIndex = Math.floor(Math.random() * responses.length);
+        const botMessage: IMessage = {
+          role: 'assistant',
+          content: responses[randomIndex],
+        };
+
+        setChatHistory(prevChatHistory => [...prevChatHistory, botMessage]);
+      }, 1000);
+    }
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -43,7 +65,11 @@ export const App = () => {
           </button>
         </div>
       </header>
-      <div id="chat-container"></div>
+      <div id="chat-container">
+        {chatHistory.map((chat, index) => (
+          <ChatBubble key={index} role={chat.role} content={chat.content} />
+        ))}
+      </div>
         <div id="input-container">
           <textarea
             id="message-input"
