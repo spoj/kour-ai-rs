@@ -6,3 +6,14 @@ export interface ISettings {
   sofficePath: string;
   providerOrder: string;
 }
+
+export interface IChatCompletionMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface IChatCompletionOptions {
+  apiKey: string;
+  modelName: string;
+  messages: IChatCompletionMessage[];
+}

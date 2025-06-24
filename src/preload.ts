@@ -13,4 +13,5 @@ contextBridge.exposeInMainWorld("electron", {
     return ipcRenderer.sendSync("all-settings-get");
   },
   setSettings: (val: any) => ipcRenderer.send("all-settings-set", val),
+  chatCompletion: (options: any) => ipcRenderer.invoke('chat:completion', options),
 });

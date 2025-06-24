@@ -9,28 +9,28 @@ export const App = () => {
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<IMessage[]>([]);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (message.trim()) {
       const userMessage: IMessage = { role: 'user', content: message };
-      setChatHistory(prevChatHistory => [...prevChatHistory, userMessage]);
+      const newChatHistory = [...chatHistory, userMessage];
+      setChatHistory(newChatHistory);
       setMessage('');
 
-      // Add a hardcoded response after a short delay
-      setTimeout(() => {
-        const responses = [
-          "I'm just a demo, so I don't have much to say.",
-          "That's interesting! Tell me more.",
-          "I see. What else is on your mind?",
-          "Thanks for sharing.",
-        ];
-        const randomIndex = Math.floor(Math.random() * responses.length);
-        const botMessage: IMessage = {
-          role: 'assistant',
-          content: responses[randomIndex],
-        };
+      const settings = window.electron.getSettings();
 
-        setChatHistory(prevChatHistory => [...prevChatHistory, botMessage]);
-      }, 1000);
+      const result = await window.electron.chatCompletion({
+        apiKey: settings.apiKey,
+        modelName: settings.modelName,
+        messages: newChatHistory.map(m => ({ role: m.role, content: m.content })),
+      });
+
+      const botMessage: IMessage = {
+        role: 'assistant',
+        content: result.message,
+        isNotification: !result.success,
+      };
+
+      setChatHistory(prev => [...prev, botMessage]);
     }
   };
 
@@ -70,16 +70,16 @@ export const App = () => {
           <ChatBubble key={index} role={chat.role} content={chat.content} />
         ))}
       </div>
-        <div id="input-container">
-          <textarea
-            id="message-input"
-            placeholder="Type a message..."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-          ></textarea>
-          <button id="send-button" onClick={handleSendMessage}>Send</button>
-        </div>
+      <div id="input-container">
+        <textarea
+          id="message-input"
+          placeholder="Type a message..."
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+        ></textarea>
+        <button id="send-button" onClick={handleSendMessage}>Send</button>
+      </div>
       {openSettingsModal && <SettingsModal onClose={setOpenSettingsModal} />}
     </div>
   );

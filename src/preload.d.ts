@@ -1,3 +1,5 @@
+import { IChatCompletionOptions } from './main';
+
 export {};
 
 declare global {
@@ -7,7 +9,7 @@ declare global {
       set: (key: string, val: any) => void;
       getSettings: () => any;
       setSettings: (val: any) => void;
-      // any other methods you've defined...
+      chatCompletion: (options: IChatCompletionOptions) => Promise<{ success: boolean; message: string; }>;
     };
   }
 }
