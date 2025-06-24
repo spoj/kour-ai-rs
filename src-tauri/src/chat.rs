@@ -14,6 +14,32 @@ pub struct ChatCompletionMessage {
     pub tool_call_id: Option<String>,
 }
 
+impl ChatCompletionMessage {
+    pub fn new(role: &str) -> Self {
+        Self {
+            role: role.to_string(),
+            content: None,
+            tool_calls: None,
+            tool_call_id: None,
+        }
+    }
+
+    pub fn content(mut self, content: &str) -> Self {
+        self.content = Some(content.to_string());
+        self
+    }
+
+    pub fn tool_calls(mut self, tool_calls: Vec<ToolCall>) -> Self {
+        self.tool_calls = Some(tool_calls);
+        self
+    }
+
+    pub fn tool_call_id(mut self, tool_call_id: &str) -> Self {
+        self.tool_call_id = Some(tool_call_id.to_string());
+        self
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChatCompletionOptions {
     #[serde(rename = "apiKey")]
@@ -70,50 +96,48 @@ pub async fn call_openrouter(
 #[derive(Debug, Clone)]
 pub enum ChatUpdate {
     ToolCall(String),
+    #[allow(dead_code)]
     ToolResult(String, String),
+}
+
+async fn execute_tool_call(
+    tool_call: ToolCall,
+    tx: mpsc::Sender<ChatUpdate>,
+) -> super::Result<(String, String)> {
+    tx.send(ChatUpdate::ToolCall(tool_call.function.name.clone()))
+        .await?;
+    let result =
+        tools::tool_executor(&tool_call.function.name, &tool_call.function.arguments).await;
+    tx.send(ChatUpdate::ToolResult(
+        tool_call.function.name.clone(),
+        result.clone(),
+    ))
+    .await?;
+
+    Ok((tool_call.id, result))
 }
 
 pub async fn handle_tool_calls(
     tool_calls: Vec<ToolCall>,
     tx: mpsc::Sender<ChatUpdate>,
-) -> Vec<ChatCompletionMessage> {
+) -> super::Result<Vec<ChatCompletionMessage>> {
     let mut new_messages = Vec::new();
-    new_messages.push(ChatCompletionMessage {
-        role: "assistant".to_string(),
-        content: None,
-        tool_calls: Some(tool_calls.clone()),
-        tool_call_id: None,
-    });
 
-    let tool_futs = tool_calls.into_iter().map(|tool_call| {
-        let tx = tx.clone();
-        tokio::spawn(async move {
-            tx.send(ChatUpdate::ToolCall(tool_call.function.name.clone()))
-                .await
-                .unwrap();
-            let result =
-                tools::tool_executor(&tool_call.function.name, &tool_call.function.arguments).await;
-            tx.send(ChatUpdate::ToolResult(
-                tool_call.function.name.clone(),
-                result.clone(),
-            ))
-            .await
-            .unwrap();
+    new_messages.push(ChatCompletionMessage::new("assistant").tool_calls(tool_calls.clone()));
 
-            (tool_call.id, result)
-        })
-    });
+    let tool_futs = tool_calls
+        .into_iter()
+        .map(|tool_call| tokio::spawn(execute_tool_call(tool_call, tx.clone())));
 
     let tool_results = join_all(tool_futs).await;
 
     for tool_result in tool_results {
-        let (id, result) = tool_result.unwrap();
-        new_messages.push(ChatCompletionMessage {
-            role: "tool".to_string(),
-            content: Some(result),
-            tool_calls: None,
-            tool_call_id: Some(id),
-        });
+        let (id, result) = tool_result??;
+        new_messages.push(
+            ChatCompletionMessage::new("tool")
+                .tool_call_id(&id)
+                .content(&result),
+        );
     }
-    new_messages
+    Ok(new_messages)
 }

@@ -1,4 +1,6 @@
+use crate::chat;
 use serde::{Serialize, Serializer};
+use tokio::sync::mpsc;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -10,6 +12,24 @@ pub enum Error {
     Json(#[from] serde_json::Error),
     #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
+    #[error(transparent)]
+    Join(#[from] tokio::task::JoinError),
+    #[error("Failed to send chat update: {0}")]
+    Send(String),
+    #[error("Tauri Error: {0}")]
+    Tauri(String),
+}
+
+impl From<tauri::Error> for Error {
+    fn from(err: tauri::Error) -> Self {
+        Error::Tauri(err.to_string())
+    }
+}
+
+impl From<mpsc::error::SendError<chat::ChatUpdate>> for Error {
+    fn from(err: mpsc::error::SendError<chat::ChatUpdate>) -> Self {
+        Error::Send(err.to_string())
+    }
 }
 
 impl Serialize for Error {
