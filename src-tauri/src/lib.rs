@@ -6,13 +6,17 @@ use self::chat::IChatCompletionOptions;
 use self::error::Error;
 use self::settings::Settings;
 use serde_json::{from_value, to_value};
-use tauri::{Manager, State, Wry};
+use std::sync::{Arc, OnceLock};
+use tauri::Wry;
 use tauri_plugin_store::{Store, StoreBuilder};
 
 type Result<T> = std::result::Result<T, Error>;
 
+static STORE: OnceLock<Arc<Store<Wry>>> = OnceLock::new();
+
 #[tauri::command]
-fn get_settings(store: State<Store<Wry>>) -> Result<Settings> {
+fn get_settings() -> Result<Settings> {
+    let store = STORE.get().unwrap();
     let settings = store
         .get("settings")
         .and_then(|v| from_value(v).ok())
@@ -30,7 +34,8 @@ fn get_settings(store: State<Store<Wry>>) -> Result<Settings> {
 }
 
 #[tauri::command]
-fn set_settings(store: State<'_, Store<Wry>>, settings: Settings) -> Result<()> {
+fn set_settings(settings: Settings) -> Result<()> {
+    let store = STORE.get().unwrap();
     store.set("settings", to_value(settings)?);
     store.save()?;
     Ok(())
@@ -52,9 +57,11 @@ pub fn run() {
             chat_completion
         ])
         .setup(|app| {
-            let builder = StoreBuilder::new(app, "store.bin");
-            let store = builder.build();
-            app.manage(store);
+            STORE.get_or_init(|| {
+                StoreBuilder::new(app.handle(), "store.bin")
+                    .build()
+                    .unwrap()
+            });
             Ok(())
         })
         .run(tauri::generate_context!())
