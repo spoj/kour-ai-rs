@@ -28,4 +28,16 @@ reqwest = { version = "0.12.5", features = ["json"] }
 tokio = { version = "1", features = ["sync", "macros", "rt-multi-thread"] }
 futures = "0.3"
 rand = "0.9"
+glob = "0"
+chrono = { version = "0.4", features = ["serde"] }
+zip-extract = "0.1.2"
+mail-parser = "0.9"
+mime = "0.3"
+infer = "0.16.0"
+calamine = "0.28"
+base64 = "0.22.1"
+walkdir = "2.5.0"
 
+sha2 = "0.10.8"
+tempfile = "3.10.1"
+anyhow = "1.0.86"

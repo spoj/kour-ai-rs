@@ -10,6 +10,14 @@ pub enum Content {
     Text { text: String },
     #[serde(rename = "image_url")]
     ImageUrl { image_url: ImageUrl },
+    #[serde(rename = "file")]
+    File { file: FileData },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FileData {
+    pub filename: String,
+    pub file_data: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -79,6 +87,7 @@ impl ChatCompletionMessage {
         self
     }
 
+    #[allow(dead_code)]
     pub fn tool_call_id(mut self, tool_call_id: &str) -> Self {
         self.tool_call_id = Some(tool_call_id.to_string());
         self
@@ -131,20 +140,36 @@ pub async fn call_openrouter(
     messages: &Vec<ChatCompletionMessage>,
     api_key: &str,
     model_name: &str,
+    system_prompt: &str,
+    tools: &Vec<tools::Tool>,
 ) -> super::Result<ChatCompletionResponse> {
+    println!("Sending messages to OpenRouter: {:?}", messages);
     let client = reqwest::Client::new();
+    let mut final_messages = messages.clone();
+    if !system_prompt.is_empty() {
+        final_messages.insert(
+            0,
+            ChatCompletionMessage::new(
+                "system",
+                vec![Content::Text {
+                    text: system_prompt.to_string(),
+                }],
+            ),
+        );
+    }
     let res = client
         .post("https://openrouter.ai/api/v1/chat/completions")
         .bearer_auth(api_key)
         .json(&serde_json::json!({
             "model": model_name,
-            "messages": messages,
-            "tools": &*tools::TOOLS,
+            "messages": final_messages,
+            "tools": tools,
         }))
         .send()
         .await?;
 
     let text = res.text().await?;
+    println!("Got response from OpenRouter: {}", text);
     let response: ChatCompletionResponse =
         match serde_json::from_str::<ChatCompletionResponse>(&text) {
             Ok(res) => res,
@@ -175,7 +200,10 @@ async fn execute_tool_call(
     tx.send(ChatUpdate::ToolCall(tool_call.function.name.clone()))
         .await?;
     let result =
-        tools::tool_executor(&tool_call.function.name, &tool_call.function.arguments).await;
+        match tools::tool_executor(&tool_call.function.name, &tool_call.function.arguments).await {
+            Ok(result) => result,
+            Err(e) => e.to_string(),
+        };
     tx.send(ChatUpdate::ToolResult(
         tool_call.function.name.clone(),
         result.clone(),
@@ -192,7 +220,7 @@ pub async fn handle_tool_calls(
     let mut new_messages = Vec::new();
 
     new_messages
-        .push(ChatCompletionMessage::new("assistant", Vec::new()).tool_calls(tool_calls.clone()));
+        .push(ChatCompletionMessage::new("assistant", vec![]).tool_calls(tool_calls.clone()));
 
     let tool_futs = tool_calls
         .into_iter()
@@ -201,16 +229,38 @@ pub async fn handle_tool_calls(
     let tool_results = join_all(tool_futs).await;
 
     for tool_result in tool_results {
-        let (id, result) = tool_result??;
-        new_messages.push(
-            ChatCompletionMessage::new(
-                "tool",
-                vec![Content::Text {
-                    text: result.clone(),
-                }],
-            )
-            .tool_call_id(&id),
-        );
+        let (id, result_str) = tool_result??;
+
+        // Try to deserialize the result into our special LoadFileResult structure
+        if let Ok(file_result) = serde_json::from_str::<serde_json::Value>(&result_str) {
+            if file_result.get("type").and_then(|t| t.as_str()) == Some("file_loaded") {
+                let display_message = file_result["display_message"].as_str().unwrap_or("").to_string();
+                
+                // The user_message is nested in the JSON, deserialize it separately
+                if let Ok(user_message) = serde_json::from_value::<ChatCompletionMessage>(file_result["user_message"].clone()) {
+                    // 1. Add the simple tool message for display
+                    new_messages.push(ChatCompletionMessage {
+                        role: "tool".to_string(),
+                        content: vec![Content::Text { text: display_message }],
+                        tool_call_id: Some(id),
+                        tool_calls: None,
+                    });
+
+                    // 2. Add the rich user message with the actual file content
+                    new_messages.push(user_message);
+
+                    continue; // Skip the default handling below
+                }
+            }
+        }
+        
+        // Default handling for all other tools
+        new_messages.push(ChatCompletionMessage {
+            role: "tool".to_string(),
+            content: vec![Content::Text { text: result_str }],
+            tool_call_id: Some(id),
+            tool_calls: None,
+        });
     }
 
     Ok(new_messages)

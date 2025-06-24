@@ -8,8 +8,6 @@ pub struct Settings {
     pub model_name: String,
     #[serde(rename = "rootDir")]
     pub root_dir: String,
-    #[serde(rename = "systemPrompt")]
-    pub system_prompt: String,
     #[serde(rename = "sofficePath")]
     pub soffice_path: String,
     #[serde(rename = "providerOrder")]
@@ -22,7 +20,6 @@ impl Default for Settings {
             api_key: "".to_string(),
             model_name: "openai/gpt-4o".to_string(),
             root_dir: "".to_string(),
-            system_prompt: "You are a helpful assistant.".to_string(),
             soffice_path: "".to_string(),
             provider_order: "openai,google,anthropic".to_string(),
         }

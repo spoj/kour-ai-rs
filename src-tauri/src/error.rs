@@ -18,6 +18,12 @@ pub enum Error {
     Send(String),
     #[error("Tauri Error: {0}")]
     Tauri(String),
+    #[error("Tool Error: {0}")]
+    Tool(String),
+    #[error("Anyhow Error: {0}")]
+    Anyhow(#[from] anyhow::Error),
+    #[error("Walkdir Error: {0}")]
+    Walkdir(#[from] walkdir::Error),
 }
 
 impl From<tauri::Error> for Error {

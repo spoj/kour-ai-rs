@@ -1,8 +1,17 @@
+mod extract;
+mod find;
+mod ls;
+mod ask_files;
+mod notes;
 mod roll_dice;
+mod load_file;
+mod check_online;
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{from_str, Value};
 use std::sync::LazyLock;
+
+use crate::error::Error;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Tool {
@@ -17,11 +26,31 @@ pub struct Function {
     pub parameters: Value,
 }
 
-pub static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| vec![roll_dice::get_tool()]);
+pub static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
+    vec![
+        roll_dice::get_tool(),
+        ls::get_tool(),
+        find::get_tool(),
+        notes::read_notes_tool(),
+        notes::append_notes_tool(),
+        ask_files::get_tool(),
+        extract::get_tool(),
+        load_file::get_tool(),
+        check_online::get_tool(),
+    ]
+});
 
-pub async fn tool_executor(name: &str, arguments: &str) -> String {
+pub async fn tool_executor(name: &str, arguments: &str) -> crate::Result<String> {
     match name {
-        "roll_dice" => roll_dice::execute(arguments).await,
-        _ => "Tool not found".to_string(),
+        "roll_dice" => roll_dice::execute(roll_dice::RollDiceArgs {}).await,
+        "ls" => Ok(ls::ls(from_str(arguments)?).await?),
+        "find" => Ok(find::find(from_str(arguments)?).await?),
+        "read_notes" => notes::read_notes().await,
+        "append_notes" => notes::append_notes(from_str(arguments)?).await,
+        "ask_files" => ask_files::ask_files(from_str(arguments)?).await,
+        "extract" => extract::extract(&from_str(arguments)?).await,
+        "load_file" => load_file::load_file(from_str(arguments)?).await,
+        "check_online" => check_online::check_online(from_str(arguments)?).await,
+        _ => Err(Error::Tool("Tool Not Found".to_string())),
     }
 }
