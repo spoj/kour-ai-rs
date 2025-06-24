@@ -1846,6 +1846,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-opener",
  "tauri-plugin-store",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
