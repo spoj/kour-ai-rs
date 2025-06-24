@@ -1,11 +1,15 @@
 import { useState } from "react";
 import "./App.css";
-import { chatCompletion, getSettings, setSettings } from "./commands";
+import { chatCompletion } from "./commands";
 import { IChatCompletionMessage } from "./types";
+import { ChatBubble } from "./components/ChatBubble";
+import { SettingsModal } from "./components/SettingsModal";
 
 function App() {
   const [messages, setMessages] = useState<IChatCompletionMessage[]>([]);
   const [input, setInput] = useState("");
+  const [openSettingsModal, setOpenSettingsModal] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
 
   const handleSend = async () => {
     const newMessages: IChatCompletionMessage[] = [
@@ -14,45 +18,75 @@ function App() {
     ];
     setMessages(newMessages);
     setInput("");
-    const response = await chatCompletion({
+    chatCompletion({
       apiKey: "dummy",
       modelName: "dummy",
       messages: newMessages,
+    }, (update) => {
+      if (update.type === 'start') {
+        setIsTyping(true);
+      } else if (update.type === 'end') {
+        setIsTyping(false);
+      } else if (update.type === 'update') {
+        const botMessage: IChatCompletionMessage = {
+          role: 'assistant',
+          content: update.message || "",
+          isNotification: update.isNotification,
+        };
+        setMessages(prev => [...prev, botMessage]);
+      }
     });
-    setMessages([...newMessages, { role: "assistant", content: response }]);
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      handleSend();
+    }
   };
 
   return (
-    <main
-      style={{
-        height: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        margin: "auto",
-        maxWidth: "768px",
-      }}
-    >
-      <div style={{ flex: "1 1 auto", overflowY: "auto" }}>
+    <div className="container">
+      <header>
+        <h1>Kour-AI</h1>
+        <div id="path-container">
+          <input
+            type="text"
+            id="path-input"
+            placeholder="Enter root directory..."
+          />
+        </div>
+        <div style={{ paddingLeft: "10px" }}>
+          <button id="header-button" title="Restart Session">
+            Restart
+          </button>
+          <button
+            id="header-button"
+            title="Settings"
+            onClick={() => setOpenSettingsModal(true)}
+          >
+            Settings
+          </button>
+        </div>
+      </header>
+      <div id="chat-container">
         {messages.map((m, i) => (
-          <div key={i}>
-            <b>{m.role}</b>: {m.content}
-          </div>
+          <ChatBubble key={i} role={m.role} content={m.content} isNotification={m.isNotification} />
         ))}
+        {isTyping && <ChatBubble role="assistant" content="Thinking..." isNotification />}
       </div>
-      <div style={{ display: "flex" }}>
-        <input
+      <div id="input-container">
+        <textarea
+          id="message-input"
+          placeholder="Type a message..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          style={{ flex: "1 1 auto" }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              handleSend();
-            }
-          }}
-        />
-        <button onClick={handleSend}>send</button>
+          onKeyDown={handleKeyDown}
+        ></textarea>
+        <button id="send-button" onClick={handleSend}>Send</button>
       </div>
-    </main>
+      {openSettingsModal && <SettingsModal onClose={setOpenSettingsModal} />}
+    </div>
   );
 }
 

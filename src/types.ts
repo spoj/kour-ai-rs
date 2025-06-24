@@ -10,6 +10,7 @@ export interface ISettings {
 export interface IChatCompletionMessage {
   role: "user" | "assistant";
   content: string;
+  isNotification?: boolean;
 }
 
 export interface IChatCompletionOptions {

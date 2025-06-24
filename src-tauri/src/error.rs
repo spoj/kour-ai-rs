@@ -8,6 +8,8 @@ pub enum Error {
     Store(#[from] tauri_plugin_store::Error),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    #[error(transparent)]
+    Reqwest(#[from] reqwest::Error),
 }
 
 impl Serialize for Error {

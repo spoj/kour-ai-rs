@@ -7,6 +7,7 @@ use self::error::Error;
 use self::settings::Settings;
 use serde_json::{from_value, to_value};
 use std::sync::{Arc, OnceLock};
+use tauri::Emitter;
 use tauri::Wry;
 use tauri_plugin_store::{Store, StoreBuilder};
 
@@ -42,8 +43,72 @@ fn set_settings(settings: Settings) -> Result<()> {
 }
 
 #[tauri::command]
-fn chat_completion(_options: IChatCompletionOptions) -> Result<String> {
-    Ok("this is a dummy response".to_string())
+async fn chat_completion(window: tauri::Window, options: IChatCompletionOptions) -> Result<()> {
+    let client = reqwest::Client::new();
+    let mut messages = options.messages;
+    let api_key = options.api_key;
+    let model_name = options.model_name;
+
+    loop {
+        let res = client
+            .post("https://openrouter.ai/api/v1/chat/completions")
+            .bearer_auth(&api_key)
+            .json(&serde_json::json!({
+                "model": model_name,
+                "messages": messages,
+                "tools": &*chat::TOOLS,
+            }))
+            .send()
+            .await?
+            .json::<chat::ChatCompletionResponse>()
+            .await?;
+
+        let choice = &res.choices[0];
+        if let Some(tool_calls) = choice.message.tool_calls.clone() {
+            messages.push(choice.message.clone());
+            for tool_call in tool_calls {
+                // TODO: add streaming support for tool calls
+                let _ = window.emit(
+                    "chat_completion_update",
+                    &serde_json::json!({
+                        "type": "update",
+                        "isNotification": true,
+                        "message": format!("Calling {}", tool_call.function.name)
+                    }),
+                );
+                let result =
+                    chat::tool_executor(tool_call.function.name, tool_call.function.arguments);
+                let _ = window.emit(
+                    "chat_completion_update",
+                    &serde_json::json!({
+                        "type": "update",
+                        "isNotification": true,
+                        "message": format!("Tool result: {}", result)
+                    }),
+                );
+                messages.push(chat::IChatCompletionMessage {
+                    role: "tool".to_string(),
+                    content: Some(result),
+                    tool_calls: None,
+                    tool_call_id: Some(tool_call.id),
+                });
+            }
+        } else {
+            let _ = window.emit(
+                "chat_completion_update",
+                &serde_json::json!({
+                    "type": "update",
+                    "message": choice.message.content.clone().unwrap()
+                }),
+            );
+            break;
+        }
+    }
+    let _ = window.emit(
+        "chat_completion_update",
+        &serde_json::json!({"type": "end"}),
+    );
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
