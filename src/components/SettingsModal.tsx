@@ -71,9 +71,6 @@ export const SettingsModal = ({
             onChange={(e) => onSave({ providerOrder: e.target.value })}
           />
         </div>
-        <div id="modal-footer">
-          <button onClick={handleClose}>Cancel</button>
-        </div>
       </div>
     </div>
   );

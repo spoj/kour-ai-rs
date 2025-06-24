@@ -87,16 +87,19 @@ impl ChatProcessor {
             )
             .await?;
             let choice = &res.choices[0];
+            let message: ChatCompletionMessage = choice.message.clone().into();
 
-            if let Some(tool_calls) = choice.message.tool_calls.clone() {
+            if let Some(tool_calls) = message.tool_calls.clone() {
                 let new_messages = chat::handle_tool_calls(tool_calls, self.tx.clone()).await?;
                 self.messages.extend(new_messages);
             } else {
-                let content = choice.message.content.clone().unwrap_or_default();
-                self.window.emit(
-                    "chat_completion_update",
-                    EventPayload::new_update(&content, false),
-                )?;
+                let content = message.content;
+                if let Some(chat::Content::Text { text }) = content.get(0) {
+                    self.window.emit(
+                        "chat_completion_update",
+                        EventPayload::new_update(text, false),
+                    )?;
+                }
                 break;
             }
         }

@@ -4,29 +4,80 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type")]
+pub enum Content {
+    #[serde(rename = "text")]
+    Text { text: String },
+    #[serde(rename = "image_url")]
+    ImageUrl { image_url: ImageUrl },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ImageUrl {
+    pub url: String,
+}
+
+pub type MessageContent = Vec<Content>;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatCompletionMessage {
     pub role: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub content: MessageContent,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
 }
 
-impl ChatCompletionMessage {
-    pub fn new(role: &str) -> Self {
-        Self {
-            role: role.to_string(),
-            content: None,
-            tool_calls: None,
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+enum FlexibleContent {
+    Text(String),
+    Parts(MessageContent),
+    None,
+}
+
+impl Default for FlexibleContent {
+    fn default() -> Self {
+        FlexibleContent::None
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct IncomingMessage {
+    pub role: String,
+    #[serde(default)]
+    pub content: FlexibleContent,
+    #[serde(default)]
+    pub tool_calls: Option<Vec<ToolCall>>,
+}
+
+impl From<IncomingMessage> for ChatCompletionMessage {
+    fn from(msg: IncomingMessage) -> Self {
+        let content = match msg.content {
+            FlexibleContent::Text(text) => vec![Content::Text { text }],
+            FlexibleContent::Parts(parts) => parts,
+            FlexibleContent::None => vec![],
+        };
+
+        ChatCompletionMessage {
+            role: msg.role,
+            content,
+            tool_calls: msg.tool_calls,
             tool_call_id: None,
         }
     }
+}
 
-    pub fn content(mut self, content: &str) -> Self {
-        self.content = Some(content.to_string());
-        self
+impl ChatCompletionMessage {
+    pub fn new(role: &str, content: MessageContent) -> Self {
+        Self {
+            role: role.to_string(),
+            content,
+            tool_calls: None,
+            tool_call_id: None,
+        }
     }
 
     pub fn tool_calls(mut self, tool_calls: Vec<ToolCall>) -> Self {
@@ -69,7 +120,17 @@ pub struct ChatCompletionResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Choice {
-    pub message: ChatCompletionMessage,
+    pub message: IncomingMessage,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChatCompletionResponseDelta {
+    pub choices: Vec<ChoiceDelta>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChoiceDelta {
+    pub delta: IncomingMessage,
 }
 
 pub async fn call_openrouter(
@@ -87,10 +148,23 @@ pub async fn call_openrouter(
             "tools": &*tools::TOOLS,
         }))
         .send()
-        .await?
-        .json::<ChatCompletionResponse>()
         .await?;
-    Ok(res)
+
+    let text = res.text().await?;
+    let response: ChatCompletionResponse =
+        match serde_json::from_str::<ChatCompletionResponse>(&text) {
+            Ok(res) => res,
+            Err(_) => ChatCompletionResponse {
+                choices: vec![Choice {
+                    message: IncomingMessage {
+                        role: "assistant".to_string(),
+                        content: FlexibleContent::Text(text),
+                        tool_calls: None,
+                    },
+                }],
+            },
+        };
+    Ok(response)
 }
 
 #[derive(Debug, Clone)]
@@ -123,7 +197,9 @@ pub async fn handle_tool_calls(
 ) -> super::Result<Vec<ChatCompletionMessage>> {
     let mut new_messages = Vec::new();
 
-    new_messages.push(ChatCompletionMessage::new("assistant").tool_calls(tool_calls.clone()));
+    new_messages.push(
+        ChatCompletionMessage::new("assistant", Vec::new()).tool_calls(tool_calls.clone()),
+    );
 
     let tool_futs = tool_calls
         .into_iter()
@@ -134,10 +210,15 @@ pub async fn handle_tool_calls(
     for tool_result in tool_results {
         let (id, result) = tool_result??;
         new_messages.push(
-            ChatCompletionMessage::new("tool")
-                .tool_call_id(&id)
-                .content(&result),
+            ChatCompletionMessage::new(
+                "tool",
+                vec![Content::Text {
+                    text: result.clone(),
+                }],
+            )
+            .tool_call_id(&id),
         );
     }
+
     Ok(new_messages)
 }
