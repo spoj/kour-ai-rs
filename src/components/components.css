@@ -119,3 +119,11 @@
 .chat-bubble p {
   margin: 0;
 }
+
+.chat-bubble.notification {
+  background-color: #fff;
+  color: #666;
+  border: 1px solid #eee;
+  font-style: italic;
+  align-self: center;
+}

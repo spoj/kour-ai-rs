@@ -17,3 +17,10 @@ export interface IChatCompletionOptions {
   modelName: string;
   messages: IChatCompletionMessage[];
 }
+
+export interface IChatCompletionUpdate {
+  type: 'start' | 'update' | 'end';
+  success: boolean;
+  message?: string;
+  isNotification?: boolean;
+}

@@ -1,4 +1,4 @@
-import { IChatCompletionOptions, ISettings } from './main';
+import { IChatCompletionOptions, ISettings, IChatCompletionUpdate } from './main';
 
 export {};
 
@@ -9,7 +9,7 @@ declare global {
       set: (key: keyof ISettings, val: string) => void;
       getSettings: () => ISettings;
       setSettings: (val: ISettings) => void;
-      chatCompletion: (options: IChatCompletionOptions) => Promise<{ success: boolean; message: string; }>;
+      chatCompletion: (options: IChatCompletionOptions, callback: (update: IChatCompletionUpdate) => void) => void;
     };
   }
 }

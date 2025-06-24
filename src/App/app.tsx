@@ -19,19 +19,24 @@ export const App = () => {
 
       const settings = window.electron.getSettings();
 
-      const result = await window.electron.chatCompletion({
+      window.electron.chatCompletion({
         apiKey: settings.apiKey,
         modelName: settings.modelName,
-        messages: newChatHistory.map(m => ({ role: m.role, content: m.content })),
+        messages: newChatHistory.map((m: IMessage) => ({ role: m.role, content: m.content })),
+      }, (update) => {
+        if (update.type === 'start') {
+          setIsTyping(true);
+        } else if (update.type === 'end') {
+          setIsTyping(false);
+        } else if (update.type === 'update') {
+          const botMessage: IMessage = {
+            role: 'assistant',
+            content: update.message,
+            isNotification: update.isNotification,
+          };
+          setChatHistory(prev => [...prev, botMessage]);
+        }
       });
-
-      const botMessage: IMessage = {
-        role: 'assistant',
-        content: result.message,
-        isNotification: !result.success,
-      };
-
-      setChatHistory(prev => [...prev, botMessage]);
     }
   };
 
@@ -68,7 +73,7 @@ export const App = () => {
       </header>
       <div id="chat-container">
         {chatHistory.map((chat, index) => (
-          <ChatBubble key={index} role={chat.role} content={chat.content} />
+          <ChatBubble key={index} role={chat.role} content={chat.content} isNotification={chat.isNotification} />
         ))}
         {isTyping && <ChatBubble role="assistant" content="Thinking..." isNotification />}
       </div>
