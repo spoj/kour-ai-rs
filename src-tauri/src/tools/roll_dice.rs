@@ -18,6 +18,6 @@ pub fn get_tool() -> Tool {
 
 pub async fn execute(_arguments: &str) -> String {
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-    let roll = rand::thread_rng().gen_range(1..=6);
+    let roll = rand::rng().random_range(1..=6);
     roll.to_string()
 }
