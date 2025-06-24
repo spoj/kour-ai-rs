@@ -1,28 +1,28 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import "./components.css";
-import { getSettings, setSettings } from "../commands";
 import { ISettings } from "../types";
 
-export const SettingsModal = ({ onClose }: { onClose: Function }) => {
+export const SettingsModal = ({
+  settings,
+  onClose,
+  onSave,
+}: {
+  settings: ISettings;
+  onClose: Function;
+  onSave: (settings: ISettings) => void;
+}) => {
+  const [localSettings, setLocalSettings] = useState<ISettings>(settings);
+
   const handleModalClick = (e: React.MouseEvent) => {
     e.stopPropagation();
   };
 
-  const [settings, setSettingsState] = useState<ISettings>({
-    apiKey: "",
-    modelName: "",
-    providerOrder: "",
-    sofficePath: "",
-    systemPrompt: "",
-    rootDir: "",
-  });
-
-  useEffect(() => {
-    getSettings().then(setSettingsState);
-  }, []);
+  const handleSave = () => {
+    onSave(localSettings);
+    onClose(false);
+  };
 
   const handleClose = () => {
-    setSettings(settings);
     onClose(false);
   };
 
@@ -37,31 +37,28 @@ export const SettingsModal = ({ onClose }: { onClose: Function }) => {
           <label htmlFor="apiKey">OpenRouter API Key:</label>
           <input
             type="password"
-            value={settings.apiKey}
+            value={localSettings.apiKey}
             onChange={(e) =>
-              setSettingsState((old) => {
-                return { ...old, apiKey: e.target.value };
-              })
+              setLocalSettings((old) => ({ ...old, apiKey: e.target.value }))
             }
           />
           <label htmlFor="modelName">Model Name:</label>
           <input
             type="text"
-            value={settings.modelName}
+            value={localSettings.modelName}
             onChange={(e) =>
-              setSettingsState((old) => {
-                return { ...old, modelName: e.target.value };
-              })
+              setLocalSettings((old) => ({ ...old, modelName: e.target.value }))
             }
           />
           <label htmlFor="system-prompt">System Prompt:</label>
           <textarea
             id="system-prompt"
-            value={settings.systemPrompt}
+            value={localSettings.systemPrompt}
             onChange={(e) =>
-              setSettingsState((old) => {
-                return { ...old, systemPrompt: e.target.value };
-              })
+              setLocalSettings((old) => ({
+                ...old,
+                systemPrompt: e.target.value,
+              }))
             }
           ></textarea>
           <label htmlFor="sofficePath">LibreOffice Path (soffice.com):</label>
@@ -69,11 +66,12 @@ export const SettingsModal = ({ onClose }: { onClose: Function }) => {
             type="text"
             style={{ marginBottom: 0 }}
             placeholder="e.g., C:\Program Files\LibreOffice\program\soffice.com"
-            value={settings.sofficePath}
+            value={localSettings.sofficePath}
             onChange={(e) =>
-              setSettingsState((old) => {
-                return { ...old, sofficePath: e.target.value };
-              })
+              setLocalSettings((old) => ({
+                ...old,
+                sofficePath: e.target.value,
+              }))
             }
           />
           <small
@@ -91,20 +89,18 @@ export const SettingsModal = ({ onClose }: { onClose: Function }) => {
           <input
             type="text"
             placeholder="e.g., google-vertex,anthropic,openai"
-            value={settings.providerOrder}
+            value={localSettings.providerOrder}
             onChange={(e) =>
-              setSettingsState((old) => {
-                return { ...old, providerOrder: e.target.value };
-              })
+              setLocalSettings((old) => ({
+                ...old,
+                providerOrder: e.target.value,
+              }))
             }
           />
         </div>
         <div id="modal-footer">
           <button onClick={handleClose}>Cancel</button>
-          <button
-            id="save-button"
-            onClick={handleClose}
-          >
+          <button id="save-button" onClick={handleSave}>
             Save
           </button>
         </div>

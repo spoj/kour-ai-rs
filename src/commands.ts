@@ -14,16 +14,12 @@ export const chatCompletion = async (
   options: IChatCompletionOptions,
   callback: (update: IChatCompletionUpdate) => void
 ): Promise<void> => {
-  console.log("chatCompletion called with options:", options);
   const unlisten = await listen("chat_completion_update", (event) => {
-    console.log("chat_completion_update event received:", event.payload);
     callback(event.payload as IChatCompletionUpdate);
   });
 
   try {
-    console.log("invoking chat_completion command");
     await invoke("chat_completion", { options });
-    console.log("chat_completion command invoked");
   } finally {
     unlisten();
   }

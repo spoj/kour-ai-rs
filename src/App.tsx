@@ -97,7 +97,16 @@ function App() {
         ></textarea>
         <button id="send-button" onClick={handleSend}>Send</button>
       </div>
-      {openSettingsModal && <SettingsModal onClose={setOpenSettingsModal} />}
+      {openSettingsModal && (
+        <SettingsModal
+          settings={settings}
+          onClose={() => setOpenSettingsModal(false)}
+          onSave={(newSettings) => {
+            setSettings(newSettings);
+            setSettings(newSettings);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -73,11 +73,11 @@ pub enum ChatUpdate {
 }
 
 pub async fn handle_tool_calls(
-    messages: &mut Vec<IChatCompletionMessage>,
     tool_calls: Vec<ToolCall>,
     tx: tokio::sync::mpsc::Sender<ChatUpdate>,
-) {
-    messages.push(IChatCompletionMessage {
+) -> Vec<IChatCompletionMessage> {
+    let mut new_messages = Vec::new();
+    new_messages.push(IChatCompletionMessage {
         role: "assistant".to_string(),
         content: None,
         tool_calls: Some(tool_calls.clone()),
@@ -104,11 +104,12 @@ pub async fn handle_tool_calls(
 
     for tool_result in tool_results {
         let (id, result) = tool_result.unwrap();
-        messages.push(IChatCompletionMessage {
+        new_messages.push(IChatCompletionMessage {
             role: "tool".to_string(),
             content: Some(result),
             tool_calls: None,
             tool_call_id: Some(id),
         });
     }
+    new_messages
 }

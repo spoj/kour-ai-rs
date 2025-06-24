@@ -22,16 +22,7 @@ fn get_settings() -> Result<Settings> {
     let settings = store
         .get("settings")
         .and_then(|v| from_value(v).ok())
-        .unwrap_or({
-            Settings {
-                api_key: "".to_string(),
-                model_name: "".to_string(),
-                root_dir: "".to_string(),
-                system_prompt: "".to_string(),
-                soffice_path: "".to_string(),
-                provider_order: "".to_string(),
-            }
-        });
+        .unwrap_or_default();
     Ok(settings)
 }
 
@@ -45,6 +36,11 @@ fn set_settings(settings: Settings) -> Result<()> {
 
 #[tauri::command]
 async fn chat_completion(window: tauri::Window, options: IChatCompletionOptions) -> Result<()> {
+    let _ = window.emit(
+        "chat_completion_update",
+        &serde_json::json!({ "type": "start" }),
+    );
+
     let (tx, mut rx) = tokio::sync::mpsc::channel(100);
     let mut messages = options.messages;
     
@@ -81,7 +77,8 @@ async fn chat_completion(window: tauri::Window, options: IChatCompletionOptions)
         let choice = &res.choices[0];
 
         if let Some(tool_calls) = choice.message.tool_calls.clone() {
-            chat::handle_tool_calls(&mut messages, tool_calls, tx.clone()).await;
+            let new_messages = chat::handle_tool_calls(tool_calls, tx.clone()).await;
+            messages.extend(new_messages);
         } else {
             let _ = window.emit(
                 "chat_completion_update",
