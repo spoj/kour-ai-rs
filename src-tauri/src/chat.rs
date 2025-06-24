@@ -1,9 +1,10 @@
+use crate::tools;
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
-use crate::tools;
+use tokio::sync::mpsc;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct IChatCompletionMessage {
+pub struct ChatCompletionMessage {
     pub role: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
@@ -14,12 +15,12 @@ pub struct IChatCompletionMessage {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct IChatCompletionOptions {
+pub struct ChatCompletionOptions {
     #[serde(rename = "apiKey")]
     pub api_key: String,
     #[serde(rename = "modelName")]
     pub model_name: String,
-    pub messages: Vec<IChatCompletionMessage>,
+    pub messages: Vec<ChatCompletionMessage>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -42,11 +43,11 @@ pub struct ChatCompletionResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Choice {
-    pub message: IChatCompletionMessage,
+    pub message: ChatCompletionMessage,
 }
 
 pub async fn call_openrouter(
-    messages: &Vec<IChatCompletionMessage>,
+    messages: &Vec<ChatCompletionMessage>,
     api_key: &str,
     model_name: &str,
 ) -> super::Result<ChatCompletionResponse> {
@@ -69,15 +70,15 @@ pub async fn call_openrouter(
 #[derive(Debug, Clone)]
 pub enum ChatUpdate {
     ToolCall(String),
-    ToolResult(String),
+    ToolResult(String, String),
 }
 
 pub async fn handle_tool_calls(
     tool_calls: Vec<ToolCall>,
-    tx: tokio::sync::mpsc::Sender<ChatUpdate>,
-) -> Vec<IChatCompletionMessage> {
+    tx: mpsc::Sender<ChatUpdate>,
+) -> Vec<ChatCompletionMessage> {
     let mut new_messages = Vec::new();
-    new_messages.push(IChatCompletionMessage {
+    new_messages.push(ChatCompletionMessage {
         role: "assistant".to_string(),
         content: None,
         tool_calls: Some(tool_calls.clone()),
@@ -91,10 +92,13 @@ pub async fn handle_tool_calls(
                 .await
                 .unwrap();
             let result =
-                tools::tool_executor(tool_call.function.name, tool_call.function.arguments).await;
-            tx.send(ChatUpdate::ToolResult(result.clone()))
-                .await
-                .unwrap();
+                tools::tool_executor(&tool_call.function.name, &tool_call.function.arguments).await;
+            tx.send(ChatUpdate::ToolResult(
+                tool_call.function.name.clone(),
+                result.clone(),
+            ))
+            .await
+            .unwrap();
 
             (tool_call.id, result)
         })
@@ -104,7 +108,7 @@ pub async fn handle_tool_calls(
 
     for tool_result in tool_results {
         let (id, result) = tool_result.unwrap();
-        new_messages.push(IChatCompletionMessage {
+        new_messages.push(ChatCompletionMessage {
             role: "tool".to_string(),
             content: Some(result),
             tool_calls: None,

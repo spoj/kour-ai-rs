@@ -3,7 +3,7 @@ mod error;
 mod settings;
 mod tools;
 
-use self::chat::IChatCompletionOptions;
+use self::chat::ChatCompletionOptions;
 use self::error::Error;
 use self::settings::Settings;
 use serde_json::{from_value, to_value};
@@ -35,7 +35,7 @@ fn set_settings(settings: Settings) -> Result<()> {
 }
 
 #[tauri::command]
-async fn chat_completion(window: tauri::Window, options: IChatCompletionOptions) -> Result<()> {
+async fn chat_completion(window: tauri::Window, options: ChatCompletionOptions) -> Result<()> {
     let _ = window.emit(
         "chat_completion_update",
         &serde_json::json!({ "type": "start" }),
@@ -43,7 +43,7 @@ async fn chat_completion(window: tauri::Window, options: IChatCompletionOptions)
 
     let (tx, mut rx) = tokio::sync::mpsc::channel(100);
     let mut messages = options.messages;
-    
+
     let window_clone = window.clone();
     tokio::spawn(async move {
         while let Some(update) = rx.recv().await {
@@ -54,17 +54,17 @@ async fn chat_completion(window: tauri::Window, options: IChatCompletionOptions)
                         &serde_json::json!({
                             "type": "update",
                             "isNotification": true,
-                            "message": format!("Calling {}", name)
+                            "message": format!("Calling {}.", name)
                         }),
                     );
                 }
-                chat::ChatUpdate::ToolResult(result) => {
+                chat::ChatUpdate::ToolResult(name, _result) => {
                     let _ = window_clone.emit(
                         "chat_completion_update",
                         &serde_json::json!({
                             "type": "update",
                             "isNotification": true,
-                            "message": format!("Tool result: {}", result)
+                            "message": format!("{} Done.", name)
                         }),
                     );
                 }

@@ -19,8 +19,8 @@ pub struct Function {
 
 pub static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| vec![roll_dice::get_tool()]);
 
-pub async fn tool_executor(name: String, arguments: String) -> String {
-    match name.as_str() {
+pub async fn tool_executor(name: &str, arguments: &str) -> String {
+    match name {
         "roll_dice" => roll_dice::execute(arguments).await,
         _ => "Tool not found".to_string(),
     }

@@ -6,7 +6,7 @@ export const getSettings = async (): Promise<ISettings> => {
   return await invoke("get_settings");
 };
 
-export const setSettings = async (settings: ISettings): Promise<void> => {
+export const saveSettings = async (settings: ISettings): Promise<void> => {
   await invoke("set_settings", { settings });
 };
 

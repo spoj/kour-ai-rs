@@ -1,4 +1,3 @@
-import { useState } from "react";
 import "./components.css";
 import { ISettings } from "../types";
 
@@ -9,17 +8,10 @@ export const SettingsModal = ({
 }: {
   settings: ISettings;
   onClose: Function;
-  onSave: (settings: ISettings) => void;
+  onSave: (settings: Partial<ISettings>) => void;
 }) => {
-  const [localSettings, setLocalSettings] = useState<ISettings>(settings);
-
   const handleModalClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-  };
-
-  const handleSave = () => {
-    onSave(localSettings);
-    onClose(false);
   };
 
   const handleClose = () => {
@@ -37,42 +29,28 @@ export const SettingsModal = ({
           <label htmlFor="apiKey">OpenRouter API Key:</label>
           <input
             type="password"
-            value={localSettings.apiKey}
-            onChange={(e) =>
-              setLocalSettings((old) => ({ ...old, apiKey: e.target.value }))
-            }
+            value={settings.apiKey}
+            onChange={(e) => onSave({ apiKey: e.target.value })}
           />
           <label htmlFor="modelName">Model Name:</label>
           <input
             type="text"
-            value={localSettings.modelName}
-            onChange={(e) =>
-              setLocalSettings((old) => ({ ...old, modelName: e.target.value }))
-            }
+            value={settings.modelName}
+            onChange={(e) => onSave({ modelName: e.target.value })}
           />
           <label htmlFor="system-prompt">System Prompt:</label>
           <textarea
             id="system-prompt"
-            value={localSettings.systemPrompt}
-            onChange={(e) =>
-              setLocalSettings((old) => ({
-                ...old,
-                systemPrompt: e.target.value,
-              }))
-            }
+            value={settings.systemPrompt}
+            onChange={(e) => onSave({ systemPrompt: e.target.value })}
           ></textarea>
           <label htmlFor="sofficePath">LibreOffice Path (soffice.com):</label>
           <input
             type="text"
             style={{ marginBottom: 0 }}
             placeholder="e.g., C:\Program Files\LibreOffice\program\soffice.com"
-            value={localSettings.sofficePath}
-            onChange={(e) =>
-              setLocalSettings((old) => ({
-                ...old,
-                sofficePath: e.target.value,
-              }))
-            }
+            value={settings.sofficePath}
+            onChange={(e) => onSave({ sofficePath: e.target.value })}
           />
           <small
             style={{
@@ -89,20 +67,12 @@ export const SettingsModal = ({
           <input
             type="text"
             placeholder="e.g., google-vertex,anthropic,openai"
-            value={localSettings.providerOrder}
-            onChange={(e) =>
-              setLocalSettings((old) => ({
-                ...old,
-                providerOrder: e.target.value,
-              }))
-            }
+            value={settings.providerOrder}
+            onChange={(e) => onSave({ providerOrder: e.target.value })}
           />
         </div>
         <div id="modal-footer">
           <button onClick={handleClose}>Cancel</button>
-          <button id="save-button" onClick={handleSave}>
-            Save
-          </button>
         </div>
       </div>
     </div>
