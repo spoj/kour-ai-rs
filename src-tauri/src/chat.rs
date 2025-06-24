@@ -1,6 +1,6 @@
+use futures::future::join_all;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::sync::LazyLock;
+use crate::tools;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct IChatCompletionMessage {
@@ -45,50 +45,6 @@ pub struct Choice {
     pub message: IChatCompletionMessage,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Tool {
-    pub r#type: String,
-    pub function: Function,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Function {
-    pub name: String,
-    pub description: String,
-    pub parameters: Value,
-}
-
-pub static TOOLS: LazyLock<[Tool; 1]> = LazyLock::new(|| {
-    [Tool {
-        r#type: "function".to_string(),
-        function: Function {
-            name: "read_file".to_string(),
-            description: "read the contents of a file".to_string(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "The path to the file"
-                    }
-                },
-                "required": ["path"]
-            }),
-        },
-    }]
-});
-
-pub fn tool_executor(name: String, arguments: String) -> String {
-    match name.as_str() {
-        "read_file" => {
-            let args: serde_json::Value = serde_json::from_str(&arguments).unwrap();
-            let path = args["path"].as_str().unwrap();
-            std::fs::read_to_string(path).unwrap()
-        }
-        _ => "Tool not found".to_string(),
-    }
-}
-
 pub async fn call_openrouter(
     messages: &Vec<IChatCompletionMessage>,
     api_key: &str,
@@ -101,7 +57,7 @@ pub async fn call_openrouter(
         .json(&serde_json::json!({
             "model": model_name,
             "messages": messages,
-            "tools": &*TOOLS,
+            "tools": &*tools::TOOLS,
         }))
         .send()
         .await?
@@ -117,30 +73,42 @@ pub enum ChatUpdate {
 }
 
 pub async fn handle_tool_calls(
-    message: &mut Vec<IChatCompletionMessage>,
+    messages: &mut Vec<IChatCompletionMessage>,
     tool_calls: Vec<ToolCall>,
     tx: tokio::sync::mpsc::Sender<ChatUpdate>,
 ) {
-    message.push(IChatCompletionMessage {
+    messages.push(IChatCompletionMessage {
         role: "assistant".to_string(),
         content: None,
         tool_calls: Some(tool_calls.clone()),
         tool_call_id: None,
     });
 
-    for tool_call in tool_calls {
-        tx.send(ChatUpdate::ToolCall(tool_call.function.name.clone()))
-            .await
-            .unwrap();
-        let result = tool_executor(tool_call.function.name, tool_call.function.arguments);
-        tx.send(ChatUpdate::ToolResult(result.clone()))
-            .await
-            .unwrap();
-        message.push(IChatCompletionMessage {
+    let tool_futs = tool_calls.into_iter().map(|tool_call| {
+        let tx = tx.clone();
+        tokio::spawn(async move {
+            tx.send(ChatUpdate::ToolCall(tool_call.function.name.clone()))
+                .await
+                .unwrap();
+            let result =
+                tools::tool_executor(tool_call.function.name, tool_call.function.arguments).await;
+            tx.send(ChatUpdate::ToolResult(result.clone()))
+                .await
+                .unwrap();
+
+            (tool_call.id, result)
+        })
+    });
+
+    let tool_results = join_all(tool_futs).await;
+
+    for tool_result in tool_results {
+        let (id, result) = tool_result.unwrap();
+        messages.push(IChatCompletionMessage {
             role: "tool".to_string(),
             content: Some(result),
             tool_calls: None,
-            tool_call_id: Some(tool_call.id),
+            tool_call_id: Some(id),
         });
     }
 }

@@ -1,6 +1,7 @@
 mod chat;
 mod error;
 mod settings;
+mod tools;
 
 use self::chat::IChatCompletionOptions;
 use self::error::Error;
