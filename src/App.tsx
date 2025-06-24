@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import "./App.css";
-import { chatCompletion, getSettings } from "./commands";
+import { chatCompletion, getSettings, saveSettings } from "./commands";
 import { IChatCompletionMessage, ISettings } from "./types";
 import { ChatBubble } from "./components/ChatBubble";
 import { SettingsModal } from "./components/SettingsModal";
@@ -22,6 +22,12 @@ function App() {
   useEffect(() => {
     getSettings().then(setSettings);
   }, []);
+
+  const handleSettingsChange = (newSettings: Partial<ISettings>) => {
+    const updatedSettings = { ...settings, ...newSettings };
+    setSettings(updatedSettings);
+    saveSettings(updatedSettings);
+  };
 
   const handleSend = async () => {
     const newMessages: IChatCompletionMessage[] = [
@@ -66,6 +72,8 @@ function App() {
             type="text"
             id="path-input"
             placeholder="Enter root directory..."
+            value={settings.rootDir}
+            onChange={(e) => handleSettingsChange({ rootDir: e.target.value })}
           />
         </div>
         <div style={{ paddingLeft: "10px" }}>
@@ -101,10 +109,7 @@ function App() {
         <SettingsModal
           settings={settings}
           onClose={() => setOpenSettingsModal(false)}
-          onSave={(newSettings) => {
-            setSettings(newSettings);
-            setSettings(newSettings);
-          }}
+          onSave={handleSettingsChange}
         />
       )}
     </div>
