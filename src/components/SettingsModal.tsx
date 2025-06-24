@@ -38,12 +38,6 @@ export const SettingsModal = ({
             value={settings.modelName}
             onChange={(e) => onSave({ modelName: e.target.value })}
           />
-          <label htmlFor="system-prompt">System Prompt:</label>
-          <textarea
-            id="system-prompt"
-            value={settings.systemPrompt}
-            onChange={(e) => onSave({ systemPrompt: e.target.value })}
-          ></textarea>
           <label htmlFor="sofficePath">LibreOffice Path (soffice.com):</label>
           <input
             type="text"

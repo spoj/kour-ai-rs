@@ -2,7 +2,7 @@ mod ls;
 mod roll_dice;
 
 use serde::{Deserialize, Serialize};
-use serde_json::{from_str, from_value, Value};
+use serde_json::{from_str, Value};
 use std::sync::LazyLock;
 
 use crate::error::Error;

@@ -2,6 +2,7 @@ mod chat;
 mod error;
 mod settings;
 mod tools;
+mod utils;
 
 use self::chat::{ChatCompletionMessage, ChatCompletionOptions};
 use self::error::Error;
@@ -17,6 +18,7 @@ use tokio::sync::mpsc;
 type Result<T> = std::result::Result<T, Error>;
 
 pub static STORE: OnceLock<Arc<Store<Wry>>> = OnceLock::new();
+pub static SYSTEM_PROMPT: &str = include_str!("DEFAULT_PROMPT.md");
 
 #[derive(Serialize, Clone)]
 #[serde(tag = "type")]
@@ -84,6 +86,7 @@ impl ChatProcessor {
                 &self.messages,
                 &self.options.api_key,
                 &self.options.model_name,
+                SYSTEM_PROMPT
             )
             .await?;
             let choice = &res.choices[0];

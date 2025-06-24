@@ -1,10 +1,9 @@
-use crate::error::Error;
+use crate::{error::Error, utils};
 use crate::Result;
 
 use super::{Function, Tool};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::Path;
 use tokio::task;
 
 pub fn get_tool() -> Tool {
@@ -43,31 +42,9 @@ pub async fn ls(args: LsArgs) -> Result<String> {
         ));
     }
 
-    let root_dir_path = Path::new(&root_dir);
-    let relative_path = Path::new(&args.relative_path);
+    let safe_path = utils::get_safe_path(&root_dir, &args.relative_path)?;
 
-    let path = root_dir_path.join(relative_path);
-
-    let canonical_root = match root_dir_path.canonicalize() {
-        Ok(path) => path,
-        Err(e) => {
-            return Err(Error::Tool(format!(
-                "Failed to canonicalize the root dir: {}",
-                e
-            )))
-        }
-    };
-
-    let canonical_path = match path.canonicalize() {
-        Ok(path) => path,
-        Err(e) => return Err(Error::Tool(format!("Failed to canonicalize path: {}", e))),
-    };
-
-    if !canonical_path.starts_with(&canonical_root) {
-        return Err(Error::Tool("Error: path outside root dir".to_string()));
-    }
-
-    match fs::read_dir(canonical_path) {
+    match fs::read_dir(safe_path) {
         Ok(entries) => {
             let mut result = String::new();
             for entry in entries.flatten() {

@@ -132,15 +132,23 @@ pub async fn call_openrouter(
     messages: &Vec<ChatCompletionMessage>,
     api_key: &str,
     model_name: &str,
+    system_prompt: &str,
 ) -> super::Result<ChatCompletionResponse> {
     println!("Sending messages to OpenRouter: {:?}", messages);
     let client = reqwest::Client::new();
+    let mut final_messages = messages.clone();
+    if !system_prompt.is_empty() {
+        final_messages.insert(
+            0,
+            ChatCompletionMessage::new("system", vec![Content::Text { text: system_prompt.to_string() }]),
+        );
+    }
     let res = client
         .post("https://openrouter.ai/api/v1/chat/completions")
         .bearer_auth(api_key)
         .json(&serde_json::json!({
             "model": model_name,
-            "messages": messages,
+            "messages": final_messages,
             "tools": &*tools::TOOLS,
         }))
         .send()
