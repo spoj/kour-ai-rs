@@ -79,6 +79,7 @@ impl ChatCompletionMessage {
         self
     }
 
+    #[allow(dead_code)]
     pub fn tool_call_id(mut self, tool_call_id: &str) -> Self {
         self.tool_call_id = Some(tool_call_id.to_string());
         self
@@ -132,6 +133,7 @@ pub async fn call_openrouter(
     api_key: &str,
     model_name: &str,
 ) -> super::Result<ChatCompletionResponse> {
+    println!("Sending messages to OpenRouter: {:?}", messages);
     let client = reqwest::Client::new();
     let res = client
         .post("https://openrouter.ai/api/v1/chat/completions")
@@ -145,6 +147,7 @@ pub async fn call_openrouter(
         .await?;
 
     let text = res.text().await?;
+    println!("Got response from OpenRouter: {}", text);
     let response: ChatCompletionResponse =
         match serde_json::from_str::<ChatCompletionResponse>(&text) {
             Ok(res) => res,
@@ -174,8 +177,15 @@ async fn execute_tool_call(
 ) -> super::Result<(String, String)> {
     tx.send(ChatUpdate::ToolCall(tool_call.function.name.clone()))
         .await?;
-    let result =
-        tools::tool_executor(&tool_call.function.name, &tool_call.function.arguments).await;
+    let result = match tools::tool_executor(
+        &tool_call.function.name,
+        &tool_call.function.arguments,
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(e) => e.to_string(),
+    };
     tx.send(ChatUpdate::ToolResult(
         tool_call.function.name.clone(),
         result.clone(),
@@ -192,7 +202,7 @@ pub async fn handle_tool_calls(
     let mut new_messages = Vec::new();
 
     new_messages
-        .push(ChatCompletionMessage::new("assistant", Vec::new()).tool_calls(tool_calls.clone()));
+        .push(ChatCompletionMessage::new("assistant", vec![]).tool_calls(tool_calls.clone()));
 
     let tool_futs = tool_calls
         .into_iter()
@@ -202,15 +212,12 @@ pub async fn handle_tool_calls(
 
     for tool_result in tool_results {
         let (id, result) = tool_result??;
-        new_messages.push(
-            ChatCompletionMessage::new(
-                "tool",
-                vec![Content::Text {
-                    text: result.clone(),
-                }],
-            )
-            .tool_call_id(&id),
-        );
+        new_messages.push(ChatCompletionMessage {
+            role: "tool".to_string(),
+            content: vec![Content::Text { text: result }],
+            tool_call_id: Some(id),
+            tool_calls: None,
+        });
     }
 
     Ok(new_messages)

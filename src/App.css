@@ -7,6 +7,11 @@ body {
   display: flex;
   height: 100vh;
 }
+
+#root {
+  width: 100%;
+}
+
 .container {
   flex-grow: 1;
   display: flex;

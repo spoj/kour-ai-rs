@@ -16,7 +16,7 @@ use tokio::sync::mpsc;
 
 type Result<T> = std::result::Result<T, Error>;
 
-static STORE: OnceLock<Arc<Store<Wry>>> = OnceLock::new();
+pub static STORE: OnceLock<Arc<Store<Wry>>> = OnceLock::new();
 
 #[derive(Serialize, Clone)]
 #[serde(tag = "type")]
@@ -111,8 +111,7 @@ impl ChatProcessor {
     }
 }
 
-#[tauri::command]
-fn get_settings() -> Result<Settings> {
+pub fn get_settings_fn() -> Result<Settings> {
     let store = STORE
         .get()
         .ok_or(Error::Io(std::io::ErrorKind::NotFound.into()))?;
@@ -121,6 +120,11 @@ fn get_settings() -> Result<Settings> {
         .and_then(|v| from_value(v).ok())
         .unwrap_or_default();
     Ok(settings)
+}
+
+#[tauri::command]
+fn get_settings() -> Result<Settings> {
+    get_settings_fn()
 }
 
 #[tauri::command]

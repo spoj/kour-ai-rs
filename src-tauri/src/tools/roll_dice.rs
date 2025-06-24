@@ -1,5 +1,9 @@
 use crate::tools::{Function, Tool};
 use rand::Rng;
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+pub struct RollDiceArgs {}
 
 pub fn get_tool() -> Tool {
     Tool {
@@ -16,8 +20,8 @@ pub fn get_tool() -> Tool {
     }
 }
 
-pub async fn execute(_arguments: &str) -> String {
+pub async fn execute(_args: RollDiceArgs) -> crate::Result<String> {
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
     let roll = rand::rng().random_range(1..=6);
-    roll.to_string()
+    Ok(roll.to_string())
 }

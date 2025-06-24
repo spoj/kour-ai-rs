@@ -18,6 +18,8 @@ pub enum Error {
     Send(String),
     #[error("Tauri Error: {0}")]
     Tauri(String),
+    #[error("Tool Error: {0}")]
+    Tool(String),
 }
 
 impl From<tauri::Error> for Error {
