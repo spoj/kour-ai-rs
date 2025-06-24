@@ -1,14 +1,14 @@
-import { IChatCompletionOptions } from './main';
+import { IChatCompletionOptions, ISettings } from './main';
 
 export {};
 
 declare global {
   interface Window {
     electron: {
-      get: (key: string) => any;
-      set: (key: string, val: any) => void;
-      getSettings: () => any;
-      setSettings: (val: any) => void;
+      get: (key: keyof ISettings) => string;
+      set: (key: keyof ISettings, val: string) => void;
+      getSettings: () => ISettings;
+      setSettings: (val: ISettings) => void;
       chatCompletion: (options: IChatCompletionOptions) => Promise<{ success: boolean; message: string; }>;
     };
   }
