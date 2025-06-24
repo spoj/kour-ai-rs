@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    kour_ai_lib::run()
+    kour_ai_rs_lib::run()
 }
