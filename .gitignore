@@ -105,3 +105,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+old_ref
