@@ -44,55 +44,43 @@ fn set_settings(settings: Settings) -> Result<()> {
 
 #[tauri::command]
 async fn chat_completion(window: tauri::Window, options: IChatCompletionOptions) -> Result<()> {
-    let client = reqwest::Client::new();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(100);
     let mut messages = options.messages;
-    let api_key = options.api_key;
-    let model_name = options.model_name;
+    
+    let window_clone = window.clone();
+    tokio::spawn(async move {
+        while let Some(update) = rx.recv().await {
+            match update {
+                chat::ChatUpdate::ToolCall(name) => {
+                    let _ = window_clone.emit(
+                        "chat_completion_update",
+                        &serde_json::json!({
+                            "type": "update",
+                            "isNotification": true,
+                            "message": format!("Calling {}", name)
+                        }),
+                    );
+                }
+                chat::ChatUpdate::ToolResult(result) => {
+                    let _ = window_clone.emit(
+                        "chat_completion_update",
+                        &serde_json::json!({
+                            "type": "update",
+                            "isNotification": true,
+                            "message": format!("Tool result: {}", result)
+                        }),
+                    );
+                }
+            }
+        }
+    });
 
     loop {
-        let res = client
-            .post("https://openrouter.ai/api/v1/chat/completions")
-            .bearer_auth(&api_key)
-            .json(&serde_json::json!({
-                "model": model_name,
-                "messages": messages,
-                "tools": &*chat::TOOLS,
-            }))
-            .send()
-            .await?
-            .json::<chat::ChatCompletionResponse>()
-            .await?;
-
+        let res = chat::call_openrouter(&messages, &options.api_key, &options.model_name).await?;
         let choice = &res.choices[0];
+
         if let Some(tool_calls) = choice.message.tool_calls.clone() {
-            messages.push(choice.message.clone());
-            for tool_call in tool_calls {
-                // TODO: add streaming support for tool calls
-                let _ = window.emit(
-                    "chat_completion_update",
-                    &serde_json::json!({
-                        "type": "update",
-                        "isNotification": true,
-                        "message": format!("Calling {}", tool_call.function.name)
-                    }),
-                );
-                let result =
-                    chat::tool_executor(tool_call.function.name, tool_call.function.arguments);
-                let _ = window.emit(
-                    "chat_completion_update",
-                    &serde_json::json!({
-                        "type": "update",
-                        "isNotification": true,
-                        "message": format!("Tool result: {}", result)
-                    }),
-                );
-                messages.push(chat::IChatCompletionMessage {
-                    role: "tool".to_string(),
-                    content: Some(result),
-                    tool_calls: None,
-                    tool_call_id: Some(tool_call.id),
-                });
-            }
+            chat::handle_tool_calls(&mut messages, tool_calls, tx.clone()).await;
         } else {
             let _ = window.emit(
                 "chat_completion_update",
@@ -104,6 +92,7 @@ async fn chat_completion(window: tauri::Window, options: IChatCompletionOptions)
             break;
         }
     }
+
     let _ = window.emit(
         "chat_completion_update",
         &serde_json::json!({"type": "end"}),

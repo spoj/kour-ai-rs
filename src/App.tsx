@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./App.css";
-import { chatCompletion } from "./commands";
-import { IChatCompletionMessage } from "./types";
+import { chatCompletion, getSettings } from "./commands";
+import { IChatCompletionMessage, ISettings } from "./types";
 import { ChatBubble } from "./components/ChatBubble";
 import { SettingsModal } from "./components/SettingsModal";
 
@@ -10,6 +10,18 @@ function App() {
   const [input, setInput] = useState("");
   const [openSettingsModal, setOpenSettingsModal] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [settings, setSettings] = useState<ISettings>({
+    apiKey: "",
+    modelName: "",
+    rootDir: "",
+    systemPrompt: "",
+    sofficePath: "",
+    providerOrder: ""
+  });
+
+  useEffect(() => {
+    getSettings().then(setSettings);
+  }, []);
 
   const handleSend = async () => {
     const newMessages: IChatCompletionMessage[] = [
@@ -19,8 +31,8 @@ function App() {
     setMessages(newMessages);
     setInput("");
     chatCompletion({
-      apiKey: "dummy",
-      modelName: "dummy",
+      apiKey: settings.apiKey,
+      modelName: settings.modelName,
       messages: newMessages,
     }, (update) => {
       if (update.type === 'start') {
