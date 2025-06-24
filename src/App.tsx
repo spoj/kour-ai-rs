@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { FaCog, FaPaperPlane, FaRedo } from "react-icons/fa";
 import "./App.css";
 import { chatCompletion, getSettings, saveSettings } from "./commands";
 import { IChatCompletionMessage, ISettings } from "./types";
@@ -9,13 +10,13 @@ function App() {
   const [messages, setMessages] = useState<IChatCompletionMessage[]>([]);
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<string[]>([]);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const [openSettingsModal, setOpenSettingsModal] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [settings, setSettings] = useState<ISettings>({
     apiKey: "",
     modelName: "",
     rootDir: "",
-    systemPrompt: "",
     sofficePath: "",
     providerOrder: ""
   });
@@ -24,6 +25,12 @@ function App() {
     getSettings().then(setSettings);
   }, []);
 
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
+
   const handleSettingsChange = (newSettings: Partial<ISettings>) => {
     const updatedSettings = { ...settings, ...newSettings };
     setSettings(updatedSettings);
@@ -31,6 +38,7 @@ function App() {
   };
 
   const handleSend = async () => {
+    if (input.trim() === "") return;
     let content: any = [{ type: "text", text: input }];
     if (attachments.length > 0) {
       content = [
@@ -103,10 +111,24 @@ function App() {
     }
   };
 
+  const handleCopy = (content: IChatCompletionMessage["content"]) => {
+    const textToCopy = content
+      .filter((item) => item.type === "text")
+      .map((item: any) => item.text)
+      .join("\n");
+    navigator.clipboard.writeText(textToCopy);
+  };
+
+  const handleDelete = (index: number) => {
+    setMessages((prev) => prev.filter((_, i) => i !== index));
+  };
+
   return (
     <div className="container">
       <header>
-        <h1>Kour-AI</h1>
+        <a href="/" style={{ color: "white", textDecoration: "none" }}>
+          <h1>Kour-AI</h1>
+        </a>
         <div id="path-container">
           <input
             type="text"
@@ -117,25 +139,24 @@ function App() {
           />
         </div>
         <div style={{ paddingLeft: "10px" }}>
-          <button id="header-button" title="Restart Session">
-            Restart
-          </button>
           <button
             id="header-button"
             title="Settings"
             onClick={() => setOpenSettingsModal(true)}
           >
-            Settings
+            <FaCog />
           </button>
         </div>
       </header>
-      <div id="chat-container">
+      <div id="chat-container" ref={chatContainerRef}>
         {messages.map((m, i) => (
           <ChatBubble
             key={i}
             role={m.role}
             content={m.content}
             isNotification={m.isNotification}
+            onCopy={() => handleCopy(m.content)}
+            onDelete={() => handleDelete(i)}
           />
         ))}
         {isTyping && (
@@ -143,6 +164,8 @@ function App() {
             role="assistant"
             content={[{ type: "text", text: "Thinking..." }]}
             isNotification
+            onCopy={() => { }}
+            onDelete={() => { }}
           />
         )}
       </div>
@@ -164,7 +187,9 @@ function App() {
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
         ></textarea>
-        <button id="send-button" onClick={handleSend}>Send</button>
+        <button id="send-button" onClick={handleSend}>
+          <FaPaperPlane />
+        </button>
       </div>
       {openSettingsModal && (
         <SettingsModal

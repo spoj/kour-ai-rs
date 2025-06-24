@@ -54,11 +54,7 @@ h1 {
   color: white;
   font-size: 24px;
   cursor: pointer;
-  transition: transform 0.5s ease-in-out;
   margin-right: 5px;
-}
-#header-button:hover {
-  transform: rotate(360deg);
 }
 #chat-container {
   flex-grow: 1;
@@ -72,7 +68,18 @@ h1 {
   padding: 10px;
   border-top: 1px solid #ddd;
   align-items: flex-end;
+  position: relative;
 }
+
+.attachment-thumbnail {
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+  border-radius: 5px;
+  margin-right: 10px;
+  cursor: pointer;
+}
+
 #message-input {
   font-family: inherit;
   flex-grow: 1;
