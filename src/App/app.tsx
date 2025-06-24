@@ -8,6 +8,7 @@ export const App = () => {
   const [openSettingsModal, setOpenSettingsModal] = useState(false);
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<IMessage[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
 
   const handleSendMessage = async () => {
     if (message.trim()) {
@@ -69,6 +70,7 @@ export const App = () => {
         {chatHistory.map((chat, index) => (
           <ChatBubble key={index} role={chat.role} content={chat.content} />
         ))}
+        {isTyping && <ChatBubble role="assistant" content="Thinking..." isNotification />}
       </div>
       <div id="input-container">
         <textarea
