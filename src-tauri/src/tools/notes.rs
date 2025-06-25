@@ -1,9 +1,13 @@
 use crate::error::Error;
 use chrono::Local;
 use serde::Deserialize;
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::PathBuf;
 use tokio::task;
+
+use crate::tools::Function;
+use crate::tools::Tool;
 
 pub async fn read_notes() -> crate::Result<String> {
     let notes_path = get_notes_path().await?;
@@ -15,22 +19,26 @@ pub async fn read_notes() -> crate::Result<String> {
 
 #[derive(Deserialize)]
 pub struct AppendNotesArgs {
-    pub notes: String,
+    pub markdown_content: String,
 }
 
 pub async fn append_notes(args: AppendNotesArgs) -> crate::Result<String> {
     let notes_path = get_notes_path().await?;
     let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
-    let note_entry = format!("# Note entry on [{}]\n{}\n\n", timestamp, args.notes);
+    let note_entry = format!(
+        "<note date=\"{}\">\n{}\n</note>\n\n",
+        timestamp, args.markdown_content
+    );
 
-    let mut current_content = if notes_path.exists() {
-        fs::read_to_string(&notes_path).map_err(|e| Error::Tool(e.to_string()))?
-    } else {
-        String::new()
-    };
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(notes_path)
+        .map_err(|e| Error::Tool(e.to_string()))?;
 
-    current_content.push_str(&note_entry);
-    fs::write(notes_path, current_content).map_err(|e| Error::Tool(e.to_string()))?;
+    file.write_all(note_entry.as_bytes())
+        .map_err(|e| Error::Tool(e.to_string()))?;
+
     Ok("Note appended successfully.".to_string())
 }
 
@@ -45,18 +53,15 @@ async fn get_notes_path() -> crate::Result<PathBuf> {
         ));
     }
 
-    Ok(PathBuf::from(root_dir).join("_NOTES.md"))
+    Ok(PathBuf::from(root_dir).join("_NOTES.txt"))
 }
-
-use crate::tools::Function;
-use crate::tools::Tool;
 
 pub fn read_notes_tool() -> Tool {
     Tool {
         r#type: "function".to_string(),
         function: Function {
             name: "read_notes".to_string(),
-            description: "Reads all notes from the _NOTES.md file.".to_string(),
+            description: "Reads all notes from the _NOTES.txt file.".to_string(),
             parameters: serde_json::Value::Object(serde_json::Map::new()),
         },
     }
@@ -67,7 +72,7 @@ pub fn append_notes_tool() -> Tool {
         r#type: "function".to_string(),
         function: Function {
             name: "append_notes".to_string(),
-            description: "Appends a markdown string to the _NOTES.md file.".to_string(),
+            description: "Appends a markdown string to the _NOTES.txt file.".to_string(),
             parameters: serde_json::from_str(
                 r#"{
                     "type": "object",

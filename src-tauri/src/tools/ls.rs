@@ -1,5 +1,7 @@
 use crate::Result;
-use crate::{error::Error, utils};
+use crate::error::Error;
+use crate::utils::jailed::Jailed;
+use std::path::Path;
 
 use super::{Function, Tool};
 use serde::{Deserialize, Serialize};
@@ -42,9 +44,10 @@ pub async fn ls(args: LsArgs) -> Result<String> {
         ));
     }
 
-    let safe_path = utils::get_safe_path(&root_dir, &args.relative_path)?;
+    let jail = Path::new(&root_dir);
+    let safe_path = jail.jailed_join(Path::new(&args.relative_path))?;
 
-    match fs::read_dir(safe_path) {
+    match fs::read_dir(&safe_path) {
         Ok(entries) => {
             let result: Vec<String> = entries
                 .flatten()

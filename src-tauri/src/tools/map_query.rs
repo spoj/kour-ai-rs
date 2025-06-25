@@ -1,8 +1,9 @@
 use serde::{Deserialize};
 use tokio::task;
 use crate::error::Error;
-use crate::utils;
+use crate::utils::jailed::Jailed;
 use futures::stream::{self, StreamExt};
+use std::path::Path;
 use serde_json::json;
 use crate::tools::{Function, Tool};
 use crate::chat::{ChatCompletionMessage, Content};
@@ -59,7 +60,8 @@ pub async fn map_query(args:MapQueryArgs) -> Result<String> {
             let model_name = MAP_MODEL;
 
             async move {
-                let file_path = utils::get_safe_path(&root_dir, &filename)?;
+                let jail = Path::new(&root_dir);
+                let file_path = jail.jailed_join(Path::new(&filename))?;
                 let file_content =
                     task::spawn_blocking(move || crate::file_handler::process_file_for_llm(&file_path))
                         .await??;
