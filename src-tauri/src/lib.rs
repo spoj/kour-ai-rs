@@ -91,9 +91,10 @@ impl EventReplayer {
             else if message.role == "tool" {
                 if let Some(tool_call_id) = &message.tool_call_id {
                     if let Some(Content::Text { text }) = message.content.first() {
-                        self.emit_tool_result(&tool_call_id, &text)?;
+                        self.emit_tool_result(tool_call_id, text)?;
                     }
                 }
+                // We do NOT replay the injected user message, it's for the LLM only
             }
             // All other messages
             else {
@@ -162,23 +163,28 @@ impl ChatProcessor {
                 &tools::TOOLS,
             )
             .await?;
+
             let choice = &res.choices[0];
             let message: ChatCompletionMessage = choice.message.clone().into();
+
             if let Some(tool_calls) = message.tool_calls.clone() {
-                // To ensure the API gets a clean message, we create a new assistant
-                // message that ONLY has the tool_calls, and no `content`.
                 let assistant_tool_call_message =
                     ChatCompletionMessage::new("assistant", vec![]).tool_calls(tool_calls.clone());
                 self.messages.push(assistant_tool_call_message);
 
-                // Handle the tool calls, which will return the tool result messages.
                 let new_messages = chat::handle_tool_calls(tool_calls, self.tx.clone()).await?;
-
-                // Add the tool result messages to history.
-                self.messages.extend(new_messages.clone());
-
+                for msg in new_messages {
+                    let mut tool_message = msg;
+                    if let Some(user_msg) = tool_message.injected_user_message.take() {
+                        self.messages.push(tool_message);
+                        self.messages.push(*user_msg);
+                    } else {
+                        self.messages.push(tool_message);
+                    }
+                }
+                // After handling tools, continue the loop to let the assistant respond.
             } else {
-                // This is a standard text response, so add it to history and emit it for display.
+                // It's a final text response. Add it to history, emit, and break the loop.
                 self.messages.push(message.clone());
                 EventReplayer::new(self.window.clone()).replay(&[message])?;
                 break;
@@ -239,9 +245,12 @@ async fn chat_completion(
     };
     let mut history = state.read().unwrap().to_vec();
     history.push(message);
+    let old_history = history.clone();
     let new_history = ChatProcessor::new(window, options, history).run().await?;
     let mut history = state.write().unwrap();
-    *history = new_history;
+    if new_history.starts_with(&old_history) {
+        *history = new_history;
+    }
     Ok(())
 }
 #[tauri::command]

@@ -1,4 +1,4 @@
-use crate::chat::ChatCompletionMessage;
+use crate::chat::{ChatCompletionMessage, Content};
 use crate::error::Error;
 use crate::file_handler;
 use crate::tools::{Function, Tool};
@@ -34,9 +34,13 @@ pub async fn load_file(args: LoadFileArgs) -> Result<LoadFileResult> {
     let jail = Path::new(&root_dir);
     let safe_path = jail.jailed_join(Path::new(&args.filename))?;
 
-    let file_content =
+    let mut file_content =
         task::spawn_blocking(move || file_handler::process_file_for_llm(&safe_path)).await??;
 
+    // Prepend an instructional message for the LLM.
+    let instructional_text = Content::Text { text: format!("The content of the file '{}' has been loaded. Here is the full content for your context. Please use this content to answer any subsequent questions.", &args.filename)};
+    file_content.insert(0, instructional_text);
+    
     // Create the user message that contains the file attachment.
     let user_message = ChatCompletionMessage::new("user", file_content);
 

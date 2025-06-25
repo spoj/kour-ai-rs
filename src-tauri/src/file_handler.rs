@@ -2,9 +2,12 @@ use crate::chat::{Content, FileData, ImageUrl};
 use crate::error::Error;
 use crate::Result;
 use base64::{engine::general_purpose, Engine as _};
-use calamine::{open_workbook, Reader, Xlsx};
+use calamine::{open_workbook_auto_from_rs, Reader};
+use csv::Writer;
 use sha2::{Digest, Sha256};
 use std::fs;
+use std::io::Cursor;
+use std::iter::once;
 use std::path::{Path, PathBuf};
 
 fn get_cache_path(file_buffer: &[u8], target_extension: &str) -> Result<PathBuf> {
@@ -117,6 +120,34 @@ pub fn convert_to_pdf(path: &Path) -> Result<Vec<u8>> {
     Ok(pdf_bytes)
 }
 
+fn convert_xlsx_to_csv(file_buffer: &[u8]) -> Result<String> {
+    println!("starting to convert csv");
+    if let Ok(Some(cached_csv_bytes)) = read_conversion_cache(file_buffer, "csv") {
+        return Ok(String::from_utf8(cached_csv_bytes).unwrap_or_default());
+    }
+    println!("no cache");
+    let reader = Cursor::new(file_buffer);
+    let mut workbook = open_workbook_auto_from_rs(reader)
+        .map_err(|_| Error::Tool("cannot open xlsx workbook".to_string()))?;
+    println!("wb opened");
+    let mut csv_data = vec![];
+    for (sheet_name, range) in workbook.worksheets() {
+        let mut writer = Writer::from_writer(vec![]);
+        println!("enter a sheet");
+        for row in range.rows() {
+            writer
+                .write_record(once(sheet_name.clone()).chain(row.iter().map(|c| c.to_string())))
+                .map_err(|_| Error::Tool("error writing CSV".to_string()))?;
+        }
+        csv_data.extend(writer.into_inner().unwrap());
+    }
+    println!("done all sheets");
+
+    write_conversion_cache(file_buffer, &csv_data, "csv");
+    println!("written to cache");
+    String::from_utf8(csv_data).map_err(|_| Error::Tool("error converting CSV to UTF".to_string()))
+}
+
 pub fn process_file_for_llm(path: &Path) -> Result<Vec<Content>> {
     let file_buffer = fs::read(path)?;
     let file_type = determine_file_type(path);
@@ -151,26 +182,7 @@ pub fn process_file_for_llm(path: &Path) -> Result<Vec<Content>> {
             }])
         }
         FileType::Xlsx => {
-            if let Ok(Some(cached_csv_bytes)) = read_conversion_cache(&file_buffer, "csv") {
-                let csv_data = String::from_utf8(cached_csv_bytes).unwrap_or_default();
-                return Ok(vec![Content::Text { text: csv_data }]);
-            }
-
-            let mut workbook: Xlsx<_> = open_workbook(path).unwrap();
-            let mut csv_data = String::new();
-            if let Ok(range) = workbook.worksheet_range("Sheet1") {
-                for row in range.rows() {
-                    let line = row
-                        .iter()
-                        .map(|c| c.to_string())
-                        .collect::<Vec<_>>()
-                        .join(",");
-                    csv_data.push_str(&line);
-                    csv_data.push('\n');
-                }
-            }
-            write_conversion_cache(&file_buffer, csv_data.as_bytes(), "csv");
-
+            let csv_data = convert_xlsx_to_csv(&file_buffer)?;
             Ok(vec![Content::Text { text: csv_data }])
         }
         FileType::Text(_) => {
