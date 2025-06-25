@@ -16,12 +16,12 @@ pub struct CheckOnlineArgs {
 }
 
 #[derive(Serialize)]
-struct CheckOnlineResult {
+pub struct CheckOnlineResult {
     content: String,
     citations: serde_json::Value, // Annotations can be complex, so Value is flexible
 }
 
-pub async fn check_online(args: CheckOnlineArgs) -> Result<String> {
+pub async fn check_online(args: CheckOnlineArgs) -> Result<CheckOnlineResult> {
     let api_key = task::spawn_blocking(crate::get_settings_fn)
         .await?
         .map(|s| s.api_key)?;
@@ -58,7 +58,7 @@ pub async fn check_online(args: CheckOnlineArgs) -> Result<String> {
                 content: text.clone(),
                 citations: json!([]) 
              };
-             return serde_json::to_string(&result).map_err(|e| e.into());
+             return Ok(result);
         }
     }
     

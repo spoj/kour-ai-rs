@@ -22,6 +22,5 @@ pub fn get_tool() -> Tool {
 
 pub async fn execute(_args: RollDiceArgs) -> u8 {
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-    let roll = rand::rng().random_range(1..=6);
-    roll
+    rand::rng().random_range(1..=6)
 }
