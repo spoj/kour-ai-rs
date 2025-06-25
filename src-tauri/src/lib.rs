@@ -42,6 +42,72 @@ enum EventPayload<'a> {
     },
 }
 type SharedHistory = Arc<RwLock<Vec<ChatCompletionMessage>>>;
+
+struct EventReplayer {
+    window: tauri::Window,
+}
+
+impl EventReplayer {
+    fn new(window: tauri::Window) -> Self {
+        Self { window }
+    }
+
+    fn emit_tool_call(&self, name: &str, id: &str, arguments: &str) -> Result<()> {
+        self.window.emit(
+            "chat_completion_update",
+            EventPayload::ToolCall {
+                tool_name: name,
+                tool_call_id: id,
+                tool_args: arguments,
+            },
+        )?;
+        Ok(())
+    }
+
+    fn emit_tool_result(&self, id: &str, result: &str) -> Result<()> {
+        self.window.emit(
+            "chat_completion_update",
+            EventPayload::ToolDone {
+                tool_call_id: id,
+                tool_result: result,
+            },
+        )?;
+        Ok(())
+    }
+
+    fn replay(&self, messages: &[ChatCompletionMessage]) -> Result<()> {
+        for message in messages {
+            // Assistant message with tool calls
+            if let Some(tool_calls) = &message.tool_calls {
+                for tool_call in tool_calls {
+                    self.emit_tool_call(
+                        &tool_call.function.name,
+                        &tool_call.id,
+                        &tool_call.function.arguments,
+                    )?;
+                }
+            }
+            // Tool message with the result
+            else if message.role == "tool" {
+                if let Some(tool_call_id) = &message.tool_call_id {
+                    if let Some(Content::Text { text }) = message.content.first() {
+                        self.emit_tool_result(&tool_call_id, &text)?;
+                    }
+                }
+            }
+            // All other messages
+            else {
+                self.window.emit(
+                    "chat_completion_update",
+                    EventPayload::Message {
+                        message: message.clone(),
+                    },
+                )?;
+            }
+        }
+        Ok(())
+    }
+}
 struct ChatProcessor {
     window: tauri::Window,
     options: ChatCompletionOptions,
@@ -67,7 +133,7 @@ impl ChatProcessor {
     }
 
     fn start_update_listener(&mut self, mut rx: mpsc::Receiver<chat::ChatUpdate>) {
-        let window = self.window.clone();
+        let replayer = EventReplayer::new(self.window.clone());
         tokio::spawn(async move {
             while let Some(update) = rx.recv().await {
                 let _ = match update {
@@ -75,21 +141,10 @@ impl ChatProcessor {
                         name,
                         id,
                         arguments,
-                    } => window.emit(
-                        "chat_completion_update",
-                        EventPayload::ToolCall {
-                            tool_name: &name,
-                            tool_call_id: &id,
-                            tool_args: &arguments,
-                        },
-                    ),
-                    chat::ChatUpdate::ToolResult { id, result } => window.emit(
-                        "chat_completion_update",
-                        EventPayload::ToolDone {
-                            tool_call_id: &id,
-                            tool_result: &result,
-                        },
-                    ),
+                    } => replayer.emit_tool_call(&name, &id, &arguments),
+                    chat::ChatUpdate::ToolResult { id, result } => {
+                        replayer.emit_tool_result(&id, &result)
+                    }
                 };
             }
         });
@@ -125,12 +180,7 @@ impl ChatProcessor {
             } else {
                 // This is a standard text response, so add it to history and emit it for display.
                 self.messages.push(message.clone());
-                self.window.emit(
-                    "chat_completion_update",
-                    EventPayload::Message {
-                        message: message.clone(),
-                    },
-                )?;
+                EventReplayer::new(self.window.clone()).replay(&[message])?;
                 break;
             }
         }
@@ -197,43 +247,7 @@ async fn chat_completion(
 #[tauri::command]
 async fn replay_history(window: tauri::Window, state: State<'_, SharedHistory>) -> Result<()> {
     let history = state.read().unwrap().clone();
-    let mut last_tool_call_id = None;
-
-    for message in history {
-        // Assistant message with tool calls
-        if let Some(tool_calls) = &message.tool_calls {
-            for tool_call in tool_calls {
-                window.emit(
-                    "chat_completion_update",
-                    EventPayload::ToolCall {
-                        tool_name: &tool_call.function.name,
-                        tool_call_id: &tool_call.id,
-                        tool_args: &tool_call.function.arguments,
-                    },
-                )?;
-                last_tool_call_id = Some(tool_call.id.clone());
-            }
-        }
-        // Tool message with the result
-        else if message.role == "tool" {
-            if let Some(tool_call_id) = &message.tool_call_id {
-                if let Some(Content::Text { text }) = message.content.first() {
-                    window.emit(
-                        "chat_completion_update",
-                        EventPayload::ToolDone {
-                            tool_call_id: &tool_call_id,
-                            tool_result: &text,
-                        },
-                    )?;
-                }
-            }
-        }
-        // All other messages
-        else {
-            window.emit("chat_completion_update", EventPayload::Message { message })?;
-        }
-    }
-
+    EventReplayer::new(window).replay(&history)?;
     Ok(())
 }
 
