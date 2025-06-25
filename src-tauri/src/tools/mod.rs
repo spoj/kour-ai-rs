@@ -28,29 +28,31 @@ pub struct Function {
 
 pub static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
     vec![
-        roll_dice::get_tool(),
+        // roll_dice::get_tool(),
         ls::get_tool(),
-        find::get_tool(),
-        notes::read_notes_tool(),
-        notes::append_notes_tool(),
-        ask_files::get_tool(),
-        extract::get_tool(),
-        load_file::get_tool(),
-        check_online::get_tool(),
+        // find::get_tool(),
+        // notes::read_notes_tool(),
+        // notes::append_notes_tool(),
+        // ask_files::get_tool(),
+        // extract::get_tool(),
+        // load_file::get_tool(),
+        // check_online::get_tool(),
     ]
 });
 
-pub async fn tool_executor(name: &str, arguments: &str) -> crate::Result<String> {
+pub async fn tool_executor(name: &str, arguments: &str) -> crate::Result<Value> {
     match name {
-        "roll_dice" => roll_dice::execute(roll_dice::RollDiceArgs {}).await,
-        "ls" => Ok(ls::ls(from_str(arguments)?).await?),
-        "find" => Ok(find::find(from_str(arguments)?).await?),
-        "read_notes" => notes::read_notes().await,
-        "append_notes" => notes::append_notes(from_str(arguments)?).await,
-        "ask_files" => ask_files::ask_files(from_str(arguments)?).await,
-        "extract" => extract::extract(&from_str(arguments)?).await,
-        "load_file" => load_file::load_file(from_str(arguments)?).await,
-        "check_online" => check_online::check_online(from_str(arguments)?).await,
+        "roll_dice" => Ok(serde_json::to_value(roll_dice::execute(from_str(arguments)?).await)?),
+        "ls" => Ok(serde_json::to_value(ls::ls(from_str(arguments)?).await?)?),
+        "find" => Ok(serde_json::to_value(find::find(from_str(arguments)?).await?)?),
+        "read_notes" => Ok(serde_json::to_value(notes::read_notes().await?)?),
+        "append_notes" => Ok(serde_json::to_value(notes::append_notes(from_str(arguments)?).await?)?),
+        "ask_files" => Ok(serde_json::to_value(ask_files::ask_files(from_str(arguments)?).await?)?),
+        "extract" => Ok(serde_json::to_value(extract::extract(from_str(arguments)?).await?)?),
+        // "load_file" => Ok(serde_json::to_value(load_file::load_file(from_str(arguments)?).await?)?),
+        // "check_online" => {
+        //     Ok(serde_json::to_value(check_online::check_online(from_str(arguments)?).await?)?)
+        // }
         _ => Err(Error::Tool("Tool Not Found".to_string())),
     }
 }

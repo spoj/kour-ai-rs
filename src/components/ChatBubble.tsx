@@ -64,7 +64,7 @@ export const ChatBubble = ({
               {isExpanded ? <FaAngleUp /> : <FaAngleDown />}
             </button>
           )}
-          {renderContent(content)}
+          <div className="chat-content">{renderContent(content)}</div>
         </div>
         {isTool && isExpanded && (
           <div className="tool-details-content">

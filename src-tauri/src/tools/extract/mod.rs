@@ -3,6 +3,7 @@ use serde_json::json;
 use std::path::PathBuf;
 use tokio::{fs, task};
 
+use crate::error::Error;
 use crate::tools::{Function, Tool};
 use crate::Result;
 
@@ -23,7 +24,7 @@ pub struct ExtractResult {
     pub total_files: usize,
 }
 
-pub async fn extract(args: &ExtractArgs) -> Result<String> {
+pub async fn extract(args: ExtractArgs) -> Result<ExtractResult> {
     let root_dir = task::spawn_blocking(crate::get_settings_fn)
         .await?
         .map(|s| s.root_dir)?;
@@ -32,7 +33,7 @@ pub async fn extract(args: &ExtractArgs) -> Result<String> {
     let file_path = root_dir.join(&args.filename);
 
     if !file_path.is_file() {
-        return Ok(json!({ "error": format!("File not found: {}", args.filename) }).to_string());
+        return Err(Error::Tool("File not found".to_string()));
     }
 
     let extraction_folder = file_path.with_extension(format!(
@@ -74,21 +75,18 @@ pub async fn extract(args: &ExtractArgs) -> Result<String> {
             .await??
         }
         _ => {
-            return Ok(json!({
-                "error": format!("Unsupported file type for extraction: {}. Supported types: .zip, .eml, .msg", file_extension)
-            })
-            .to_string())
+            return Err(Error::Tool("Unsupported file type".to_string()))
         }
     };
 
-    let result = ExtractResult {
+    let result: ExtractResult = ExtractResult {
         status: "success".to_string(),
         extraction_folder: extraction_folder.to_str().unwrap().to_string(),
         total_files: extracted_files.len(),
         extracted_files,
     };
 
-    Ok(serde_json::to_string(&result)?)
+    Ok(result)
 }
 
 pub fn get_tool() -> Tool {

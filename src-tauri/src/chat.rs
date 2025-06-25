@@ -209,20 +209,22 @@ async fn execute_tool_call(
         arguments: tool_call.function.arguments.clone(),
     })
     .await?;
-    let mut result =
+    let json_value =
         match tools::tool_executor(&tool_call.function.name, &tool_call.function.arguments).await {
-            Ok(result) => result,
-            Err(e) => e.to_string(),
+            Ok(value) => value,
+            Err(e) => serde_json::Value::String(e.to_string()),
         };
-    
-    if tool_call.function.name == "load_file" {
-        if let Ok(mut json_result) = serde_json::from_str::<serde_json::Value>(&result) {
-            if let Some(obj) = json_result.as_object_mut() {
-                obj.remove("user_message");
-                result = serde_json::to_string(&json_result).unwrap_or(result);
-            }
+
+    let result = if tool_call.function.name == "load_file" {
+        if let Some(mut obj) = json_value.as_object().cloned() {
+            obj.remove("user_message");
+            serde_json::to_string(&obj).unwrap_or_else(|_| json_value.to_string())
+        } else {
+            json_value.to_string()
         }
-    }
+    } else {
+        serde_json::to_string(&json_value).unwrap_or_else(|_| json_value.to_string())
+    };
     tx.send(ChatUpdate::ToolResult {
         id: tool_call.id.clone(),
         result: result.clone(),

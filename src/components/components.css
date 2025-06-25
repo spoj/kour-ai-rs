@@ -173,6 +173,10 @@
   align-items: center;
 }
 
+.chat-content {
+  flex-grow: 1;
+}
+
 .expand-button {
   background: none;
   border: none;
