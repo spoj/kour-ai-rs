@@ -65,14 +65,13 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
                         .await??;
                 
                 let mut messages = vec![
-                    ChatCompletionMessage::new("system", vec![Content::Text { text: "You are a helpful assistant that answers questions about files. Your answer must be grounded.".to_string() }]),
                     ChatCompletionMessage::new("user", vec![Content::Text { text: format!("File: {}\n\nQuery: {}", filename, query) }])
                 ];
 
-                messages[1].content.extend(file_content);
+                messages[0].content.extend(file_content);
 
                 let response =
-                    crate::chat::call_openrouter(&messages, model_name, "", &vec![]).await?;
+                    crate::chat::call_openrouter(&messages, model_name, "You are a helpful assistant that answers questions about files. Your answer must be grounded.", &vec![]).await?;
                 let choice = &response.choices[0];
                 let message: ChatCompletionMessage = choice.message.clone().into();
                 if let Some(Content::Text { text }) = message.content.first() {
