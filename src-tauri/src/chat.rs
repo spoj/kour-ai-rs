@@ -1,4 +1,4 @@
-use crate::tools;
+use crate::{get_settings_fn, settings::Settings, tools};
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -84,6 +84,7 @@ impl ChatCompletionMessage {
 
     pub fn tool_calls(mut self, tool_calls: Vec<ToolCall>) -> Self {
         self.tool_calls = Some(tool_calls);
+        self.content = vec![]; // Empty vec will be omitted by serde
         self
     }
 
@@ -96,11 +97,8 @@ impl ChatCompletionMessage {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChatCompletionOptions {
-    #[serde(rename = "apiKey")]
-    pub api_key: String,
     #[serde(rename = "modelName")]
     pub model_name: String,
-    pub messages: Vec<ChatCompletionMessage>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -137,15 +135,15 @@ pub struct ChoiceDelta {
 }
 
 pub async fn call_openrouter(
-    messages: &Vec<ChatCompletionMessage>,
-    api_key: &str,
+    messages: &[ChatCompletionMessage],
     model_name: &str,
     system_prompt: &str,
     tools: &Vec<tools::Tool>,
 ) -> super::Result<ChatCompletionResponse> {
     println!("Sending messages to OpenRouter: {:?}", messages);
+    let settings = get_settings_fn()?;
     let client = reqwest::Client::new();
-    let mut final_messages = messages.clone();
+    let mut final_messages = messages.to_vec();
     if !system_prompt.is_empty() {
         final_messages.insert(
             0,
@@ -159,11 +157,14 @@ pub async fn call_openrouter(
     }
     let res = client
         .post("https://openrouter.ai/api/v1/chat/completions")
-        .bearer_auth(api_key)
+        .bearer_auth(&settings.api_key)
         .json(&serde_json::json!({
             "model": model_name,
             "messages": final_messages,
             "tools": tools,
+            "provider": {
+                "order": settings.provider_order.split(',').collect::<Vec<_>>(),
+            }
         }))
         .send()
         .await?;
@@ -240,8 +241,6 @@ pub async fn handle_tool_calls(
 ) -> super::Result<Vec<ChatCompletionMessage>> {
     let mut new_messages = Vec::new();
 
-    new_messages
-        .push(ChatCompletionMessage::new("assistant", vec![]).tool_calls(tool_calls.clone()));
 
     let tool_futs = tool_calls
         .into_iter()

@@ -33,13 +33,13 @@ export interface IChatCompletionMessage {
 export interface IChatCompletionOptions {
   apiKey: string;
   modelName: string;
-  messages: IChatCompletionMessage[];
 }
 
 export type IChatCompletionUpdate =
   | { type: "Start" }
   | { type: "End" }
-  | { type: "Update"; message: string; is_notification: boolean }
+  | { type: "Delta"; delta: string; is_notification: boolean }
+  | { type: "Message"; message: IChatCompletionMessage }
   | {
       type: "ToolCall";
       tool_name: string;

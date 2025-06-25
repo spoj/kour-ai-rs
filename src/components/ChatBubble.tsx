@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { IChatCompletionMessage, MessageContent } from "../types";
 import ReactMarkdown from "react-markdown";
-import { FaCopy, FaTrash, FaAngleDown, FaAngleUp } from "react-icons/fa";
+import { FaCopy, FaAngleDown, FaAngleUp } from "react-icons/fa";
 import "./components.css";
 
 const renderContent = (content: MessageContent) => {
+  if (!content) {
+    return null;
+  }
   return content.map((item, index) => {
     if (item.type === "text") {
       return <ReactMarkdown key={index}>{item.text}</ReactMarkdown>;
@@ -27,12 +30,10 @@ export const ChatBubble = ({
   content,
   isNotification,
   onCopy,
-  onDelete,
   toolArgs,
   toolResult,
 }: IChatCompletionMessage & {
   onCopy: () => void;
-  onDelete: () => void;
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -44,9 +45,6 @@ export const ChatBubble = ({
         <div className="message-actions">
           <button onClick={onCopy} title="Copy">
             <FaCopy />
-          </button>
-          <button onClick={onDelete} title="Delete">
-            <FaTrash />
           </button>
         </div>
       )}
@@ -85,9 +83,6 @@ export const ChatBubble = ({
         <div className="message-actions">
           <button onClick={onCopy} title="Copy">
             <FaCopy />
-          </button>
-          <button onClick={onDelete} title="Delete">
-            <FaTrash />
           </button>
         </div>
       )}

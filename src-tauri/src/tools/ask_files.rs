@@ -48,15 +48,14 @@ pub fn get_tool() -> Tool {
 
 pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
     let AskFilesArgs { query, filenames } = args;
-    let (root_dir,api_key) = task::spawn_blocking(crate::get_settings_fn)
-        .await?
-        .map(|s| (s.root_dir,s.api_key))?;
+    let settings = task::spawn_blocking(crate::get_settings_fn)
+        .await??;
 
     let responses: Vec<_> = stream::iter(filenames)
         .map(|filename| {
-            let root_dir = root_dir.clone();
+            let root_dir = settings.root_dir.clone();
             let query = query.clone();
-            let api_key = api_key.clone();
+            let settings = settings.clone();
             let model_name = MAP_MODEL;
 
             async move {
@@ -74,11 +73,11 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
                 messages[1].content.extend(file_content);
 
                 let response =
-                    crate::chat::call_openrouter(&messages, &api_key, model_name, "", &vec![]).await?;
+                    crate::chat::call_openrouter(&messages, model_name, "", &vec![]).await?;
                 let choice = &response.choices[0];
                 let message: ChatCompletionMessage = choice.message.clone().into();
-                if let Some(Content::Text{text}) = message.content.first() {
-                    return Ok(json!({filename: text,}));
+                if let Some(Content::Text { text }) = message.content.first() {
+                    return Ok(json!({ filename: text, }));
                 }
                 
                 Err(Error::Tool("MapError".to_string()))
