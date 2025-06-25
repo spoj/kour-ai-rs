@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { IChatCompletionMessage, IChatCompletionOptions, IChatCompletionUpdate, ISettings } from "./types";
+import { IChatCompletionMessage, IChatCompletionUpdate, ISettings } from "./types";
 
 export const getSettings = async (): Promise<ISettings> => {
 	return await invoke("get_settings");
