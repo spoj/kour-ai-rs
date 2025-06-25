@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { IChatCompletionMessage, MessageContent } from "../types";
 import ReactMarkdown from "react-markdown";
-import { FaCopy, FaTrash } from "react-icons/fa";
+import { FaCopy, FaTrash, FaAngleDown, FaAngleUp } from "react-icons/fa";
 import "./components.css";
 
 const renderContent = (content: MessageContent) => {
@@ -27,10 +28,16 @@ export const ChatBubble = ({
   isNotification,
   onCopy,
   onDelete,
+  toolArgs,
+  toolResult,
 }: IChatCompletionMessage & {
   onCopy: () => void;
   onDelete: () => void;
 }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const isTool = !!(toolArgs || toolResult);
+
   return (
     <div className={`chat-bubble-container ${role}`}>
       {role === "user" && !isNotification && (
@@ -44,9 +51,35 @@ export const ChatBubble = ({
         </div>
       )}
       <div
-        className={`chat-bubble ${role} ${isNotification ? "notification" : ""}`}
+        className={`chat-bubble ${role} ${
+          isNotification ? "notification" : ""
+        }`}
       >
-        {renderContent(content)}
+        <div className="chat-bubble-content-wrapper">
+          {isTool && (
+            <button
+              className="expand-button"
+              onClick={() => setIsExpanded(!isExpanded)}
+            >
+              {isExpanded ? <FaAngleUp /> : <FaAngleDown />}
+            </button>
+          )}
+          {renderContent(content)}
+        </div>
+        {isTool && isExpanded && (
+          <div className="tool-details-content">
+            {toolArgs && (
+              <pre>
+                <b>Arguments:</b> {toolArgs}
+              </pre>
+            )}
+            {toolResult && (
+              <pre>
+                <b>Result:</b> {toolResult.substring(0, 300)}
+              </pre>
+            )}
+          </div>
+        )}
       </div>
       {role === "assistant" && !isNotification && (
         <div className="message-actions">

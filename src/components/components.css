@@ -167,3 +167,33 @@
 .chat-bubble.user .message-actions button {
   color: #fff;
 }
+
+.chat-bubble-content-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.expand-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-right: 10px;
+  font-size: 1em;
+  color: #666;
+}
+
+.tool-details-content {
+  margin-top: 10px;
+  border-top: 1px solid #eee;
+  padding-top: 10px;
+  background-color: #f9f9f9;
+  padding: 10px;
+  border-radius: 5px;
+  white-space: pre-wrap;
+}
+
+.tool-details-content pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+}

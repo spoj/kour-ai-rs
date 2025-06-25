@@ -26,6 +26,8 @@ export interface IChatCompletionMessage {
   content: MessageContent;
   isNotification?: boolean;
   toolName?: string;
+  toolArgs?: string;
+  toolResult?: string;
 }
 
 export interface IChatCompletionOptions {
@@ -38,5 +40,10 @@ export type IChatCompletionUpdate =
   | { type: "Start" }
   | { type: "End" }
   | { type: "Update"; message: string; is_notification: boolean }
-  | { type: "ToolCall"; tool_name: string; tool_call_id: string }
-  | { type: "ToolDone"; tool_call_id: string };
+  | {
+      type: "ToolCall";
+      tool_name: string;
+      tool_call_id: string;
+      tool_args: string;
+    }
+  | { type: "ToolDone"; tool_call_id: string; tool_result: string };

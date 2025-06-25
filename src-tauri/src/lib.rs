@@ -35,9 +35,11 @@ enum EventPayload<'a> {
     ToolCall {
         tool_name: &'a str,
         tool_call_id: &'a str,
+        tool_args: &'a str,
     },
     ToolDone {
         tool_call_id: &'a str,
+        tool_result: &'a str,
     },
 }
 
@@ -67,16 +69,21 @@ impl ChatProcessor {
         tokio::spawn(async move {
             while let Some(update) = rx.recv().await {
                 let _ = match update {
-                    chat::ChatUpdate::ToolCall(name, id) => window.emit(
+                    chat::ChatUpdate::ToolCall { name, id, arguments } => window.emit(
                         "chat_completion_update",
                         EventPayload::ToolCall {
                             tool_name: &name,
                             tool_call_id: &id,
+                            tool_args: &arguments,
                         },
                     ),
-                    chat::ChatUpdate::ToolResult(_, id) => {
-                        window.emit("chat_completion_update", EventPayload::ToolDone { tool_call_id: &id })
-                    }
+                    chat::ChatUpdate::ToolResult { id, result } => window.emit(
+                        "chat_completion_update",
+                        EventPayload::ToolDone {
+                            tool_call_id: &id,
+                            tool_result: &result,
+                        },
+                    ),
                 };
             }
         });

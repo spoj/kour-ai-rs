@@ -108,6 +108,7 @@ function App() {
               ],
               isNotification: true,
               toolName: update.tool_name,
+              toolArgs: update.tool_args,
             };
             setMessages((prev) => [...prev, toolCallMessage]);
             break;
@@ -123,6 +124,7 @@ function App() {
                         text: `Calling ${m.toolName} done.`,
                       },
                     ],
+                    toolResult: update.tool_result,
                   }
                   : m
               )
@@ -206,6 +208,8 @@ function App() {
             isNotification={m.isNotification}
             onCopy={() => handleCopy(m.content)}
             onDelete={() => handleDelete(i)}
+            toolArgs={m.toolArgs}
+            toolResult={m.toolResult}
           />
         ))}
         {isTyping && (
