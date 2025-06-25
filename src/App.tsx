@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { FaCog, FaPaperPlane, FaRedo } from "react-icons/fa";
+import { FaCog, FaPaperPlane } from "react-icons/fa";
 import "./App.css";
 import { chatCompletion, getSettings, saveSettings } from "./commands";
 import { IChatCompletionMessage, ISettings } from "./types";

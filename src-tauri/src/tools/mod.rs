@@ -1,3 +1,4 @@
+mod extract;
 mod find;
 mod ls;
 mod map_query;
@@ -31,6 +32,7 @@ pub static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
         notes::read_notes_tool(),
         notes::append_notes_tool(),
         map_query::get_tool(),
+        extract::get_tool(),
     ]
 });
 
@@ -42,6 +44,7 @@ pub async fn tool_executor(name: &str, arguments: &str) -> crate::Result<String>
         "read_notes" => notes::read_notes().await,
         "append_notes" => notes::append_notes(from_str(arguments)?).await,
         "map_query" => map_query::map_query(from_str(arguments)?).await,
+        "extract" => extract::extract(&from_str(arguments)?).await,
         _ => Err(Error::Tool("Tool Not Found".to_string())),
     }
 }
