@@ -63,16 +63,37 @@ function App() {
           setMessages((prev) => [...prev, toolCallMessage]);
           break;
         case "ToolDone":
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.tool_call_id === update.tool_call_id
-                ? {
+          setMessages((prev) => {
+            // Find the most recent tool call with matching ID that doesn't have a result yet
+            let foundIndex = -1;
+            for (let i = prev.length - 1; i >= 0; i--) {
+              if (prev[i].tool_call_id === update.tool_call_id && !prev[i].toolResult) {
+                foundIndex = i;
+                break;
+              }
+            }
+
+            if (foundIndex !== -1) {
+              return prev.map((m, index) =>
+                index === foundIndex
+                  ? {
                     ...m,
                     toolResult: update.tool_result,
                   }
+                  : m
+              );
+            }
+
+            // Fallback to original behavior if no match found
+            return prev.map((m) =>
+              m.tool_call_id === update.tool_call_id
+                ? {
+                  ...m,
+                  toolResult: update.tool_result,
+                }
                 : m
-            )
-          );
+            );
+          });
           break;
       }
     });
