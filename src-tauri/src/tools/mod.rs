@@ -1,4 +1,7 @@
+mod find;
 mod ls;
+mod map_query;
+mod notes;
 mod roll_dice;
 
 use serde::{Deserialize, Serialize};
@@ -20,16 +23,25 @@ pub struct Function {
     pub parameters: Value,
 }
 
-pub static TOOLS: LazyLock<Vec<Tool>> =
-    LazyLock::new(|| vec![roll_dice::get_tool(), ls::get_tool()]);
+pub static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
+    vec![
+        roll_dice::get_tool(),
+        ls::get_tool(),
+        find::get_tool(),
+        notes::read_notes_tool(),
+        notes::append_notes_tool(),
+        map_query::get_tool(),
+    ]
+});
 
 pub async fn tool_executor(name: &str, arguments: &str) -> crate::Result<String> {
     match name {
         "roll_dice" => roll_dice::execute(roll_dice::RollDiceArgs {}).await,
-        "ls" => {
-            let args = from_str(arguments)?;
-            Ok(ls::ls(args).await?)
-        }
+        "ls" => Ok(ls::ls(from_str(arguments)?).await?),
+        "find" => Ok(find::find(from_str(arguments)?).await?),
+        "read_notes" => notes::read_notes().await,
+        "append_notes" => notes::append_notes(from_str(arguments)?).await,
+        "map_query" => map_query::map_query(from_str(arguments)?).await,
         _ => Err(Error::Tool("Tool Not Found".to_string())),
     }
 }

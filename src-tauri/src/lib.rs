@@ -1,5 +1,6 @@
 mod chat;
 mod error;
+pub mod file_handler;
 mod settings;
 mod tools;
 mod utils;
@@ -9,15 +10,17 @@ use self::error::Error;
 use self::settings::Settings;
 use serde::Serialize;
 use serde_json::{from_value, to_value};
+use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
-use tauri::Emitter;
 use tauri::Wry;
+use tauri::{Emitter, Manager};
 use tauri_plugin_store::{Store, StoreBuilder};
 use tokio::sync::mpsc;
 
 type Result<T> = std::result::Result<T, Error>;
 
 pub static STORE: OnceLock<Arc<Store<Wry>>> = OnceLock::new();
+pub static CACHE_DIR: OnceLock<PathBuf> = OnceLock::new();
 pub static SYSTEM_PROMPT: &str = include_str!("DEFAULT_PROMPT.md");
 
 #[derive(Serialize, Clone)]
@@ -86,7 +89,8 @@ impl ChatProcessor {
                 &self.messages,
                 &self.options.api_key,
                 &self.options.model_name,
-                SYSTEM_PROMPT
+                SYSTEM_PROMPT,
+                &tools::TOOLS,
             )
             .await?;
             let choice = &res.choices[0];
@@ -125,6 +129,15 @@ pub fn get_settings_fn() -> Result<Settings> {
     Ok(settings)
 }
 
+pub fn get_cache_dir() -> Result<std::path::PathBuf> {
+    let cache_dir = crate::CACHE_DIR
+        .get()
+        .ok_or(Error::Io(std::io::ErrorKind::NotFound.into()))?
+        .join("conversion_cache");
+    std::fs::create_dir_all(&cache_dir)?;
+    Ok(cache_dir)
+}
+
 #[tauri::command]
 fn get_settings() -> Result<Settings> {
     get_settings_fn()
@@ -161,6 +174,7 @@ pub fn run() {
                     .build()
                     .unwrap()
             });
+            CACHE_DIR.get_or_init(|| app.path().app_cache_dir().unwrap());
             Ok(())
         })
         .run(tauri::generate_context!())

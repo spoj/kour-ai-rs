@@ -1,5 +1,5 @@
-use crate::{error::Error, utils};
 use crate::Result;
+use crate::{error::Error, utils};
 
 use super::{Function, Tool};
 use serde::{Deserialize, Serialize};
@@ -46,12 +46,11 @@ pub async fn ls(args: LsArgs) -> Result<String> {
 
     match fs::read_dir(safe_path) {
         Ok(entries) => {
-            let mut result = String::new();
-            for entry in entries.flatten() {
-                result.push_str(&entry.file_name().to_string_lossy());
-                result.push('\n');
-            }
-            Ok(result)
+            let result: Vec<String> = entries
+                .flatten()
+                .map(|entry| entry.file_name().to_string_lossy().to_string())
+                .collect();
+            Ok(serde_json::to_string(&result)?)
         }
         Err(e) => Err(Error::Tool(format!("Error: failed to read dir: {}", e))),
     }

@@ -10,6 +10,14 @@ pub enum Content {
     Text { text: String },
     #[serde(rename = "image_url")]
     ImageUrl { image_url: ImageUrl },
+    #[serde(rename = "file")]
+    File { file: FileData },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FileData {
+    pub filename: String,
+    pub file_data: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -133,6 +141,7 @@ pub async fn call_openrouter(
     api_key: &str,
     model_name: &str,
     system_prompt: &str,
+    tools: &Vec<tools::Tool>,
 ) -> super::Result<ChatCompletionResponse> {
     println!("Sending messages to OpenRouter: {:?}", messages);
     let client = reqwest::Client::new();
@@ -140,7 +149,12 @@ pub async fn call_openrouter(
     if !system_prompt.is_empty() {
         final_messages.insert(
             0,
-            ChatCompletionMessage::new("system", vec![Content::Text { text: system_prompt.to_string() }]),
+            ChatCompletionMessage::new(
+                "system",
+                vec![Content::Text {
+                    text: system_prompt.to_string(),
+                }],
+            ),
         );
     }
     let res = client
@@ -149,7 +163,7 @@ pub async fn call_openrouter(
         .json(&serde_json::json!({
             "model": model_name,
             "messages": final_messages,
-            "tools": &*tools::TOOLS,
+            "tools": tools,
         }))
         .send()
         .await?;
@@ -185,15 +199,11 @@ async fn execute_tool_call(
 ) -> super::Result<(String, String)> {
     tx.send(ChatUpdate::ToolCall(tool_call.function.name.clone()))
         .await?;
-    let result = match tools::tool_executor(
-        &tool_call.function.name,
-        &tool_call.function.arguments,
-    )
-    .await
-    {
-        Ok(result) => result,
-        Err(e) => e.to_string(),
-    };
+    let result =
+        match tools::tool_executor(&tool_call.function.name, &tool_call.function.arguments).await {
+            Ok(result) => result,
+            Err(e) => e.to_string(),
+        };
     tx.send(ChatUpdate::ToolResult(
         tool_call.function.name.clone(),
         result.clone(),
