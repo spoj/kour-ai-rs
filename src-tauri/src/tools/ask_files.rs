@@ -4,7 +4,7 @@ use crate::error::Error;
 use crate::utils::jailed::Jailed;
 use futures::stream::{self, StreamExt};
 use std::path::Path;
-use serde_json::json;
+use serde_json::{json, Value};
 use crate::tools::{Function, Tool};
 use crate::chat::{ChatCompletionMessage, Content};
 
@@ -46,7 +46,7 @@ pub fn get_tool() -> Tool {
     }
 }
 
-pub async fn ask_files(args: AskFilesArgs) -> Result<String> {
+pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
     let AskFilesArgs { query, filenames } = args;
     let (root_dir,api_key) = task::spawn_blocking(crate::get_settings_fn)
         .await?
@@ -78,11 +78,7 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<String> {
                 let choice = &response.choices[0];
                 let message: ChatCompletionMessage = choice.message.clone().into();
                 if let Some(Content::Text{text}) = message.content.first() {
-                    return Ok(json!({
-                        "filename": filename,
-                        "answer": text,
-                        "extracts": []
-                    }));
+                    return Ok(json!({filename: text,}));
                 }
                 
                 Err(Error::Tool("MapError".to_string()))
@@ -92,5 +88,5 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<String> {
         .collect()
         .await;
     
-    serde_json::to_string(&responses).map_err(|e|e.into())
+    Ok(responses)
 }
