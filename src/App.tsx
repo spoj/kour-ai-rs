@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { FaCog, FaPaperPlane } from "react-icons/fa";
+import { FaCog, FaPaperPlane, FaTrash } from "react-icons/fa";
 import "./App.css";
-import { chatCompletion, getSettings, saveSettings } from "./commands";
+import { chatCompletion, getSettings, saveSettings, replayHistory, clearHistory, onChatCompletionUpdate } from "./commands";
 import { IChatCompletionMessage, ISettings } from "./types";
 import { ChatBubble } from "./components/ChatBubble";
 import { SettingsModal } from "./components/SettingsModal";
@@ -11,6 +11,9 @@ function App() {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<string[]>([]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const rootDirInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement>(null);
+  const hasReplayed = useRef(false);
   const [openSettingsModal, setOpenSettingsModal] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [settings, setSettings] = useState<ISettings>({
@@ -23,12 +26,76 @@ function App() {
 
   useEffect(() => {
     getSettings().then(setSettings);
+    messageInputRef.current?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "l" && e.ctrlKey) {
+        e.preventDefault();
+        rootDirInputRef.current?.focus();
+      } else if (e.key === "k" && e.ctrlKey) {
+        e.preventDefault();
+        clearHistory().then(() => setMessages([]));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    const unlisten = onChatCompletionUpdate((update) => {
+      switch (update.type) {
+        case "Start":
+          setIsTyping(true);
+          break;
+        case "End":
+          setIsTyping(false);
+          break;
+        case "Message":
+          setMessages((prev) => [...prev, update.message]);
+          break;
+        case "ToolCall":
+          const toolCallMessage: IChatCompletionMessage = {
+            tool_call_id: update.tool_call_id,
+            role: "assistant",
+            content: [],
+            isNotification: true,
+            toolName: update.tool_name,
+            toolArgs: update.tool_args,
+          };
+          setMessages((prev) => [...prev, toolCallMessage]);
+          break;
+        case "ToolDone":
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.tool_call_id === update.tool_call_id
+                ? {
+                    ...m,
+                    toolResult: update.tool_result,
+                  }
+                : m
+            )
+          );
+          break;
+      }
+    });
+
+    if (!hasReplayed.current) {
+      // Clear messages before replaying history to prevent duplication
+      setMessages([]);
+      replayHistory();
+      hasReplayed.current = true;
+    }
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      unlisten.then((f) => f());
+    };
   }, []);
 
   useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
+    setTimeout(() => {
+      if (chatContainerRef.current) {
+        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      }
+    }, 100);
   }, [messages]);
 
   const handleSettingsChange = (newSettings: Partial<ISettings>) => {
@@ -50,40 +117,13 @@ function App() {
       ];
     }
 
-    const newMessages: IChatCompletionMessage[] = [
-      ...messages,
-      { role: "user", content },
-    ];
+    const userMessage: IChatCompletionMessage = { role: "user", content };
 
-    setMessages(newMessages);
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setAttachments([]);
 
-    chatCompletion(
-      {
-        apiKey: settings.apiKey,
-        modelName: settings.modelName,
-        messages: newMessages,
-      },
-      (update) => {
-        switch (update.type) {
-          case "Start":
-            setIsTyping(true);
-            break;
-          case "End":
-            setIsTyping(false);
-            break;
-          case "Update":
-            const botMessage: IChatCompletionMessage = {
-              role: "assistant",
-              content: [{ type: "text", text: update.message }],
-              isNotification: update.is_notification,
-            };
-            setMessages((prev) => [...prev, botMessage]);
-            break;
-        }
-      }
-    );
+    chatCompletion(userMessage);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -119,9 +159,6 @@ function App() {
     navigator.clipboard.writeText(textToCopy);
   };
 
-  const handleDelete = (index: number) => {
-    setMessages((prev) => prev.filter((_, i) => i !== index));
-  };
 
   return (
     <div className="container">
@@ -131,14 +168,23 @@ function App() {
         </a>
         <div id="path-container">
           <input
+            ref={rootDirInputRef}
             type="text"
             id="path-input"
             placeholder="Enter root directory..."
             value={settings.rootDir}
             onChange={(e) => handleSettingsChange({ rootDir: e.target.value })}
+            onFocus={(e) => e.target.select()}
           />
         </div>
         <div style={{ paddingLeft: "10px" }}>
+          <button
+            id="header-button"
+            title="Clear History"
+            onClick={() => clearHistory().then(() => setMessages([]))}
+          >
+            <FaTrash />
+          </button>
           <button
             id="header-button"
             title="Settings"
@@ -156,7 +202,9 @@ function App() {
             content={m.content}
             isNotification={m.isNotification}
             onCopy={() => handleCopy(m.content)}
-            onDelete={() => handleDelete(i)}
+            toolName={m.toolName}
+            toolArgs={m.toolArgs}
+            toolResult={m.toolResult}
           />
         ))}
         {isTyping && (
@@ -165,7 +213,6 @@ function App() {
             content={[{ type: "text", text: "Thinking..." }]}
             isNotification
             onCopy={() => { }}
-            onDelete={() => { }}
           />
         )}
       </div>
@@ -180,6 +227,7 @@ function App() {
           />
         ))}
         <textarea
+          ref={messageInputRef}
           id="message-input"
           placeholder="Type a message..."
           value={input}

@@ -1,4 +1,4 @@
-use crate::tools;
+use crate::{get_settings_fn, settings::Settings, tools};
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -84,6 +84,7 @@ impl ChatCompletionMessage {
 
     pub fn tool_calls(mut self, tool_calls: Vec<ToolCall>) -> Self {
         self.tool_calls = Some(tool_calls);
+        self.content = vec![]; // Empty vec will be omitted by serde
         self
     }
 
@@ -96,11 +97,8 @@ impl ChatCompletionMessage {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChatCompletionOptions {
-    #[serde(rename = "apiKey")]
-    pub api_key: String,
     #[serde(rename = "modelName")]
     pub model_name: String,
-    pub messages: Vec<ChatCompletionMessage>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -137,15 +135,15 @@ pub struct ChoiceDelta {
 }
 
 pub async fn call_openrouter(
-    messages: &Vec<ChatCompletionMessage>,
-    api_key: &str,
+    messages: &[ChatCompletionMessage],
     model_name: &str,
     system_prompt: &str,
     tools: &Vec<tools::Tool>,
 ) -> super::Result<ChatCompletionResponse> {
     println!("Sending messages to OpenRouter: {:?}", messages);
+    let settings = get_settings_fn()?;
     let client = reqwest::Client::new();
-    let mut final_messages = messages.clone();
+    let mut final_messages = messages.to_vec();
     if !system_prompt.is_empty() {
         final_messages.insert(
             0,
@@ -159,11 +157,14 @@ pub async fn call_openrouter(
     }
     let res = client
         .post("https://openrouter.ai/api/v1/chat/completions")
-        .bearer_auth(api_key)
+        .bearer_auth(&settings.api_key)
         .json(&serde_json::json!({
             "model": model_name,
             "messages": final_messages,
             "tools": tools,
+            "provider": {
+                "order": settings.provider_order.split(',').collect::<Vec<_>>(),
+            }
         }))
         .send()
         .await?;
@@ -188,26 +189,47 @@ pub async fn call_openrouter(
 
 #[derive(Debug, Clone)]
 pub enum ChatUpdate {
-    ToolCall(String),
-    #[allow(dead_code)]
-    ToolResult(String, String),
+    ToolCall {
+        name: String,
+        id: String,
+        arguments: String,
+    },
+    ToolResult {
+        id: String,
+        result: String,
+    },
 }
 
 async fn execute_tool_call(
     tool_call: ToolCall,
     tx: mpsc::Sender<ChatUpdate>,
 ) -> super::Result<(String, String)> {
-    tx.send(ChatUpdate::ToolCall(tool_call.function.name.clone()))
-        .await?;
-    let result =
+    tx.send(ChatUpdate::ToolCall {
+        name: tool_call.function.name.clone(),
+        id: tool_call.id.clone(),
+        arguments: tool_call.function.arguments.clone(),
+    })
+    .await?;
+    let json_value =
         match tools::tool_executor(&tool_call.function.name, &tool_call.function.arguments).await {
-            Ok(result) => result,
-            Err(e) => e.to_string(),
+            Ok(value) => value,
+            Err(e) => serde_json::Value::String(e.to_string()),
         };
-    tx.send(ChatUpdate::ToolResult(
-        tool_call.function.name.clone(),
-        result.clone(),
-    ))
+
+    let result = if tool_call.function.name == "load_file" {
+        if let Some(mut obj) = json_value.as_object().cloned() {
+            obj.remove("user_message");
+            serde_json::to_string(&obj).unwrap_or_else(|_| json_value.to_string())
+        } else {
+            json_value.to_string()
+        }
+    } else {
+        serde_json::to_string(&json_value).unwrap_or_else(|_| json_value.to_string())
+    };
+    tx.send(ChatUpdate::ToolResult {
+        id: tool_call.id.clone(),
+        result: result.clone(),
+    })
     .await?;
 
     Ok((tool_call.id, result))
@@ -219,8 +241,6 @@ pub async fn handle_tool_calls(
 ) -> super::Result<Vec<ChatCompletionMessage>> {
     let mut new_messages = Vec::new();
 
-    new_messages
-        .push(ChatCompletionMessage::new("assistant", vec![]).tool_calls(tool_calls.clone()));
 
     let tool_futs = tool_calls
         .into_iter()
@@ -234,14 +254,21 @@ pub async fn handle_tool_calls(
         // Try to deserialize the result into our special LoadFileResult structure
         if let Ok(file_result) = serde_json::from_str::<serde_json::Value>(&result_str) {
             if file_result.get("type").and_then(|t| t.as_str()) == Some("file_loaded") {
-                let display_message = file_result["display_message"].as_str().unwrap_or("").to_string();
-                
+                let display_message = file_result["display_message"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
+
                 // The user_message is nested in the JSON, deserialize it separately
-                if let Ok(user_message) = serde_json::from_value::<ChatCompletionMessage>(file_result["user_message"].clone()) {
+                if let Ok(user_message) = serde_json::from_value::<ChatCompletionMessage>(
+                    file_result["user_message"].clone(),
+                ) {
                     // 1. Add the simple tool message for display
                     new_messages.push(ChatCompletionMessage {
                         role: "tool".to_string(),
-                        content: vec![Content::Text { text: display_message }],
+                        content: vec![Content::Text {
+                            text: display_message,
+                        }],
                         tool_call_id: Some(id),
                         tool_calls: None,
                     });
@@ -253,7 +280,7 @@ pub async fn handle_tool_calls(
                 }
             }
         }
-        
+
         // Default handling for all other tools
         new_messages.push(ChatCompletionMessage {
             role: "tool".to_string(),

@@ -16,17 +16,16 @@ pub struct CheckOnlineArgs {
 }
 
 #[derive(Serialize)]
-struct CheckOnlineResult {
+pub struct CheckOnlineResult {
     content: String,
     citations: serde_json::Value, // Annotations can be complex, so Value is flexible
 }
 
-pub async fn check_online(args: CheckOnlineArgs) -> Result<String> {
-    let api_key = task::spawn_blocking(crate::get_settings_fn)
-        .await?
-        .map(|s| s.api_key)?;
+pub async fn check_online(args: CheckOnlineArgs) -> Result<CheckOnlineResult> {
+    let settings = task::spawn_blocking(crate::get_settings_fn)
+        .await??;
 
-    if api_key.is_empty() {
+    if settings.api_key.is_empty() {
         return Err(Error::Tool(
             "Error: OpenRouter API key is not set.".to_string(),
         ));
@@ -47,18 +46,18 @@ pub async fn check_online(args: CheckOnlineArgs) -> Result<String> {
         ],
     )];
 
-    let response = crate::chat::call_openrouter(&messages, &api_key, SEARCH_MODEL, "", &vec![]).await?;
+    let response = crate::chat::call_openrouter(&messages, SEARCH_MODEL, "", &vec![]).await?;
 
     if let Some(choice) = response.choices.first() {
         let chat_message: ChatCompletionMessage = choice.message.clone().into();
         if let Some(Content::Text { text }) = chat_message.content.first() {
-             // Assuming annotations are part of the response, though not typed in our current struct
-             // We'll just pass an empty array for now. A more robust impl would parse this.
-             let result = CheckOnlineResult {
+            // Assuming annotations are part of the response, though not typed in our current struct
+            // We'll just pass an empty array for now. A more robust impl would parse this.
+            let result = CheckOnlineResult {
                 content: text.clone(),
-                citations: json!([]) 
-             };
-             return serde_json::to_string(&result).map_err(|e| e.into());
+                citations: json!([]),
+            };
+            return Ok(result);
         }
     }
     

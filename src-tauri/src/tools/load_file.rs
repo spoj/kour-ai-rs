@@ -20,7 +20,7 @@ pub struct LoadFileResult {
     pub user_message: ChatCompletionMessage,
 }
 
-pub async fn load_file(args: LoadFileArgs) -> Result<String> {
+pub async fn load_file(args: LoadFileArgs) -> Result<LoadFileResult> {
     let root_dir = task::spawn_blocking(crate::get_settings_fn)
         .await?
         .map(|s| s.root_dir)?;
@@ -46,7 +46,7 @@ pub async fn load_file(args: LoadFileArgs) -> Result<String> {
         user_message,
     };
 
-    serde_json::to_string(&result).map_err(|e| e.into())
+    Ok(result)
 }
 
 pub fn get_tool() -> Tool {

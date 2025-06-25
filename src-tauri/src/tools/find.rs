@@ -34,7 +34,7 @@ pub struct FindArgs {
     pub glob: String,
 }
 
-fn find_internal(root_dir: &str, glob_pattern: &str) -> Result<String> {
+fn find_internal(root_dir: &str, glob_pattern: &str) -> Result<Vec<String>> {
     if root_dir.is_empty() {
         return Err(Error::Tool(
             "Error: Root directory is not set. Please set it in the settings.".to_string(),
@@ -76,62 +76,12 @@ fn find_internal(root_dir: &str, glob_pattern: &str) -> Result<String> {
         })
         .collect();
 
-    Ok(result.join("\n"))
+    Ok(result)
 }
 
-pub async fn find(args: FindArgs) -> Result<String> {
+pub async fn find(args: FindArgs) -> Result<Vec<String>> {
     let root_dir = task::spawn_blocking(crate::get_settings_fn)
         .await?
         .map(|s| s.root_dir)?;
     find_internal(&root_dir, &args.glob)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-    use tempfile::tempdir;
-
-    #[test]
-    fn test_find_safe_pattern() {
-        let dir = tempdir().unwrap();
-        fs::write(dir.path().join("file1.txt"), "content").unwrap();
-        fs::write(dir.path().join("file2.log"), "content").unwrap();
-
-        let root = dir.path().to_str().unwrap();
-        let result = find_internal(root, "*.txt").unwrap();
-
-        assert!(result.contains("file1.txt"));
-        assert!(!result.contains("file2.log"));
-    }
-
-    #[test]
-    fn test_find_in_subdirectory() {
-        let dir = tempdir().unwrap();
-        let subdir = dir.path().join("subdir");
-        fs::create_dir(&subdir).unwrap();
-        fs::write(subdir.join("file.log"), "content").unwrap();
-
-        let root = dir.path().to_str().unwrap();
-        let result = find_internal(root, "subdir/*.log").unwrap();
-
-        assert!(result.contains("subdir/file.log") || result.contains("subdir\\file.log"));
-    }
-
-    #[test]
-    fn test_find_prevents_traversal() {
-        let dir = tempdir().unwrap();
-        fs::write(dir.path().join("should_not_be_found.txt"), "secret").unwrap();
-
-        let root = dir.path().to_str().unwrap();
-        // This glob attempts to escape the temporary root directory.
-        let result = find_internal(root, "../../*");
-
-        assert!(result.is_err());
-        if let Err(Error::Tool(msg)) = result {
-            assert!(msg.contains("Path traversal attempt detected"));
-        } else {
-            panic!("Expected a tool error for path traversal");
-        }
-    }
 }

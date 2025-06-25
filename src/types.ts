@@ -20,19 +20,41 @@ export type ImageContent = {
 
 export type MessageContent = (TextContent | ImageContent)[];
 
+export interface IToolCall {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
+  result?: string;
+}
+
 export interface IChatCompletionMessage {
-  role: "user" | "assistant";
+  tool_call_id?: string;
+  role: "user" | "assistant" | "tool";
   content: MessageContent;
   isNotification?: boolean;
+  tool_calls?: IToolCall[];
+  toolName?: string;
+  toolArgs?: string;
+  toolResult?: string;
 }
 
 export interface IChatCompletionOptions {
   apiKey: string;
   modelName: string;
-  messages: IChatCompletionMessage[];
 }
 
 export type IChatCompletionUpdate =
   | { type: "Start" }
   | { type: "End" }
-  | { type: "Update"; message: string; is_notification: boolean };
+  | { type: "Delta"; delta: string; is_notification: boolean }
+  | { type: "Message"; message: IChatCompletionMessage }
+  | {
+      type: "ToolCall";
+      tool_name: string;
+      tool_call_id: string;
+      tool_args: string;
+    }
+  | { type: "ToolDone"; tool_call_id: string; tool_result: string };

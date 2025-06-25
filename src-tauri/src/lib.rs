@@ -5,15 +5,15 @@ mod settings;
 mod tools;
 mod utils;
 
-use self::chat::{ChatCompletionMessage, ChatCompletionOptions};
+use self::chat::{ChatCompletionMessage, ChatCompletionOptions, Content};
 use self::error::Error;
 use self::settings::Settings;
 use serde::Serialize;
 use serde_json::{from_value, to_value};
 use std::path::PathBuf;
-use std::sync::{Arc, OnceLock};
-use tauri::Wry;
+use std::sync::{Arc, OnceLock, RwLock};
 use tauri::{Emitter, Manager};
+use tauri::{State, Wry};
 use tauri_plugin_store::{Store, StoreBuilder};
 use tokio::sync::mpsc;
 
@@ -28,21 +28,86 @@ pub static SYSTEM_PROMPT: &str = include_str!("DEFAULT_PROMPT.md");
 enum EventPayload<'a> {
     Start,
     End,
-    Update {
-        message: &'a str,
-        is_notification: bool,
+    Message {
+        message: ChatCompletionMessage,
+    },
+    ToolCall {
+        tool_name: &'a str,
+        tool_call_id: &'a str,
+        tool_args: &'a str,
+    },
+    ToolDone {
+        tool_call_id: &'a str,
+        tool_result: &'a str,
     },
 }
+type SharedHistory = Arc<RwLock<Vec<ChatCompletionMessage>>>;
 
-impl<'a> EventPayload<'a> {
-    fn new_update(message: &'a str, is_notification: bool) -> Self {
-        EventPayload::Update {
-            message,
-            is_notification,
-        }
-    }
+struct EventReplayer {
+    window: tauri::Window,
 }
 
+impl EventReplayer {
+    fn new(window: tauri::Window) -> Self {
+        Self { window }
+    }
+
+    fn emit_tool_call(&self, name: &str, id: &str, arguments: &str) -> Result<()> {
+        self.window.emit(
+            "chat_completion_update",
+            EventPayload::ToolCall {
+                tool_name: name,
+                tool_call_id: id,
+                tool_args: arguments,
+            },
+        )?;
+        Ok(())
+    }
+
+    fn emit_tool_result(&self, id: &str, result: &str) -> Result<()> {
+        self.window.emit(
+            "chat_completion_update",
+            EventPayload::ToolDone {
+                tool_call_id: id,
+                tool_result: result,
+            },
+        )?;
+        Ok(())
+    }
+
+    fn replay(&self, messages: &[ChatCompletionMessage]) -> Result<()> {
+        for message in messages {
+            // Assistant message with tool calls
+            if let Some(tool_calls) = &message.tool_calls {
+                for tool_call in tool_calls {
+                    self.emit_tool_call(
+                        &tool_call.function.name,
+                        &tool_call.id,
+                        &tool_call.function.arguments,
+                    )?;
+                }
+            }
+            // Tool message with the result
+            else if message.role == "tool" {
+                if let Some(tool_call_id) = &message.tool_call_id {
+                    if let Some(Content::Text { text }) = message.content.first() {
+                        self.emit_tool_result(&tool_call_id, &text)?;
+                    }
+                }
+            }
+            // All other messages
+            else {
+                self.window.emit(
+                    "chat_completion_update",
+                    EventPayload::Message {
+                        message: message.clone(),
+                    },
+                )?;
+            }
+        }
+        Ok(())
+    }
+}
 struct ChatProcessor {
     window: tauri::Window,
     options: ChatCompletionOptions,
@@ -51,12 +116,16 @@ struct ChatProcessor {
 }
 
 impl ChatProcessor {
-    fn new(window: tauri::Window, options: ChatCompletionOptions) -> Self {
+    fn new(
+        window: tauri::Window,
+        options: ChatCompletionOptions,
+        messages: Vec<ChatCompletionMessage>,
+    ) -> Self {
         let (tx, rx) = mpsc::channel(100);
         let mut processor = Self {
             window,
             options,
-            messages: Vec::new(),
+            messages,
             tx,
         };
         processor.start_update_listener(rx);
@@ -64,30 +133,30 @@ impl ChatProcessor {
     }
 
     fn start_update_listener(&mut self, mut rx: mpsc::Receiver<chat::ChatUpdate>) {
-        let window = self.window.clone();
+        let replayer = EventReplayer::new(self.window.clone());
         tokio::spawn(async move {
             while let Some(update) = rx.recv().await {
-                let (msg, is_notification) = match update {
-                    chat::ChatUpdate::ToolCall(name) => (format!("Calling {}.", name), true),
-                    chat::ChatUpdate::ToolResult(name, _) => (format!("{} Done.", name), true),
+                let _ = match update {
+                    chat::ChatUpdate::ToolCall {
+                        name,
+                        id,
+                        arguments,
+                    } => replayer.emit_tool_call(&name, &id, &arguments),
+                    chat::ChatUpdate::ToolResult { id, result } => {
+                        replayer.emit_tool_result(&id, &result)
+                    }
                 };
-                let _ = window.emit(
-                    "chat_completion_update",
-                    EventPayload::new_update(&msg, is_notification),
-                );
             }
         });
     }
 
-    async fn run(&mut self) -> Result<()> {
+    async fn run(mut self) -> Result<Vec<ChatCompletionMessage>> {
         self.window
             .emit("chat_completion_update", &EventPayload::Start)?;
-        self.messages = self.options.messages.clone();
 
         loop {
             let res = chat::call_openrouter(
                 &self.messages,
-                &self.options.api_key,
                 &self.options.model_name,
                 SYSTEM_PROMPT,
                 &tools::TOOLS,
@@ -95,18 +164,23 @@ impl ChatProcessor {
             .await?;
             let choice = &res.choices[0];
             let message: ChatCompletionMessage = choice.message.clone().into();
-
             if let Some(tool_calls) = message.tool_calls.clone() {
+                // To ensure the API gets a clean message, we create a new assistant
+                // message that ONLY has the tool_calls, and no `content`.
+                let assistant_tool_call_message =
+                    ChatCompletionMessage::new("assistant", vec![]).tool_calls(tool_calls.clone());
+                self.messages.push(assistant_tool_call_message);
+
+                // Handle the tool calls, which will return the tool result messages.
                 let new_messages = chat::handle_tool_calls(tool_calls, self.tx.clone()).await?;
-                self.messages.extend(new_messages);
+
+                // Add the tool result messages to history.
+                self.messages.extend(new_messages.clone());
+
             } else {
-                let content = message.content;
-                if let Some(chat::Content::Text { text }) = content.first() {
-                    self.window.emit(
-                        "chat_completion_update",
-                        EventPayload::new_update(text, false),
-                    )?;
-                }
+                // This is a standard text response, so add it to history and emit it for display.
+                self.messages.push(message.clone());
+                EventReplayer::new(self.window.clone()).replay(&[message])?;
                 break;
             }
         }
@@ -114,7 +188,7 @@ impl ChatProcessor {
         self.window
             .emit("chat_completion_update", &EventPayload::End)?;
 
-        Ok(())
+        Ok(self.messages)
     }
 }
 
@@ -154,8 +228,34 @@ fn set_settings(settings: Settings) -> Result<()> {
 }
 
 #[tauri::command]
-async fn chat_completion(window: tauri::Window, options: ChatCompletionOptions) -> Result<()> {
-    ChatProcessor::new(window, options).run().await
+async fn chat_completion(
+    window: tauri::Window,
+    message: ChatCompletionMessage,
+    state: State<'_, SharedHistory>,
+) -> Result<()> {
+    let settings = get_settings_fn()?;
+    let options = ChatCompletionOptions {
+        model_name: settings.model_name,
+    };
+    let mut history = state.read().unwrap().to_vec();
+    history.push(message);
+    let new_history = ChatProcessor::new(window, options, history).run().await?;
+    let mut history = state.write().unwrap();
+    *history = new_history;
+    Ok(())
+}
+#[tauri::command]
+async fn replay_history(window: tauri::Window, state: State<'_, SharedHistory>) -> Result<()> {
+    let history = state.read().unwrap().clone();
+    EventReplayer::new(window).replay(&history)?;
+    Ok(())
+}
+
+#[tauri::command]
+fn clear_history(state: State<'_, SharedHistory>) -> Result<()> {
+    let mut history = state.write().unwrap();
+    history.clear();
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -166,7 +266,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_settings,
             set_settings,
-            chat_completion
+            chat_completion,
+            replay_history,
+            clear_history
         ])
         .setup(|app| {
             STORE.get_or_init(|| {
@@ -175,6 +277,8 @@ pub fn run() {
                     .unwrap()
             });
             CACHE_DIR.get_or_init(|| app.path().app_cache_dir().unwrap());
+            let history: SharedHistory = Arc::new(RwLock::new(vec![]));
+            app.manage(history);
             Ok(())
         })
         .run(tauri::generate_context!())

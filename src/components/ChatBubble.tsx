@@ -1,9 +1,13 @@
+import { useState } from "react";
 import { IChatCompletionMessage, MessageContent } from "../types";
 import ReactMarkdown from "react-markdown";
-import { FaCopy, FaTrash } from "react-icons/fa";
+import { FaCopy, FaAngleDown, FaAngleUp } from "react-icons/fa";
 import "./components.css";
 
 const renderContent = (content: MessageContent) => {
+  if (!content || !content.length) {
+    return null;
+  }
   return content.map((item, index) => {
     if (item.type === "text") {
       return <ReactMarkdown key={index}>{item.text}</ReactMarkdown>;
@@ -26,11 +30,19 @@ export const ChatBubble = ({
   content,
   isNotification,
   onCopy,
-  onDelete,
+  toolName,
+  toolArgs,
+  toolResult,
 }: IChatCompletionMessage & {
   onCopy: () => void;
-  onDelete: () => void;
 }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // A bubble is a tool bubble if it has a tool name, or if it already has args/results from history
+  const isTool = !!(toolName || toolArgs || toolResult);
+
+  const mainContent = toolName ? `Calling ${toolName}${toolResult ? " done." : ""}` : renderContent(content);
+
   return (
     <div className={`chat-bubble-container ${role}`}>
       {role === "user" && !isNotification && (
@@ -38,23 +50,43 @@ export const ChatBubble = ({
           <button onClick={onCopy} title="Copy">
             <FaCopy />
           </button>
-          <button onClick={onDelete} title="Delete">
-            <FaTrash />
-          </button>
         </div>
       )}
       <div
-        className={`chat-bubble ${role} ${isNotification ? "notification" : ""}`}
+        className={`chat-bubble ${role} ${
+          isNotification ? "notification" : ""
+        }`}
       >
-        {renderContent(content)}
+        <div className="chat-bubble-content-wrapper">
+          {isTool && (
+            <button
+              className="expand-button"
+              onClick={() => setIsExpanded(!isExpanded)}
+            >
+              {isExpanded ? <FaAngleUp /> : <FaAngleDown />}
+            </button>
+          )}
+          <div className="chat-content">{mainContent}</div>
+        </div>
+        {isTool && isExpanded && (
+          <div className="tool-details-content">
+            {toolArgs && (
+              <pre>
+                <b>Arguments:</b> {toolArgs}
+              </pre>
+            )}
+            {toolResult && (
+              <pre>
+                <b>Result:</b> {toolResult.substring(0, 300)}
+              </pre>
+            )}
+          </div>
+        )}
       </div>
       {role === "assistant" && !isNotification && (
         <div className="message-actions">
           <button onClick={onCopy} title="Copy">
             <FaCopy />
-          </button>
-          <button onClick={onDelete} title="Delete">
-            <FaTrash />
           </button>
         </div>
       )}

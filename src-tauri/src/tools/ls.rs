@@ -33,7 +33,7 @@ pub struct LsArgs {
     pub relative_path: String,
 }
 
-pub async fn ls(args: LsArgs) -> Result<String> {
+pub async fn ls(args: LsArgs) -> Result<Vec<String>> {
     let root_dir = task::spawn_blocking(crate::get_settings_fn)
         .await?
         .map(|s| s.root_dir)?;
@@ -53,7 +53,7 @@ pub async fn ls(args: LsArgs) -> Result<String> {
                 .flatten()
                 .map(|entry| entry.file_name().to_string_lossy().to_string())
                 .collect();
-            Ok(serde_json::to_string(&result)?)
+            Ok(result)
         }
         Err(e) => Err(Error::Tool(format!("Error: failed to read dir: {}", e))),
     }
