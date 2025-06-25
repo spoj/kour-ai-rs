@@ -5,7 +5,7 @@ import { FaCopy, FaAngleDown, FaAngleUp } from "react-icons/fa";
 import "./components.css";
 
 const renderContent = (content: MessageContent) => {
-  if (!content) {
+  if (!content || !content.length) {
     return null;
   }
   return content.map((item, index) => {
@@ -30,6 +30,7 @@ export const ChatBubble = ({
   content,
   isNotification,
   onCopy,
+  toolName,
   toolArgs,
   toolResult,
 }: IChatCompletionMessage & {
@@ -37,7 +38,10 @@ export const ChatBubble = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const isTool = !!(toolArgs || toolResult);
+  // A bubble is a tool bubble if it has a tool name, or if it already has args/results from history
+  const isTool = !!(toolName || toolArgs || toolResult);
+
+  const mainContent = toolName ? `Calling ${toolName}${toolResult ? " done." : ""}` : renderContent(content);
 
   return (
     <div className={`chat-bubble-container ${role}`}>
@@ -62,7 +66,7 @@ export const ChatBubble = ({
               {isExpanded ? <FaAngleUp /> : <FaAngleDown />}
             </button>
           )}
-          <div className="chat-content">{renderContent(content)}</div>
+          <div className="chat-content">{mainContent}</div>
         </div>
         {isTool && isExpanded && (
           <div className="tool-details-content">

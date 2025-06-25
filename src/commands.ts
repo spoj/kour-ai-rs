@@ -10,8 +10,8 @@ export const saveSettings = async (settings: ISettings): Promise<void> => {
 	await invoke("set_settings", { settings });
 };
 
-export const getHistory = async (): Promise<IChatCompletionMessage[]> => {
-	return await invoke("get_history");
+export const replayHistory = async (): Promise<void> => {
+	await invoke("replay_history");
 }
 
 export const clearHistory = async (): Promise<void> => {
@@ -20,15 +20,14 @@ export const clearHistory = async (): Promise<void> => {
 
 export const chatCompletion = async (
 	message: IChatCompletionMessage,
-	callback: (update: IChatCompletionUpdate) => void
 ): Promise<void> => {
-	const unlisten = await listen("chat_completion_update", (event) => {
+	await invoke("chat_completion", { message });
+};
+
+export const onChatCompletionUpdate = async (
+	callback: (update: IChatCompletionUpdate) => void
+) => {
+	return await listen("chat_completion_update", (event) => {
 		callback(event.payload as IChatCompletionUpdate);
 	});
-
-	try {
-		await invoke("chat_completion", { message });
-	} finally {
-		unlisten();
-	}
-};
+}

@@ -5,7 +5,7 @@ mod settings;
 mod tools;
 mod utils;
 
-use self::chat::{ChatCompletionMessage, ChatCompletionOptions};
+use self::chat::{ChatCompletionMessage, ChatCompletionOptions, Content};
 use self::error::Error;
 use self::settings::Settings;
 use serde::Serialize;
@@ -195,8 +195,46 @@ async fn chat_completion(
     Ok(())
 }
 #[tauri::command]
-fn get_history(state: State<'_, SharedHistory>) -> Result<Vec<ChatCompletionMessage>> {
-    Ok(state.read().unwrap().clone())
+async fn replay_history(window: tauri::Window, state: State<'_, SharedHistory>) -> Result<()> {
+    let history = state.read().unwrap().clone();
+    let mut last_tool_call_id = None;
+
+    for message in history {
+        // Assistant message with tool calls
+        if let Some(tool_calls) = &message.tool_calls {
+            for tool_call in tool_calls {
+                window.emit(
+                    "chat_completion_update",
+                    EventPayload::ToolCall {
+                        tool_name: &tool_call.function.name,
+                        tool_call_id: &tool_call.id,
+                        tool_args: &tool_call.function.arguments,
+                    },
+                )?;
+                last_tool_call_id = Some(tool_call.id.clone());
+            }
+        }
+        // Tool message with the result
+        else if message.role == "tool" {
+            if let Some(tool_call_id) = &message.tool_call_id {
+                if let Some(Content::Text { text }) = message.content.first() {
+                    window.emit(
+                        "chat_completion_update",
+                        EventPayload::ToolDone {
+                            tool_call_id: &tool_call_id,
+                            tool_result: &text,
+                        },
+                    )?;
+                }
+            }
+        }
+        // All other messages
+        else {
+            window.emit("chat_completion_update", EventPayload::Message { message })?;
+        }
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -215,7 +253,7 @@ pub fn run() {
             get_settings,
             set_settings,
             chat_completion,
-            get_history,
+            replay_history,
             clear_history
         ])
         .setup(|app| {

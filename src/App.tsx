@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { FaCog, FaPaperPlane, FaTrash } from "react-icons/fa";
 import "./App.css";
-import { chatCompletion, getSettings, saveSettings, getHistory, clearHistory } from "./commands";
+import { chatCompletion, getSettings, saveSettings, replayHistory, clearHistory, onChatCompletionUpdate } from "./commands";
 import { IChatCompletionMessage, ISettings } from "./types";
 import { ChatBubble } from "./components/ChatBubble";
 import { SettingsModal } from "./components/SettingsModal";
@@ -13,6 +13,7 @@ function App() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const rootDirInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
+  const hasReplayed = useRef(false);
   const [openSettingsModal, setOpenSettingsModal] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [settings, setSettings] = useState<ISettings>({
@@ -23,13 +24,8 @@ function App() {
     providerOrder: ""
   });
 
-  const refreshHistory = () => {
-    getHistory().then(setMessages);
-  }
-
   useEffect(() => {
     getSettings().then(setSettings);
-    refreshHistory();
     messageInputRef.current?.focus();
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -38,12 +34,60 @@ function App() {
         rootDirInputRef.current?.focus();
       } else if (e.key === "k" && e.ctrlKey) {
         e.preventDefault();
-        clearHistory().then(refreshHistory);
+        clearHistory().then(() => setMessages([]));
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+
+    const unlisten = onChatCompletionUpdate((update) => {
+      switch (update.type) {
+        case "Start":
+          setIsTyping(true);
+          break;
+        case "End":
+          setIsTyping(false);
+          break;
+        case "Message":
+          setMessages((prev) => [...prev, update.message]);
+          break;
+        case "ToolCall":
+          const toolCallMessage: IChatCompletionMessage = {
+            tool_call_id: update.tool_call_id,
+            role: "assistant",
+            content: [],
+            isNotification: true,
+            toolName: update.tool_name,
+            toolArgs: update.tool_args,
+          };
+          setMessages((prev) => [...prev, toolCallMessage]);
+          break;
+        case "ToolDone":
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.tool_call_id === update.tool_call_id
+                ? {
+                    ...m,
+                    toolResult: update.tool_result,
+                  }
+                : m
+            )
+          );
+          break;
+      }
+    });
+
+    if (!hasReplayed.current) {
+      // Clear messages before replaying history to prevent duplication
+      setMessages([]);
+      replayHistory();
+      hasReplayed.current = true;
+    }
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      unlisten.then((f) => f());
+    };
   }, []);
 
   useEffect(() => {
@@ -79,53 +123,7 @@ function App() {
     setInput("");
     setAttachments([]);
 
-    chatCompletion(userMessage, (update) => {
-    	switch (update.type) {
-    		case "Start":
-    			setIsTyping(true);
-    			break;
-    		case "End":
-    			setIsTyping(false);
-    			break;
-    		case "Message":
-    			setMessages((prev) => [...prev, update.message]);
-    			break;
-    		case "ToolCall":
-    			const toolCallMessage: IChatCompletionMessage = {
-    				tool_call_id: update.tool_call_id,
-    				role: "assistant",
-    				content: [
-    					{
-    						type: "text",
-    						text: `Calling ${update.tool_name}...`,
-    					},
-    				],
-    				isNotification: true,
-    				toolName: update.tool_name,
-    				toolArgs: update.tool_args,
-    			};
-    			setMessages((prev) => [...prev, toolCallMessage]);
-    			break;
-    		case "ToolDone":
-    			setMessages((prev) =>
-    				prev.map((m) =>
-    					m.tool_call_id === update.tool_call_id
-    						? {
-    							...m,
-    							content: [
-    								{
-    									type: "text",
-    									text: `Calling ${m.toolName} done.`,
-    								},
-    							],
-    							toolResult: update.tool_result,
-    						}
-    						: m
-    				)
-    			);
-    			break;
-    	}
-    });
+    chatCompletion(userMessage);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -183,7 +181,7 @@ function App() {
           <button
             id="header-button"
             title="Clear History"
-            onClick={() => clearHistory().then(refreshHistory)}
+            onClick={() => clearHistory().then(() => setMessages([]))}
           >
             <FaTrash />
           </button>
@@ -204,6 +202,7 @@ function App() {
             content={m.content}
             isNotification={m.isNotification}
             onCopy={() => handleCopy(m.content)}
+            toolName={m.toolName}
             toolArgs={m.toolArgs}
             toolResult={m.toolResult}
           />

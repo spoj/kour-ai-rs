@@ -20,11 +20,22 @@ export type ImageContent = {
 
 export type MessageContent = (TextContent | ImageContent)[];
 
+export interface IToolCall {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
+  result?: string;
+}
+
 export interface IChatCompletionMessage {
   tool_call_id?: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "tool";
   content: MessageContent;
   isNotification?: boolean;
+  tool_calls?: IToolCall[];
   toolName?: string;
   toolArgs?: string;
   toolResult?: string;
