@@ -1,11 +1,11 @@
-use crate::chat::{ChatCompletionMessage, Content};
+use crate::chat::ChatCompletionMessage;
 use crate::error::Error;
 use crate::file_handler;
 use crate::tools::{Function, Tool};
 use crate::utils::jailed::Jailed;
 use crate::Result;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tokio::task;
 
 #[derive(Deserialize)]
@@ -34,8 +34,8 @@ pub async fn load_file(args: LoadFileArgs) -> Result<String> {
     let jail = Path::new(&root_dir);
     let safe_path = jail.jailed_join(Path::new(&args.filename))?;
 
-    let file_content = task::spawn_blocking(move || file_handler::process_file_for_llm(&safe_path))
-        .await??;
+    let file_content =
+        task::spawn_blocking(move || file_handler::process_file_for_llm(&safe_path)).await??;
 
     // Create the user message that contains the file attachment.
     let user_message = ChatCompletionMessage::new("user", file_content);
@@ -54,7 +54,9 @@ pub fn get_tool() -> Tool {
         r#type: "function".to_string(),
         function: Function {
             name: "load_file".to_string(),
-            description: "Loads a file directly into the conversation context. Supports various file types.".to_string(),
+            description:
+                "Loads a file directly into the conversation context. Supports various file types."
+                    .to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {

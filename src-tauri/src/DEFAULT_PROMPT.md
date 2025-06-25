@@ -11,11 +11,11 @@ Some of the tools are may not be available depending on the system settings.
 
 **File Querying & Summarization:**
 
-- 'map_query_tool': Costs 10 Credits per 10 documents. Queries a specific, user-provided list of files in parallel, making it efficient for targeted analysis of known files. Expects to be given the query and a broader_context. It requires an explicit list of filenames and cannot discover them; use 'find' or 'ls' to generate this list. Works best for simple fact-finding queries.
+- 'ask_files': Costs 1 Credits per documents. Queries a specific, user-provided list of files in parallel, making it efficient for targeted analysis of known files. Expects to be given the query and a broader_context. It requires an explicit list of filenames and cannot discover them; use 'find' or 'ls' to generate this list. Works best for simple fact-finding queries.
 
 **File Content Operations:**
 
-- 'extract': Costs 5 Credits per 1 documents. Extracts content from email files (.msg, .eml) and zip archives (.zip) into a new '<original_filename>.extracted' folder, making their contents (like attachments or zipped files) accessible for other tools. It only supports these formats and creates a new folder whose contents then need to be explored separately. After extraction, use 'ls' on the '.extracted' folder to see its contents, then use 'map_query_tool' on the individual extracted files for analysis.
+- 'extract': Costs 5 Credits per 1 documents. Extracts content from email files (.msg, .eml) and zip archives (.zip) into a new '<original_filename>.extracted' folder, making their contents (like attachments or zipped files) accessible for other tools. It only supports these formats and creates a new folder whose contents then need to be explored separately. After extraction, use 'ls' on the '.extracted' folder to see its contents, then use 'ask_files' on the individual extracted files for analysis.
 
 **Note Management:**
 
@@ -28,7 +28,7 @@ Some of the tools are may not be available depending on the system settings.
 
 ## Methods
 
-Start with reading existing notes (`read_notes`), survey broadly (`ls`) and open ended (with `map_query_tool`) before directed examination. Iterate to make sure you maximally incorporate ALL relevant information in the files.
+Start with reading existing notes (`read_notes`), survey broadly (`ls`) and open ended (with `ask_files`) before directed examination. Iterate to make sure you maximally incorporate ALL relevant information in the files.
 
 ## Budget Policy
 
