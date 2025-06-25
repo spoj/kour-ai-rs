@@ -1,4 +1,4 @@
-use crate::{get_settings_fn, settings::Settings, tools};
+use crate::{get_settings_fn, tools};
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -34,6 +34,8 @@ pub struct ChatCompletionMessage {
     pub tool_calls: Option<Vec<ToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub injected_user_message: Option<Box<ChatCompletionMessage>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -68,6 +70,7 @@ impl From<IncomingMessage> for ChatCompletionMessage {
             content,
             tool_calls: msg.tool_calls,
             tool_call_id: None,
+            injected_user_message: None,
         }
     }
 }
@@ -79,6 +82,7 @@ impl ChatCompletionMessage {
             content,
             tool_calls: None,
             tool_call_id: None,
+            injected_user_message: None,
         }
     }
 
@@ -216,16 +220,7 @@ async fn execute_tool_call(
             Err(e) => serde_json::Value::String(e.to_string()),
         };
 
-    let result = if tool_call.function.name == "load_file" {
-        if let Some(mut obj) = json_value.as_object().cloned() {
-            obj.remove("user_message");
-            serde_json::to_string(&obj).unwrap_or_else(|_| json_value.to_string())
-        } else {
-            json_value.to_string()
-        }
-    } else {
-        serde_json::to_string(&json_value).unwrap_or_else(|_| json_value.to_string())
-    };
+    let result = serde_json::to_string(&json_value).unwrap_or_else(|_| json_value.to_string());
     tx.send(ChatUpdate::ToolResult {
         id: tool_call.id.clone(),
         result: result.clone(),
@@ -240,7 +235,6 @@ pub async fn handle_tool_calls(
     tx: mpsc::Sender<ChatUpdate>,
 ) -> super::Result<Vec<ChatCompletionMessage>> {
     let mut new_messages = Vec::new();
-
 
     let tool_futs = tool_calls
         .into_iter()
@@ -263,7 +257,7 @@ pub async fn handle_tool_calls(
                 if let Ok(user_message) = serde_json::from_value::<ChatCompletionMessage>(
                     file_result["user_message"].clone(),
                 ) {
-                    // 1. Add the simple tool message for display
+                    // 1. Add the simple tool message for display, with the rich user message nested inside.
                     new_messages.push(ChatCompletionMessage {
                         role: "tool".to_string(),
                         content: vec![Content::Text {
@@ -271,10 +265,8 @@ pub async fn handle_tool_calls(
                         }],
                         tool_call_id: Some(id),
                         tool_calls: None,
+                        injected_user_message: Some(Box::new(user_message)),
                     });
-
-                    // 2. Add the rich user message with the actual file content
-                    new_messages.push(user_message);
 
                     continue; // Skip the default handling below
                 }
@@ -287,6 +279,7 @@ pub async fn handle_tool_calls(
             content: vec![Content::Text { text: result_str }],
             tool_call_id: Some(id),
             tool_calls: None,
+            injected_user_message: None,
         });
     }
 

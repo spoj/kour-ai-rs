@@ -55,7 +55,6 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
         .map(|filename| {
             let root_dir = settings.root_dir.clone();
             let query = query.clone();
-            let settings = settings.clone();
             let model_name = MAP_MODEL;
 
             async move {
