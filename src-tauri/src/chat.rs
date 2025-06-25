@@ -188,8 +188,7 @@ pub async fn call_openrouter(
 
 #[derive(Debug, Clone)]
 pub enum ChatUpdate {
-    ToolCall(String),
-    #[allow(dead_code)]
+    ToolCall(String, String),
     ToolResult(String, String),
 }
 
@@ -197,8 +196,11 @@ async fn execute_tool_call(
     tool_call: ToolCall,
     tx: mpsc::Sender<ChatUpdate>,
 ) -> super::Result<(String, String)> {
-    tx.send(ChatUpdate::ToolCall(tool_call.function.name.clone()))
-        .await?;
+    tx.send(ChatUpdate::ToolCall(
+        tool_call.function.name.clone(),
+        tool_call.id.clone(),
+    ))
+    .await?;
     let result =
         match tools::tool_executor(&tool_call.function.name, &tool_call.function.arguments).await {
             Ok(result) => result,
@@ -206,7 +208,7 @@ async fn execute_tool_call(
         };
     tx.send(ChatUpdate::ToolResult(
         tool_call.function.name.clone(),
-        result.clone(),
+        tool_call.id.clone(),
     ))
     .await?;
 

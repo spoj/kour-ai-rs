@@ -21,9 +21,11 @@ export type ImageContent = {
 export type MessageContent = (TextContent | ImageContent)[];
 
 export interface IChatCompletionMessage {
+  tool_call_id?: string;
   role: "user" | "assistant";
   content: MessageContent;
   isNotification?: boolean;
+  toolName?: string;
 }
 
 export interface IChatCompletionOptions {
@@ -35,4 +37,6 @@ export interface IChatCompletionOptions {
 export type IChatCompletionUpdate =
   | { type: "Start" }
   | { type: "End" }
-  | { type: "Update"; message: string; is_notification: boolean };
+  | { type: "Update"; message: string; is_notification: boolean }
+  | { type: "ToolCall"; tool_name: string; tool_call_id: string }
+  | { type: "ToolDone"; tool_call_id: string };

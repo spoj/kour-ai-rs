@@ -11,6 +11,8 @@ function App() {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<string[]>([]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const rootDirInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const [openSettingsModal, setOpenSettingsModal] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [settings, setSettings] = useState<ISettings>({
@@ -23,12 +25,25 @@ function App() {
 
   useEffect(() => {
     getSettings().then(setSettings);
+    messageInputRef.current?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "l" && e.ctrlKey) {
+        e.preventDefault();
+        rootDirInputRef.current?.focus();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
+    setTimeout(() => {
+      if (chatContainerRef.current) {
+        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      }
+    }, 100);
   }, [messages]);
 
   const handleSettingsChange = (newSettings: Partial<ISettings>) => {
@@ -81,6 +96,38 @@ function App() {
             };
             setMessages((prev) => [...prev, botMessage]);
             break;
+          case "ToolCall":
+            const toolCallMessage: IChatCompletionMessage = {
+              tool_call_id: update.tool_call_id,
+              role: "assistant",
+              content: [
+                {
+                  type: "text",
+                  text: `Calling ${update.tool_name}...`,
+                },
+              ],
+              isNotification: true,
+              toolName: update.tool_name,
+            };
+            setMessages((prev) => [...prev, toolCallMessage]);
+            break;
+          case "ToolDone":
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.tool_call_id === update.tool_call_id
+                  ? {
+                    ...m,
+                    content: [
+                      {
+                        type: "text",
+                        text: `Calling ${m.toolName} done.`,
+                      },
+                    ],
+                  }
+                  : m
+              )
+            );
+            break;
         }
       }
     );
@@ -131,11 +178,13 @@ function App() {
         </a>
         <div id="path-container">
           <input
+            ref={rootDirInputRef}
             type="text"
             id="path-input"
             placeholder="Enter root directory..."
             value={settings.rootDir}
             onChange={(e) => handleSettingsChange({ rootDir: e.target.value })}
+            onFocus={(e) => e.target.select()}
           />
         </div>
         <div style={{ paddingLeft: "10px" }}>
@@ -180,6 +229,7 @@ function App() {
           />
         ))}
         <textarea
+          ref={messageInputRef}
           id="message-input"
           placeholder="Type a message..."
           value={input}

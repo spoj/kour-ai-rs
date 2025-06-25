@@ -32,16 +32,15 @@ enum EventPayload<'a> {
         message: &'a str,
         is_notification: bool,
     },
+    ToolCall {
+        tool_name: &'a str,
+        tool_call_id: &'a str,
+    },
+    ToolDone {
+        tool_call_id: &'a str,
+    },
 }
 
-impl<'a> EventPayload<'a> {
-    fn new_update(message: &'a str, is_notification: bool) -> Self {
-        EventPayload::Update {
-            message,
-            is_notification,
-        }
-    }
-}
 
 struct ChatProcessor {
     window: tauri::Window,
@@ -67,14 +66,18 @@ impl ChatProcessor {
         let window = self.window.clone();
         tokio::spawn(async move {
             while let Some(update) = rx.recv().await {
-                let (msg, is_notification) = match update {
-                    chat::ChatUpdate::ToolCall(name) => (format!("Calling {}.", name), true),
-                    chat::ChatUpdate::ToolResult(name, _) => (format!("{} Done.", name), true),
+                let _ = match update {
+                    chat::ChatUpdate::ToolCall(name, id) => window.emit(
+                        "chat_completion_update",
+                        EventPayload::ToolCall {
+                            tool_name: &name,
+                            tool_call_id: &id,
+                        },
+                    ),
+                    chat::ChatUpdate::ToolResult(_, id) => {
+                        window.emit("chat_completion_update", EventPayload::ToolDone { tool_call_id: &id })
+                    }
                 };
-                let _ = window.emit(
-                    "chat_completion_update",
-                    EventPayload::new_update(&msg, is_notification),
-                );
             }
         });
     }
@@ -104,7 +107,10 @@ impl ChatProcessor {
                 if let Some(chat::Content::Text { text }) = content.first() {
                     self.window.emit(
                         "chat_completion_update",
-                        EventPayload::new_update(text, false),
+                        EventPayload::Update {
+                            message: text,
+                            is_notification: false,
+                        },
                     )?;
                 }
                 break;
