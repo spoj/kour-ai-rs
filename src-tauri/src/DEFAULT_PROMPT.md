@@ -12,12 +12,10 @@ Some of the tools are may not be available depending on the system settings.
 **File Querying & Summarization:**
 
 - 'map_query_tool': Costs 10 Credits per 10 documents. Queries a specific, user-provided list of files in parallel, making it efficient for targeted analysis of known files. Expects to be given the query and a broader_context. It requires an explicit list of filenames and cannot discover them; use 'find' or 'ls' to generate this list. Works best for simple fact-finding queries.
-- 'map_query_tool_glob': Costs 10 Credits per 10 documents. Runs a query against files whose filenames match a given glob. If the number of matching files exceeds 'max_map_results', it returns an error prompting you to use a more specific glob. Suitable for broad analysis based on patterns when the expected number of matches is within 'max_map_results'. Always use 'find' first to gauge the number of matches if unsure.
 
 **File Content Operations:**
 
 - 'extract': Costs 5 Credits per 1 documents. Extracts content from email files (.msg, .eml) and zip archives (.zip) into a new '<original_filename>.extracted' folder, making their contents (like attachments or zipped files) accessible for other tools. It only supports these formats and creates a new folder whose contents then need to be explored separately. After extraction, use 'ls' on the '.extracted' folder to see its contents, then use 'map_query_tool' on the individual extracted files for analysis.
-- 'produce_crop': Costs 5 Credits. Sends an image crop from a document to the user. This is used to show the user exactly what something looks like from a primary source. Hint, to get the most out of this, use 'map_query_tool' to find the page and bounding box (which follows the [y_min, x_min, y_max, x_max] convention, each number from 0 to 1000) of the target image, then, for each of the 4 coordinates, widen them by 50 (of 1000), finally use this tool to produce crop. Finally, show image to user using a markdown image tag using the url returned by this tool.
 
 **Note Management:**
 

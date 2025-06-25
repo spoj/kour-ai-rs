@@ -14,7 +14,7 @@ const MAX_CONCURRENCY: usize = 50;
 const MAP_MODEL:&str = "google/gemini-2.5-flash";
 
 #[derive(Deserialize)]
-pub struct MapQueryArgs {
+pub struct AskFilesArgs {
     pub query: String,
     pub filenames: Vec<String>,
 }
@@ -23,8 +23,8 @@ pub fn get_tool() -> Tool {
     Tool {
         r#type: "function".to_string(),
         function: Function {
-            name: "map_query".to_string(),
-            description: "Answers a query about individual files in a directory.".to_string(),
+            name: "ask_files".to_string(),
+            description: "Answers a query about a list of files.".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -46,8 +46,8 @@ pub fn get_tool() -> Tool {
     }
 }
 
-pub async fn map_query(args:MapQueryArgs) -> Result<String> {
-    let MapQueryArgs { query, filenames } = args;
+pub async fn ask_files(args: AskFilesArgs) -> Result<String> {
+    let AskFilesArgs { query, filenames } = args;
     let (root_dir,api_key) = task::spawn_blocking(crate::get_settings_fn)
         .await?
         .map(|s| (s.root_dir,s.api_key))?;

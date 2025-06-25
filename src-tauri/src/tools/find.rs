@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::task;
 
+const MAX_FIND_RESULTS: usize = 100;
+
 pub fn get_tool() -> Tool {
     Tool {
         r#type: "function".to_string(),
@@ -50,18 +52,31 @@ fn find_internal(root_dir: &str, glob_pattern: &str) -> Result<String> {
         .to_str()
         .ok_or_else(|| Error::Tool("Invalid pattern path".to_string()))?;
 
-    let mut result = String::new();
-    for entry in glob::glob(full_pattern_str)
+    let entries: Vec<_> = glob::glob(full_pattern_str)
         .map_err(|e| Error::Tool(format!("Invalid glob pattern: {}", e)))?
         .flatten()
-    {
-        if let Some(path_str) = entry.to_str() {
-            // Strip the root to return a relative path, which is more user-friendly.
-            result.push_str(path_str.strip_prefix(root_dir).unwrap_or(path_str));
-            result.push('\n');
-        }
+        .collect();
+
+    if entries.len() > MAX_FIND_RESULTS {
+        return Err(Error::Tool(format!(
+            "Error: Find returned too many results ({}). Please provide a more specific glob pattern.",
+            entries.len()
+        )));
     }
-    Ok(result)
+
+    let result: Vec<String> = entries
+        .iter()
+        .map(|entry| {
+            entry
+                .to_str()
+                .unwrap_or_default()
+                .strip_prefix(root_dir)
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect();
+
+    Ok(result.join("\n"))
 }
 
 pub async fn find(args: FindArgs) -> Result<String> {

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tokio::{fs, task};
 
 use crate::tools::{Function, Tool};

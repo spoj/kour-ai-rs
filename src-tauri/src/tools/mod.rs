@@ -1,9 +1,11 @@
 mod extract;
 mod find;
 mod ls;
-mod map_query;
+mod ask_files;
 mod notes;
 mod roll_dice;
+mod load_file;
+mod check_online;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, Value};
@@ -31,8 +33,10 @@ pub static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
         find::get_tool(),
         notes::read_notes_tool(),
         notes::append_notes_tool(),
-        map_query::get_tool(),
+        ask_files::get_tool(),
         extract::get_tool(),
+        load_file::get_tool(),
+        check_online::get_tool(),
     ]
 });
 
@@ -43,8 +47,10 @@ pub async fn tool_executor(name: &str, arguments: &str) -> crate::Result<String>
         "find" => Ok(find::find(from_str(arguments)?).await?),
         "read_notes" => notes::read_notes().await,
         "append_notes" => notes::append_notes(from_str(arguments)?).await,
-        "map_query" => map_query::map_query(from_str(arguments)?).await,
+        "ask_files" => ask_files::ask_files(from_str(arguments)?).await,
         "extract" => extract::extract(&from_str(arguments)?).await,
+        "load_file" => load_file::load_file(from_str(arguments)?).await,
+        "check_online" => check_online::check_online(from_str(arguments)?).await,
         _ => Err(Error::Tool("Tool Not Found".to_string())),
     }
 }

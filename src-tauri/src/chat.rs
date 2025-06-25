@@ -229,10 +229,35 @@ pub async fn handle_tool_calls(
     let tool_results = join_all(tool_futs).await;
 
     for tool_result in tool_results {
-        let (id, result) = tool_result??;
+        let (id, result_str) = tool_result??;
+
+        // Try to deserialize the result into our special LoadFileResult structure
+        if let Ok(file_result) = serde_json::from_str::<serde_json::Value>(&result_str) {
+            if file_result.get("type").and_then(|t| t.as_str()) == Some("file_loaded") {
+                let display_message = file_result["display_message"].as_str().unwrap_or("").to_string();
+                
+                // The user_message is nested in the JSON, deserialize it separately
+                if let Ok(user_message) = serde_json::from_value::<ChatCompletionMessage>(file_result["user_message"].clone()) {
+                    // 1. Add the simple tool message for display
+                    new_messages.push(ChatCompletionMessage {
+                        role: "tool".to_string(),
+                        content: vec![Content::Text { text: display_message }],
+                        tool_call_id: Some(id),
+                        tool_calls: None,
+                    });
+
+                    // 2. Add the rich user message with the actual file content
+                    new_messages.push(user_message);
+
+                    continue; // Skip the default handling below
+                }
+            }
+        }
+        
+        // Default handling for all other tools
         new_messages.push(ChatCompletionMessage {
             role: "tool".to_string(),
-            content: vec![Content::Text { text: result }],
+            content: vec![Content::Text { text: result_str }],
             tool_call_id: Some(id),
             tool_calls: None,
         });
