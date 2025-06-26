@@ -95,7 +95,7 @@ h1 {
   line-height: 18px;
   field-sizing: content;
 }
-#send-button {
+.send-button {
   background-color: hsl(219, 82%, 51%);
   color: white;
   border: none;
@@ -110,10 +110,10 @@ h1 {
   justify-content: center;
   flex-shrink: 0;
 }
-#send-button:hover {
+.send-button:hover {
   background-color: hsl(219, 82%, 45%);
 }
 
-.stop-button {
-  background-color: hsl(0, 85%, 43%) !important;
+#stop-button {
+  background-color: hsl(0, 85%, 43%);
 }
