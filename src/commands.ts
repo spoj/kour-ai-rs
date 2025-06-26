@@ -17,6 +17,10 @@ export const replayHistory = async (): Promise<void> => {
 export const clearHistory = async (): Promise<void> => {
 	await invoke("clear_history");
 }
+export const cancelOutstandingRequest = async (): Promise<void> => {
+	await invoke("cancel_outstanding_request");
+}
+
 
 export const chatCompletion = async (
 	message: IChatCompletionMessage,

@@ -1,7 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { FaCog, FaPaperPlane, FaTrash } from "react-icons/fa";
+import { FaCog, FaPaperPlane, FaTrash, FaSquare } from "react-icons/fa";
 import "./App.css";
-import { chatCompletion, getSettings, saveSettings, replayHistory, clearHistory, onChatCompletionUpdate } from "./commands";
+import {
+  chatCompletion,
+  getSettings,
+  saveSettings,
+  replayHistory,
+  clearHistory,
+  onChatCompletionUpdate,
+  cancelOutstandingRequest,
+} from "./commands";
 import { IChatCompletionMessage, ISettings } from "./types";
 import { ChatBubble } from "./components/ChatBubble";
 import { SettingsModal } from "./components/SettingsModal";
@@ -34,7 +42,9 @@ function App() {
         rootDirInputRef.current?.focus();
       } else if (e.key === "k" && e.ctrlKey) {
         e.preventDefault();
-        clearHistory().then(() => setMessages([]));
+        clearHistory().then(() => {
+          setMessages([]);
+        });
       }
     };
 
@@ -202,7 +212,11 @@ function App() {
           <button
             id="header-button"
             title="Clear History"
-            onClick={() => clearHistory().then(() => setMessages([]))}
+            onClick={() => {
+              clearHistory().then(() => {
+                setMessages([]);
+              });
+            }}
           >
             <FaTrash />
           </button>
@@ -256,9 +270,19 @@ function App() {
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
         ></textarea>
-        <button id="send-button" onClick={handleSend}>
-          <FaPaperPlane />
-        </button>
+        {isTyping ? (
+          <button
+            id="send-button"
+            className="stop-button"
+            onClick={cancelOutstandingRequest}
+          >
+            <FaSquare />
+          </button>
+        ) : (
+          <button id="send-button" onClick={handleSend}>
+            <FaPaperPlane />
+          </button>
+        )}
       </div>
       {openSettingsModal && (
         <SettingsModal

@@ -113,3 +113,7 @@ h1 {
 #send-button:hover {
   background-color: hsl(219, 82%, 45%);
 }
+
+.stop-button {
+  background-color: hsl(0, 85%, 43%) !important;
+}
