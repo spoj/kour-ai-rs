@@ -252,10 +252,22 @@ async fn chat_completion(
     let mut history = state.history.read().unwrap().to_vec();
     history.push(message);
     let cancel_token = CancellationToken::new();
-    *state.cancel.lock().unwrap() = Some(cancel_token.clone());
+    {
+        let mut guard = state.cancel.lock().unwrap();
+        if guard.is_none() {
+            *guard = Some(cancel_token.clone());
+        } else {
+            return Err(Error::Send("more than 1 request".to_string()));
+        }
+    }
+
     select! {
-        _ = cancel_token.cancelled() => {}
-        Ok(new_history) = ChatProcessor::new(window, options, history).run() => {
+        _ = cancel_token.cancelled() => {
+            window.clone().emit("chat_completion_update", &EventPayload::End)?;
+            *state.cancel.lock().unwrap() = None
+        }
+        Ok(new_history) = ChatProcessor::new(window.clone(), options, history).run() => {
+            *state.cancel.lock().unwrap() = None;
             let mut history = state.history.write().unwrap();
             *history = new_history;
         }
@@ -270,19 +282,18 @@ async fn replay_history(window: tauri::Window, state: AppState<'_>) -> Result<()
 }
 
 #[tauri::command]
-fn clear_history(state: AppState<'_>, window: tauri::Window) -> Result<()> {
-    cancel_outstanding_request(state.clone(), window)?;
+fn clear_history(state: AppState<'_>) -> Result<()> {
+    cancel_outstanding_request(state.clone())?;
     let mut history = state.history.write().unwrap();
     history.clear();
     Ok(())
 }
 
 #[tauri::command]
-fn cancel_outstanding_request(state: AppState<'_>, window: tauri::Window) -> Result<()> {
+fn cancel_outstanding_request(state: AppState<'_>) -> Result<()> {
     if let Some(cancel_token) = state.cancel.lock().unwrap().as_ref() {
         cancel_token.cancel();
     }
-    window.emit("chat_completion_update", &EventPayload::End)?;
     Ok(())
 }
 

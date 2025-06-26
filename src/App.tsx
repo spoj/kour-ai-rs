@@ -136,7 +136,7 @@ function App() {
   };
 
   const handleSend = async () => {
-    if (input.trim() === "") return;
+    if (input.trim() === "" || isTyping) return;
     let content: any = [{ type: "text", text: input }];
     if (attachments.length > 0) {
       content = [
@@ -190,6 +190,12 @@ function App() {
     navigator.clipboard.writeText(textToCopy);
   };
 
+  const handleCancel = () => {
+    cancelOutstandingRequest().then(() => {
+      setMessages([]);
+      replayHistory();
+    });
+  };
 
   return (
     <div className="container">
@@ -274,7 +280,7 @@ function App() {
           <button
             id="send-button"
             className="stop-button"
-            onClick={cancelOutstandingRequest}
+            onClick={handleCancel}
           >
             <FaSquare />
           </button>
