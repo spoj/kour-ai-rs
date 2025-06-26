@@ -278,14 +278,14 @@ function App() {
         ></textarea>
         {isTyping ? (
           <button
-            id="send-button"
-            className="stop-button"
+            className="send-button"
+            id="stop-button"
             onClick={handleCancel}
           >
             <FaSquare />
           </button>
         ) : (
-          <button id="send-button" onClick={handleSend}>
+          <button className="send-button" onClick={handleSend}>
             <FaPaperPlane />
           </button>
         )}
