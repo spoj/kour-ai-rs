@@ -2,8 +2,8 @@ name: "publish"
 
 on:
   push:
-    branches:
-      - release
+    tags:
+      - 'v*.*.*' # Trigger on tags like v1.0.0, v2.3.4, etc.
 
 # This is the example from the readme.
 # On each push to the `release` branch it will create or update a GitHub release, build your app, and upload the artifacts to the release.
