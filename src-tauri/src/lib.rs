@@ -245,9 +245,12 @@ async fn chat_completion(
     };
     let mut history = state.read().unwrap().to_vec();
     history.push(message);
+    let old_history = history.clone();
     let new_history = ChatProcessor::new(window, options, history).run().await?;
     let mut history = state.write().unwrap();
-    *history = new_history;
+    if new_history.starts_with(&old_history) {
+        *history = new_history;
+    }
     Ok(())
 }
 #[tauri::command]

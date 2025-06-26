@@ -58,12 +58,23 @@ pub async fn extract(args: ExtractArgs) -> Result<ExtractResult> {
             .await??
         }
         "eml" => {
-            let file_path = file_path.to_path_buf();
-            let extraction_folder = extraction_folder.to_path_buf();
+            let file_content = fs::read(file_path).await?;
+            let extraction_folder_clone = extraction_folder.clone();
             tokio::task::spawn_blocking(move || {
-                extract_eml::extract_eml(&file_path, &extraction_folder)
+                let message = mail_parser::MessageParser::default()
+                    .parse(&file_content)
+                    .ok_or_else(|| Error::Tool("Failed to parse .eml file".to_string()))?;
+                extract_eml::extract_eml(&message, &extraction_folder_clone);
+                Ok(()) as Result<()>
             })
-            .await??
+            .await??;
+
+            let mut entries = fs::read_dir(&extraction_folder).await?;
+            let mut extracted_files = Vec::new();
+            while let Some(entry) = entries.next_entry().await? {
+                extracted_files.push(entry.file_name().to_string_lossy().to_string());
+            }
+            extracted_files
         }
         "msg" => {
             let file_path = file_path.to_path_buf();

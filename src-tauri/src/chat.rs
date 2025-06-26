@@ -3,7 +3,7 @@ use futures::future::join_all;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 #[serde(tag = "type")]
 pub enum Content {
     #[serde(rename = "text")]
@@ -14,18 +14,18 @@ pub enum Content {
     File { file: FileData },
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub struct FileData {
     pub filename: String,
     pub file_data: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub struct ImageUrl {
     pub url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub struct ChatCompletionMessage {
     pub role: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -105,14 +105,14 @@ pub struct ChatCompletionOptions {
     pub model_name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub struct ToolCall {
     pub id: String,
     pub r#type: String,
     pub function: FunctionCall,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub struct FunctionCall {
     pub name: String,
     pub arguments: String,
