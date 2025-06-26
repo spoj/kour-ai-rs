@@ -1,10 +1,8 @@
 # Kour-AI
 
-Your Windows desktop AI assistant for all file lookup, summarising, and instant chat needs.
+Windows desktop assistant that understands PDF's, PPT's, and DOC's, and can answer questions about them.
 
 ![screenshot](docs/screenshot.png)
-
-Kour-AI is written in Electron to be cross platform, and is a budding application that is capable of interacting with system directories to parse files.
 
 ---
 
@@ -12,33 +10,16 @@ Kour-AI is written in Electron to be cross platform, and is a budding applicatio
 
 Built with Tauri and React, Kour-AI is designed to be lightweight and efficient. It uses the OpenRouter API for AI capabilities and LibreOffice for document parsing.
 
-## Installation and running
+## Quick start
 
-1. Create a fork of the repository
+1. Download from the releases page
+2. install the app
+3. Input openrouter key in the settings
+4. specify a root directory and ask away!
+5. Optional: For PPTX and DOCX support, you need Libreoffice.
 
-2. Download it via HTTP or ssh onto your system
+## Development
 
-3. Install dependencies
-
-    ```shell
-    cd kour-ai && npm install
-    ```
-
-4. Run the app
-
-    ```shell
-    npm run start
-    ```
-
-5. Build
-
-    ```shell
-    npm run make
-    ```
-
-### To run Kour-AI to its full potential, you will need the following
-
-- An OpenRouter key: This is needed to make API calls for the AI
-
-- LibreOffice: To allow the app to read `.pptx`, `.docx` formats
-  - In particular, you will need to provide the app the link to the `soffice.com` file in the LibreOffice installation: `C:\Users\<path to LibreOffice>\App\libreoffice\program`
+1. Ensure you have rust and npm installed
+2. run `npm install` to install dependencies
+3. run `npm run tauri dev` to start the development server
