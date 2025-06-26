@@ -1,7 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { FaCog, FaPaperPlane, FaTrash } from "react-icons/fa";
+import { FaCog, FaPaperPlane, FaTrash, FaSquare } from "react-icons/fa";
 import "./App.css";
-import { chatCompletion, getSettings, saveSettings, replayHistory, clearHistory, onChatCompletionUpdate } from "./commands";
+import {
+  chatCompletion,
+  getSettings,
+  saveSettings,
+  replayHistory,
+  clearHistory,
+  onChatCompletionUpdate,
+  cancelOutstandingRequest,
+} from "./commands";
 import { IChatCompletionMessage, ISettings } from "./types";
 import { ChatBubble } from "./components/ChatBubble";
 import { SettingsModal } from "./components/SettingsModal";
@@ -34,7 +42,9 @@ function App() {
         rootDirInputRef.current?.focus();
       } else if (e.key === "k" && e.ctrlKey) {
         e.preventDefault();
-        clearHistory().then(() => setMessages([]));
+        clearHistory().then(() => {
+          setMessages([]);
+        });
       }
     };
 
@@ -126,7 +136,7 @@ function App() {
   };
 
   const handleSend = async () => {
-    if (input.trim() === "") return;
+    if (input.trim() === "" || isTyping) return;
     let content: any = [{ type: "text", text: input }];
     if (attachments.length > 0) {
       content = [
@@ -180,6 +190,12 @@ function App() {
     navigator.clipboard.writeText(textToCopy);
   };
 
+  const handleCancel = () => {
+    cancelOutstandingRequest().then(() => {
+      setMessages([]);
+      replayHistory();
+    });
+  };
 
   return (
     <div className="container">
@@ -202,7 +218,11 @@ function App() {
           <button
             id="header-button"
             title="Clear History"
-            onClick={() => clearHistory().then(() => setMessages([]))}
+            onClick={() => {
+              clearHistory().then(() => {
+                setMessages([]);
+              });
+            }}
           >
             <FaTrash />
           </button>
@@ -256,9 +276,19 @@ function App() {
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
         ></textarea>
-        <button id="send-button" onClick={handleSend}>
-          <FaPaperPlane />
-        </button>
+        {isTyping ? (
+          <button
+            className="send-button"
+            id="stop-button"
+            onClick={handleCancel}
+          >
+            <FaSquare />
+          </button>
+        ) : (
+          <button className="send-button" onClick={handleSend}>
+            <FaPaperPlane />
+          </button>
+        )}
       </div>
       {openSettingsModal && (
         <SettingsModal

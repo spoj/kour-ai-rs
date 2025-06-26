@@ -11,11 +11,13 @@ use self::settings::Settings;
 use serde::Serialize;
 use serde_json::{from_value, to_value};
 use std::path::PathBuf;
-use std::sync::{Arc, OnceLock, RwLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use tauri::{Emitter, Manager};
 use tauri::{State, Wry};
 use tauri_plugin_store::{Store, StoreBuilder};
+use tokio::select;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -41,7 +43,11 @@ enum EventPayload<'a> {
         tool_result: &'a str,
     },
 }
-type SharedHistory = Arc<RwLock<Vec<ChatCompletionMessage>>>;
+struct AppStateInner {
+    cancel: Arc<Mutex<Option<CancellationToken>>>,
+    history: Arc<RwLock<Vec<ChatCompletionMessage>>>,
+}
+type AppState<'a> = State<'a, AppStateInner>;
 
 struct EventReplayer {
     window: tauri::Window,
@@ -237,33 +243,57 @@ fn set_settings(settings: Settings) -> Result<()> {
 async fn chat_completion(
     window: tauri::Window,
     message: ChatCompletionMessage,
-    state: State<'_, SharedHistory>,
+    state: AppState<'_>,
 ) -> Result<()> {
     let settings = get_settings_fn()?;
     let options = ChatCompletionOptions {
         model_name: settings.model_name,
     };
-    let mut history = state.read().unwrap().to_vec();
+    let mut history = state.history.read().unwrap().to_vec();
     history.push(message);
-    let old_history = history.clone();
-    let new_history = ChatProcessor::new(window, options, history).run().await?;
-    let mut history = state.write().unwrap();
-    if new_history.starts_with(&old_history) {
-        *history = new_history;
+    let cancel_token = CancellationToken::new();
+    {
+        let mut guard = state.cancel.lock().unwrap();
+        if guard.is_none() {
+            *guard = Some(cancel_token.clone());
+        } else {
+            return Err(Error::Send("more than 1 request".to_string()));
+        }
+    }
+
+    select! {
+        _ = cancel_token.cancelled() => {
+            window.clone().emit("chat_completion_update", &EventPayload::End)?;
+            *state.cancel.lock().unwrap() = None
+        }
+        Ok(new_history) = ChatProcessor::new(window.clone(), options, history).run() => {
+            *state.cancel.lock().unwrap() = None;
+            let mut history = state.history.write().unwrap();
+            *history = new_history;
+        }
     }
     Ok(())
 }
 #[tauri::command]
-async fn replay_history(window: tauri::Window, state: State<'_, SharedHistory>) -> Result<()> {
-    let history = state.read().unwrap().clone();
+async fn replay_history(window: tauri::Window, state: AppState<'_>) -> Result<()> {
+    let history = state.history.read().unwrap().clone();
     EventReplayer::new(window).replay(&history)?;
     Ok(())
 }
 
 #[tauri::command]
-fn clear_history(state: State<'_, SharedHistory>) -> Result<()> {
-    let mut history = state.write().unwrap();
+fn clear_history(state: AppState<'_>) -> Result<()> {
+    cancel_outstanding_request(state.clone())?;
+    let mut history = state.history.write().unwrap();
     history.clear();
+    Ok(())
+}
+
+#[tauri::command]
+fn cancel_outstanding_request(state: AppState<'_>) -> Result<()> {
+    if let Some(cancel_token) = state.cancel.lock().unwrap().as_ref() {
+        cancel_token.cancel();
+    }
     Ok(())
 }
 
@@ -277,7 +307,8 @@ pub fn run() {
             set_settings,
             chat_completion,
             replay_history,
-            clear_history
+            clear_history,
+            cancel_outstanding_request
         ])
         .setup(|app| {
             STORE.get_or_init(|| {
@@ -286,8 +317,10 @@ pub fn run() {
                     .unwrap()
             });
             CACHE_DIR.get_or_init(|| app.path().app_cache_dir().unwrap());
-            let history: SharedHistory = Arc::new(RwLock::new(vec![]));
-            app.manage(history);
+            let history = Arc::new(RwLock::new(vec![]));
+            let cancel = Arc::new(Mutex::new(None));
+            let inner_state = AppStateInner { cancel, history };
+            app.manage(inner_state);
             Ok(())
         })
         .run(tauri::generate_context!())
