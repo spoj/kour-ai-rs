@@ -52,9 +52,13 @@ h1 {
   background: none;
   border: none;
   color: white;
-  font-size: 24px;
+  font-size: 20px;
   cursor: pointer;
   margin-right: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
 }
 #chat-container {
   flex-grow: 1;
