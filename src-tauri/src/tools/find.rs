@@ -53,7 +53,7 @@ fn find_internal(root_dir: &str, glob_pattern: &str) -> Result<Vec<String>> {
         .ok_or_else(|| Error::Tool("Invalid pattern path".to_string()))?;
 
     let entries: Vec<_> = glob::glob(full_pattern_str)
-        .map_err(|e| Error::Tool(format!("Invalid glob pattern: {}", e)))?
+        .map_err(|e| Error::Tool(format!("Invalid glob pattern: {e}")))?
         .flatten()
         .collect();
 

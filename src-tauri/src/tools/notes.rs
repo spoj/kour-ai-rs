@@ -85,7 +85,7 @@ pub fn append_notes_tool() -> Tool {
                     "required": ["markdown_content"]
                 }"#,
             )
-            .unwrap(),
+            .unwrap_or_default(),
         },
     }
 }
