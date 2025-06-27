@@ -29,7 +29,7 @@ function App() {
     modelName: "",
     rootDir: "",
     sofficePath: "",
-    providerOrder: ""
+    providerOrder: "",
   });
 
   useEffect(() => {
@@ -77,7 +77,10 @@ function App() {
             // Find the most recent tool call with matching ID that doesn't have a result yet
             let foundIndex = -1;
             for (let i = prev.length - 1; i >= 0; i--) {
-              if (prev[i].tool_call_id === update.tool_call_id && !prev[i].toolResult) {
+              if (
+                prev[i].tool_call_id === update.tool_call_id &&
+                !prev[i].toolResult
+              ) {
                 foundIndex = i;
                 break;
               }
@@ -87,9 +90,9 @@ function App() {
               return prev.map((m, index) =>
                 index === foundIndex
                   ? {
-                    ...m,
-                    toolResult: update.tool_result,
-                  }
+                      ...m,
+                      toolResult: update.tool_result,
+                    }
                   : m
               );
             }
@@ -98,9 +101,9 @@ function App() {
             return prev.map((m) =>
               m.tool_call_id === update.tool_call_id
                 ? {
-                  ...m,
-                  toolResult: update.tool_result,
-                }
+                    ...m,
+                    toolResult: update.tool_result,
+                  }
                 : m
             );
           });
@@ -124,7 +127,8 @@ function App() {
   useEffect(() => {
     setTimeout(() => {
       if (chatContainerRef.current) {
-        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        chatContainerRef.current.scrollTop =
+          chatContainerRef.current.scrollHeight;
       }
     }, 100);
   }, [messages]);
@@ -185,7 +189,17 @@ function App() {
           };
           reader.readAsDataURL(file);
         }
+      } else if (items[i].type.indexOf("html") !== -1) {
+        items[i].getAsString((html) => {
+          const tempDiv = document.createElement("div");
+          tempDiv.innerHTML = html;
+          const img = tempDiv.querySelector("img");
+          if (img) {
+            setAttachments((prev) => [...prev, img.src]);
+          }
+        });
       }
+      console.log("file data", items[i]);
     }
   };
 
@@ -260,7 +274,7 @@ function App() {
             role="assistant"
             content={[{ type: "text", text: "Thinking..." }]}
             isNotification
-            onCopy={() => { }}
+            onCopy={() => {}}
           />
         )}
       </div>
@@ -271,7 +285,9 @@ function App() {
             src={a}
             alt="attachment"
             className="attachment-thumbnail"
-            onClick={() => setAttachments((prev) => prev.filter((_, j) => i !== j))}
+            onClick={() =>
+              setAttachments((prev) => prev.filter((_, j) => i !== j))
+            }
           />
         ))}
         <textarea
