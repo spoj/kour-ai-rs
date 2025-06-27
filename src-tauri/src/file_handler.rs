@@ -63,7 +63,7 @@ pub enum FileType {
 
 pub fn determine_file_type(path: &Path) -> FileType {
     let extension = path.extension().and_then(|s| s.to_str()).unwrap_or("");
-    match extension {
+    match extension.to_lowercase().as_str() {
         "jpg" | "jpeg" => FileType::Image("image/jpeg".to_string()),
         "png" => FileType::Image("image/png".to_string()),
         "pdf" => FileType::Pdf,
