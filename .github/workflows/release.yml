@@ -44,4 +44,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          releaseId: ${{env.RELEASE_VERSION}}
+          tagName: ${{ github.event.release.tag_name }}
