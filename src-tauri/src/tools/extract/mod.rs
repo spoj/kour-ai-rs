@@ -97,7 +97,7 @@ pub async fn extract(args: ExtractArgs) -> Result<ExtractResult> {
 
     let result: ExtractResult = ExtractResult {
         status: "success".to_string(),
-        extraction_folder: extraction_folder.to_str().unwrap_or_default().to_string(),
+        extraction_folder: extraction_folder.to_string_lossy().to_string(),
         total_files: extracted_files.len(),
         extracted_files,
     };
