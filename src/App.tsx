@@ -129,6 +129,13 @@ function App() {
     }, 100);
   }, [messages]);
 
+  useEffect(() => {
+    if (messageInputRef.current) {
+      messageInputRef.current.style.height = "auto";
+      messageInputRef.current.style.height = `${messageInputRef.current.scrollHeight}px`;
+    }
+  }, [input]);
+
   const handleSettingsChange = (newSettings: Partial<ISettings>) => {
     const updatedSettings = { ...settings, ...newSettings };
     setSettings(updatedSettings);
@@ -271,6 +278,7 @@ function App() {
           ref={messageInputRef}
           id="message-input"
           placeholder="Type a message..."
+          rows={1}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}

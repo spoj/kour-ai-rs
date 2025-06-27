@@ -92,6 +92,7 @@ h1 {
   padding: 10px 15px;
   font-size: 14px;
   resize: none;
+  height: auto;
   overflow-y: auto;
   box-sizing: border-box;
   min-height: 40px;
