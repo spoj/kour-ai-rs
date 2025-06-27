@@ -37,7 +37,15 @@ pub async fn extract(args: ExtractArgs) -> Result<ExtractResult> {
 
     let extraction_folder = file_path.with_extension(format!(
         "{}.extracted",
-        file_path.extension().unwrap_or_default().to_str().unwrap()
+        file_path
+            .extension()
+            .ok_or(Error::Tool(
+                "Extraction error, corrupted filename".to_string()
+            ))?
+            .to_str()
+            .ok_or(Error::Tool(
+                "Extraction error, corrupted filename".to_string()
+            ))?
     ));
 
     fs::create_dir_all(&extraction_folder).await?;
@@ -64,7 +72,7 @@ pub async fn extract(args: ExtractArgs) -> Result<ExtractResult> {
                 let message = mail_parser::MessageParser::default()
                     .parse(&file_content)
                     .ok_or_else(|| Error::Tool("Failed to parse .eml file".to_string()))?;
-                extract_eml::extract_eml(&message, &extraction_folder_clone);
+                let _ = extract_eml::extract_eml(&message, &extraction_folder_clone);
                 Ok(()) as Result<()>
             })
             .await??;
@@ -84,14 +92,12 @@ pub async fn extract(args: ExtractArgs) -> Result<ExtractResult> {
             })
             .await??
         }
-        _ => {
-            return Err(Error::Tool("Unsupported file type".to_string()))
-        }
+        _ => return Err(Error::Tool("Unsupported file type".to_string())),
     };
 
     let result: ExtractResult = ExtractResult {
         status: "success".to_string(),
-        extraction_folder: extraction_folder.to_str().unwrap().to_string(),
+        extraction_folder: extraction_folder.to_str().unwrap_or_default().to_string(),
         total_files: extracted_files.len(),
         extracted_files,
     };

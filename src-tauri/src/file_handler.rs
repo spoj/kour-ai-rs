@@ -14,7 +14,7 @@ fn get_cache_path(file_buffer: &[u8], target_extension: &str) -> Result<PathBuf>
     let mut hasher = Sha256::new();
     hasher.update(file_buffer);
     let result = hasher.finalize();
-    let hash = format!("{:x}", result);
+    let hash = format!("{result:x}");
     let cache_dir = crate::get_cache_dir()?;
     let sub_dir = &hash[0..2];
     let cache_file_name = format!("{}.{}", &hash[2..], target_extension);
@@ -28,14 +28,6 @@ fn read_conversion_cache(file_buffer: &[u8], target_extension: &str) -> Result<O
     } else {
         Ok(None)
     }
-}
-
-pub fn get_cache(
-    orig_file_buffer: &[u8],
-    _orig_ext: &str,
-    target_ext: &str,
-) -> Result<Option<Vec<u8>>> {
-    read_conversion_cache(orig_file_buffer, target_ext)
 }
 
 fn write_conversion_cache(
@@ -57,7 +49,7 @@ pub enum FileType {
     Docx,
     Pptx,
     Xlsx,
-    Text(String),
+    Text,
     Unsupported,
 }
 
@@ -70,7 +62,7 @@ pub fn determine_file_type(path: &Path) -> FileType {
         "docx" => FileType::Docx,
         "pptx" => FileType::Pptx,
         "xlsx" => FileType::Xlsx,
-        "txt" | "md" | "csv" => FileType::Text("text/plain".to_string()),
+        "txt" | "md" | "csv" => FileType::Text,
         _ => FileType::Unsupported,
     }
 }
@@ -88,7 +80,7 @@ pub fn convert_to_pdf(path: &Path) -> Result<Vec<u8>> {
     let temp_dir = Builder::new()
         .prefix("file_conversion")
         .tempdir()
-        .map_err(Error::Io)?;
+        .map_err(|_| Error::Tool("File conversion error".to_string()))?;
 
     let temp_dir_path = temp_dir.path();
 
@@ -109,7 +101,10 @@ pub fn convert_to_pdf(path: &Path) -> Result<Vec<u8>> {
     }
 
     let mut pdf_path = temp_dir_path.to_path_buf();
-    pdf_path.push(path.file_name().unwrap());
+    pdf_path.push(
+        path.file_name()
+            .ok_or(Error::Tool("PDF conversion error".to_string()))?,
+    );
     pdf_path.set_extension("pdf");
 
     let pdf_bytes = std::fs::read(&pdf_path)?;
@@ -139,7 +134,11 @@ fn convert_xlsx_to_csv(file_buffer: &[u8]) -> Result<String> {
                 .write_record(once(sheet_name.clone()).chain(row.iter().map(|c| c.to_string())))
                 .map_err(|_| Error::Tool("error writing CSV".to_string()))?;
         }
-        csv_data.extend(writer.into_inner().unwrap());
+        csv_data.extend(
+            writer
+                .into_inner()
+                .map_err(|_| Error::Tool("CSV conversion error".to_string()))?,
+        );
     }
     println!("done all sheets");
 
@@ -155,17 +154,22 @@ pub fn process_file_for_llm(path: &Path) -> Result<Vec<Content>> {
     let result = match file_type {
         FileType::Image(mime) => {
             let encoded = general_purpose::STANDARD.encode(&file_buffer);
-            let data_url = format!("data:{};base64,{}", mime, encoded);
+            let data_url = format!("data:{mime};base64,{encoded}");
             Ok(vec![Content::ImageUrl {
                 image_url: ImageUrl { url: data_url },
             }])
         }
         FileType::Pdf => {
             let encoded = general_purpose::STANDARD.encode(&file_buffer);
-            let data_url = format!("data:application/pdf;base64,{}", encoded);
+            let data_url = format!("data:application/pdf;base64,{encoded}");
             Ok(vec![Content::File {
                 file: FileData {
-                    filename: path.file_name().unwrap().to_str().unwrap().to_string(),
+                    filename: path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_str()
+                        .unwrap_or_default()
+                        .to_string(),
                     file_data: data_url,
                 },
             }])
@@ -173,10 +177,15 @@ pub fn process_file_for_llm(path: &Path) -> Result<Vec<Content>> {
         FileType::Docx | FileType::Pptx => {
             let pdf_bytes = convert_to_pdf(path)?;
             let encoded = general_purpose::STANDARD.encode(&pdf_bytes);
-            let data_url = format!("data:application/pdf;base64,{}", encoded);
+            let data_url = format!("data:application/pdf;base64,{encoded}");
             Ok(vec![Content::File {
                 file: FileData {
-                    filename: path.file_name().unwrap().to_str().unwrap().to_string(),
+                    filename: path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_str()
+                        .unwrap_or_default()
+                        .to_string(),
                     file_data: data_url,
                 },
             }])
@@ -185,7 +194,7 @@ pub fn process_file_for_llm(path: &Path) -> Result<Vec<Content>> {
             let csv_data = convert_xlsx_to_csv(&file_buffer)?;
             Ok(vec![Content::Text { text: csv_data }])
         }
-        FileType::Text(_) => {
+        FileType::Text => {
             let content = fs::read_to_string(path)?;
             Ok(vec![Content::Text { text: content }])
         }

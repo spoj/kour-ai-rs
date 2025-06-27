@@ -8,7 +8,7 @@ use crate::Result;
 pub fn extract_zip(file_path: &Path, output_dir: &Path) -> Result<Vec<String>> {
     let source = std_fs::File::open(file_path)?;
     zip_extract::extract(source, output_dir, true)
-        .map_err(|e| Error::Tool(format!("Failed to extract zip archive: {}", e)))?;
+        .map_err(|e| Error::Tool(format!("Failed to extract zip archive: {e}")))?;
 
     let mut extracted_files = Vec::new();
     for entry in WalkDir::new(output_dir) {

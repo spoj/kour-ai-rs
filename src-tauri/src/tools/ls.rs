@@ -55,6 +55,6 @@ pub async fn ls(args: LsArgs) -> Result<Vec<String>> {
                 .collect();
             Ok(result)
         }
-        Err(e) => Err(Error::Tool(format!("Error: failed to read dir: {}", e))),
+        Err(e) => Err(Error::Tool(format!("Error: failed to read dir: {e}"))),
     }
 }
