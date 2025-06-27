@@ -44,8 +44,8 @@ enum EventPayload<'a> {
     },
 }
 struct AppStateInner {
-    cancel: Arc<Mutex<Option<CancellationToken>>>,
-    history: Arc<RwLock<Vec<ChatCompletionMessage>>>,
+    cancel: Mutex<Option<CancellationToken>>,
+    history: RwLock<Vec<ChatCompletionMessage>>,
 }
 type AppState<'a> = State<'a, AppStateInner>;
 
@@ -317,8 +317,8 @@ pub fn run() {
                     .unwrap()
             });
             CACHE_DIR.get_or_init(|| app.path().app_cache_dir().unwrap());
-            let history = Arc::new(RwLock::new(vec![]));
-            let cancel = Arc::new(Mutex::new(None));
+            let history = RwLock::new(vec![]);
+            let cancel = Mutex::new(None);
             let inner_state = AppStateInner { cancel, history };
             app.manage(inner_state);
             Ok(())
