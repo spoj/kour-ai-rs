@@ -1,7 +1,41 @@
-use crate::{get_settings_fn, tools};
+use crate::{get_settings_fn, tools, Result};
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
+use tauri::Emitter;
+
+pub static SYSTEM_PROMPT: &str = include_str!("DEFAULT_PROMPT.md");
+
+#[derive(Serialize, Clone)]
+#[serde(tag = "type")]
+enum EventPayload<'a> {
+    Start,
+    End,
+    Message {
+        message: ChatCompletionMessage,
+    },
+    ToolCall {
+        tool_name: &'a str,
+        tool_call_id: &'a str,
+        tool_args: &'a str,
+    },
+    ToolDone {
+        tool_call_id: &'a str,
+        tool_result: &'a str,
+    },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
+pub struct ChatCompletionMessage {
+    pub role: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub content: Vec<Content>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCall>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub injected_user_message: Option<Box<ChatCompletionMessage>>,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 #[serde(tag = "type")]
@@ -25,17 +59,13 @@ pub struct ImageUrl {
     pub url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
-pub struct ChatCompletionMessage {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct IncomingMessage {
     pub role: String,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub content: Vec<Content>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    content: MessageContent,
+    #[serde(default)]
     pub tool_calls: Option<Vec<ToolCall>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_call_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub injected_user_message: Option<Box<ChatCompletionMessage>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -46,15 +76,6 @@ enum MessageContent {
     Parts(Vec<Content>),
     #[default]
     None,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct IncomingMessage {
-    pub role: String,
-    #[serde(default)]
-    content: MessageContent,
-    #[serde(default)]
-    pub tool_calls: Option<Vec<ToolCall>>,
 }
 
 impl From<IncomingMessage> for ChatCompletionMessage {
@@ -91,12 +112,6 @@ impl ChatCompletionMessage {
         self.content = vec![]; // Empty vec will be omitted by serde
         self
     }
-
-    #[allow(dead_code)]
-    pub fn tool_call_id(mut self, tool_call_id: &str) -> Self {
-        self.tool_call_id = Some(tool_call_id.to_string());
-        self
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -129,13 +144,231 @@ pub struct Choice {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ChatCompletionResponseDelta {
-    pub choices: Vec<ChoiceDelta>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct ChoiceDelta {
     pub delta: IncomingMessage,
+}
+
+#[derive(Clone)]
+pub struct EventReplayer {
+    window: tauri::Window,
+}
+
+impl EventReplayer {
+    pub fn new(window: tauri::Window) -> Self {
+        Self { window }
+    }
+
+    pub fn emit_tool_call(&self, name: &str, id: &str, arguments: &str) -> Result<()> {
+        self.window.emit(
+            "chat_completion_update",
+            EventPayload::ToolCall {
+                tool_name: name,
+                tool_call_id: id,
+                tool_args: arguments,
+            },
+        )?;
+        Ok(())
+    }
+
+    pub fn emit_tool_result(&self, id: &str, result: &str) -> Result<()> {
+        self.window.emit(
+            "chat_completion_update",
+            EventPayload::ToolDone {
+                tool_call_id: id,
+                tool_result: result,
+            },
+        )?;
+        Ok(())
+    }
+    pub fn emit_done(&self) -> Result<()> {
+        self.window
+            .emit("chat_completion_update", EventPayload::End)?;
+        Ok(())
+    }
+
+    pub fn emit_start(&self) -> Result<()> {
+        self.window
+            .emit("chat_completion_update", EventPayload::Start)?;
+        Ok(())
+    }
+
+    pub fn replay(&self, messages: &[ChatCompletionMessage]) -> Result<()> {
+        for message in messages {
+            // Assistant message with tool calls
+            if let Some(tool_calls) = &message.tool_calls {
+                for tool_call in tool_calls {
+                    self.emit_tool_call(
+                        &tool_call.function.name,
+                        &tool_call.id,
+                        &tool_call.function.arguments,
+                    )?;
+                }
+            }
+            // Tool message with the result
+            else if message.role == "tool" {
+                if let Some(tool_call_id) = &message.tool_call_id {
+                    if let Some(Content::Text { text }) = message.content.first() {
+                        self.emit_tool_result(tool_call_id, text)?;
+                    }
+                }
+                // We do NOT replay the injected user message, it's for the LLM only
+            }
+            // All other messages
+            else {
+                self.window.emit(
+                    "chat_completion_update",
+                    EventPayload::Message {
+                        message: message.clone(),
+                    },
+                )?;
+            }
+        }
+        Ok(())
+    }
+}
+pub struct ChatProcessor {
+    replayer: EventReplayer,
+    options: ChatCompletionOptions,
+    messages: Vec<ChatCompletionMessage>,
+}
+
+impl ChatProcessor {
+    pub fn new(
+        window: tauri::Window,
+        options: ChatCompletionOptions,
+        messages: Vec<ChatCompletionMessage>,
+    ) -> Self {
+        Self {
+            replayer: EventReplayer::new(window),
+            options,
+            messages,
+        }
+    }
+
+    pub async fn run(mut self) -> Result<Vec<ChatCompletionMessage>> {
+        let _ = self.replayer.emit_start();
+
+        loop {
+            let res = call_openrouter(
+                &self.messages,
+                &self.options.model_name,
+                SYSTEM_PROMPT,
+                &tools::TOOLS,
+            )
+            .await?;
+
+            let choice = &res.choices[0];
+            let message: ChatCompletionMessage = choice.message.clone().into();
+
+            if let Some(tool_calls) = message.tool_calls.clone() {
+                let assistant_tool_call_message =
+                    ChatCompletionMessage::new("assistant", vec![]).tool_calls(tool_calls.clone());
+                self.messages.push(assistant_tool_call_message);
+
+                let new_messages = self.handle_tool_calls(tool_calls).await?;
+                for msg in new_messages {
+                    let mut tool_message = msg;
+                    if let Some(user_msg) = tool_message.injected_user_message.take() {
+                        self.messages.push(tool_message);
+                        self.messages.push(*user_msg);
+                    } else {
+                        self.messages.push(tool_message);
+                    }
+                }
+                // After handling tools, continue the loop to let the assistant respond.
+            } else {
+                // It's a final text response. Add it to history, emit, and break the loop.
+                self.messages.push(message.clone());
+                self.replayer.replay(&[message])?;
+                break;
+            }
+        }
+
+        self.replayer.emit_done()?;
+
+        Ok(self.messages)
+    }
+
+    async fn execute_tool_call(
+        replayer: EventReplayer,
+        tool_call: ToolCall,
+    ) -> Result<(String, String)> {
+        replayer
+            .emit_tool_call(
+                &tool_call.function.name,
+                &tool_call.id,
+                &tool_call.function.arguments,
+            )
+            .expect("error emit");
+        let json_value =
+            match tools::tool_executor(&tool_call.function.name, &tool_call.function.arguments)
+                .await
+            {
+                Ok(value) => value,
+                Err(e) => serde_json::Value::String(e.to_string()),
+            };
+
+        let result = serde_json::to_string(&json_value).unwrap_or_else(|_| json_value.to_string());
+        let _ = replayer.emit_tool_result(&tool_call.id, &result);
+
+        Ok((tool_call.id, result))
+    }
+
+    pub async fn handle_tool_calls(
+        &self,
+        tool_calls: Vec<ToolCall>,
+    ) -> Result<Vec<ChatCompletionMessage>> {
+        let mut new_messages = Vec::new();
+
+        let tool_futs = tool_calls.into_iter().map(|tool_call| {
+            tokio::spawn(Self::execute_tool_call(self.replayer.clone(), tool_call))
+        });
+
+        let tool_results = join_all(tool_futs).await;
+
+        for tool_result in tool_results {
+            let (id, result_str) = tool_result??;
+
+            // Try to deserialize the result into our special LoadFileResult structure
+            if let Ok(file_result) = serde_json::from_str::<serde_json::Value>(&result_str) {
+                if file_result.get("type").and_then(|t| t.as_str()) == Some("file_loaded") {
+                    let display_message = file_result["display_message"]
+                        .as_str()
+                        .unwrap_or("")
+                        .to_string();
+
+                    // The user_message is nested in the JSON, deserialize it separately
+                    if let Ok(user_message) = serde_json::from_value::<ChatCompletionMessage>(
+                        file_result["user_message"].clone(),
+                    ) {
+                        // 1. Add the simple tool message for display, with the rich user message nested inside.
+                        new_messages.push(ChatCompletionMessage {
+                            role: "tool".to_string(),
+                            content: vec![Content::Text {
+                                text: display_message,
+                            }],
+                            tool_call_id: Some(id),
+                            tool_calls: None,
+                            injected_user_message: Some(Box::new(user_message)),
+                        });
+
+                        continue; // Skip the default handling below
+                    }
+                }
+            }
+
+            // Default handling for all other tools
+            new_messages.push(ChatCompletionMessage {
+                role: "tool".to_string(),
+                content: vec![Content::Text { text: result_str }],
+                tool_call_id: Some(id),
+                tool_calls: None,
+                injected_user_message: None,
+            });
+        }
+
+        Ok(new_messages)
+    }
 }
 
 pub async fn call_openrouter(
@@ -144,7 +377,7 @@ pub async fn call_openrouter(
     system_prompt: &str,
     tools: &Vec<tools::Tool>,
 ) -> super::Result<ChatCompletionResponse> {
-    println!("Sending messages to OpenRouter: {:?}", messages);
+    println!("Sending messages to OpenRouter: {messages:?}");
     let settings = get_settings_fn()?;
     let client = reqwest::Client::new();
     let mut final_messages = messages.to_vec();
@@ -174,7 +407,7 @@ pub async fn call_openrouter(
         .await?;
 
     let text = res.text().await?;
-    println!("Got response from OpenRouter: {}", text);
+    println!("Got response from OpenRouter: {text}",);
     let response: ChatCompletionResponse =
         match serde_json::from_str::<ChatCompletionResponse>(&text) {
             Ok(res) => res,
@@ -189,99 +422,4 @@ pub async fn call_openrouter(
             },
         };
     Ok(response)
-}
-
-#[derive(Debug, Clone)]
-pub enum ChatUpdate {
-    ToolCall {
-        name: String,
-        id: String,
-        arguments: String,
-    },
-    ToolResult {
-        id: String,
-        result: String,
-    },
-}
-
-async fn execute_tool_call(
-    tool_call: ToolCall,
-    tx: mpsc::Sender<ChatUpdate>,
-) -> super::Result<(String, String)> {
-    tx.send(ChatUpdate::ToolCall {
-        name: tool_call.function.name.clone(),
-        id: tool_call.id.clone(),
-        arguments: tool_call.function.arguments.clone(),
-    })
-    .await?;
-    let json_value =
-        match tools::tool_executor(&tool_call.function.name, &tool_call.function.arguments).await {
-            Ok(value) => value,
-            Err(e) => serde_json::Value::String(e.to_string()),
-        };
-
-    let result = serde_json::to_string(&json_value).unwrap_or_else(|_| json_value.to_string());
-    tx.send(ChatUpdate::ToolResult {
-        id: tool_call.id.clone(),
-        result: result.clone(),
-    })
-    .await?;
-
-    Ok((tool_call.id, result))
-}
-
-pub async fn handle_tool_calls(
-    tool_calls: Vec<ToolCall>,
-    tx: mpsc::Sender<ChatUpdate>,
-) -> super::Result<Vec<ChatCompletionMessage>> {
-    let mut new_messages = Vec::new();
-
-    let tool_futs = tool_calls
-        .into_iter()
-        .map(|tool_call| tokio::spawn(execute_tool_call(tool_call, tx.clone())));
-
-    let tool_results = join_all(tool_futs).await;
-
-    for tool_result in tool_results {
-        let (id, result_str) = tool_result??;
-
-        // Try to deserialize the result into our special LoadFileResult structure
-        if let Ok(file_result) = serde_json::from_str::<serde_json::Value>(&result_str) {
-            if file_result.get("type").and_then(|t| t.as_str()) == Some("file_loaded") {
-                let display_message = file_result["display_message"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_string();
-
-                // The user_message is nested in the JSON, deserialize it separately
-                if let Ok(user_message) = serde_json::from_value::<ChatCompletionMessage>(
-                    file_result["user_message"].clone(),
-                ) {
-                    // 1. Add the simple tool message for display, with the rich user message nested inside.
-                    new_messages.push(ChatCompletionMessage {
-                        role: "tool".to_string(),
-                        content: vec![Content::Text {
-                            text: display_message,
-                        }],
-                        tool_call_id: Some(id),
-                        tool_calls: None,
-                        injected_user_message: Some(Box::new(user_message)),
-                    });
-
-                    continue; // Skip the default handling below
-                }
-            }
-        }
-
-        // Default handling for all other tools
-        new_messages.push(ChatCompletionMessage {
-            role: "tool".to_string(),
-            content: vec![Content::Text { text: result_str }],
-            tool_call_id: Some(id),
-            tool_calls: None,
-            injected_user_message: None,
-        });
-    }
-
-    Ok(new_messages)
 }
