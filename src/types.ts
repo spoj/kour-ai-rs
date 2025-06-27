@@ -11,14 +11,14 @@ export type TextContent = {
   text: string;
 };
 
-export type ImageContent = {
-  type: "image_url";
+export type TMessageAttachment = {
+  type: "image_url" | "file_pdf";
   image_url: {
     url: string;
   };
 };
 
-export type MessageContent = (TextContent | ImageContent)[];
+export type MessageContent = (TextContent | TMessageAttachment)[];
 
 export interface IToolCall {
   id: string;

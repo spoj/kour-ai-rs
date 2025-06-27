@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { FaCog, FaPaperPlane, FaTrash, FaSquare } from "react-icons/fa";
+import { FaCog, FaPaperPlane, FaTrash, FaSquare, FaFile } from "react-icons/fa";
 import "./App.css";
 import {
   chatCompletion,
@@ -17,7 +17,9 @@ import { SettingsModal } from "./components/SettingsModal";
 function App() {
   const [messages, setMessages] = useState<IChatCompletionMessage[]>([]);
   const [input, setInput] = useState("");
-  const [attachments, setAttachments] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState<
+    { type: string; content: string }[]
+  >([]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const rootDirInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
@@ -178,13 +180,25 @@ function App() {
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = event.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf("image") !== -1) {
+      if (
+        items[i].type.indexOf("image") !== -1 ||
+        items[i].type.indexOf("pdf") !== -1
+      ) {
         const file = items[i].getAsFile();
         if (file) {
           const reader = new FileReader();
           reader.onload = (e) => {
             if (e.target?.result) {
-              setAttachments((prev) => [...prev, e.target?.result as string]);
+              setAttachments((prev) => [
+                ...prev,
+                {
+                  type:
+                    items[i].type.indexOf("pdf") !== -1
+                      ? "file_pdf"
+                      : "image_url",
+                  content: e.target?.result as string,
+                },
+              ]);
             }
           };
           reader.readAsDataURL(file);
@@ -195,11 +209,13 @@ function App() {
           tempDiv.innerHTML = html;
           const img = tempDiv.querySelector("img");
           if (img) {
-            setAttachments((prev) => [...prev, img.src]);
+            setAttachments((prev) => [
+              ...prev,
+              { type: "image_url", content: img.src },
+            ]);
           }
         });
       }
-      console.log("file data", items[i]);
     }
   };
 
@@ -279,17 +295,26 @@ function App() {
         )}
       </div>
       <div id="input-container">
-        {attachments.map((a, i) => (
-          <img
-            key={i}
-            src={a}
-            alt="attachment"
-            className="attachment-thumbnail"
-            onClick={() =>
-              setAttachments((prev) => prev.filter((_, j) => i !== j))
-            }
-          />
-        ))}
+        {attachments.map((a, i) =>
+          a.type !== "file_pdf" ? (
+            <img
+              key={i}
+              src={a.content}
+              alt="attachment"
+              className="attachment-thumbnail"
+              onClick={() =>
+                setAttachments((prev) => prev.filter((_, j) => i !== j))
+              }
+            />
+          ) : (
+            <FaFile
+              className="attachment-thumbnail"
+              onClick={() =>
+                setAttachments((prev) => prev.filter((_, j) => i !== j))
+              }
+            />
+          )
+        )}
         <textarea
           ref={messageInputRef}
           id="message-input"
