@@ -34,7 +34,7 @@ export const ChatBubble = ({
   toolArgs,
   toolResult,
 }: IChatCompletionMessage & {
-  onCopy: () => void;
+  onCopy?: () => void;
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
