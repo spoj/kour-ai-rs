@@ -5,7 +5,7 @@ mod settings;
 mod tools;
 mod utils;
 
-use crate::chat::{ChatCompletionMessage, ChatCompletionOptions};
+use crate::chat::{ChatMessage, ChatOptions, Content};
 use crate::chat::{ChatProcessor, EventReplayer};
 use crate::error::Error;
 use crate::settings::Settings;
@@ -25,7 +25,7 @@ pub static CACHE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 struct AppStateInner {
     cancel: Mutex<Option<CancellationToken>>,
-    history: RwLock<Vec<ChatCompletionMessage>>,
+    history: RwLock<Vec<ChatMessage>>,
 }
 type AppState<'a> = State<'a, AppStateInner>;
 
@@ -65,17 +65,18 @@ fn set_settings(settings: Settings) -> Result<()> {
 }
 
 #[tauri::command]
-async fn chat_completion(
-    window: tauri::Window,
-    message: ChatCompletionMessage,
-    state: AppState<'_>,
-) -> Result<()> {
+async fn chat(window: tauri::Window, content: Vec<Content>, state: AppState<'_>) -> Result<()> {
     let settings = get_settings_fn()?;
-    let options = ChatCompletionOptions {
+    let options = ChatOptions {
         model_name: settings.model_name,
     };
+    let replayer = EventReplayer::new(window.clone());
     let mut history = state.history.read().unwrap().to_vec(); // unwrap: won't try to recover from poisoned lock
-    history.push(message);
+
+    let received_message = ChatMessage::from_user_content(content);
+    history.push(received_message.clone());
+    let _ = replayer.emit_message(received_message);
+
     let cancel_token = CancellationToken::new();
     {
         let mut guard = state.cancel.lock().unwrap(); // unwrap: won't try to recover from poisoned lock
@@ -88,7 +89,6 @@ async fn chat_completion(
 
     select! {
         _ = cancel_token.cancelled() => {
-            let replayer = EventReplayer::new(window.clone());
             let _ = replayer.emit_done();
             *state.cancel.lock().unwrap() = None; // unwrap: won't try to recover from poisoned lock
         }
@@ -132,7 +132,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_settings,
             set_settings,
-            chat_completion,
+            chat,
             replay_history,
             clear_history,
             cancel_outstanding_request

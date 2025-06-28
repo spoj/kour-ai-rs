@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { FaCog, FaPaperPlane, FaTrash, FaSquare } from "react-icons/fa";
+import { FaCog, FaPaperPlane, FaTrash, FaSquare, FaFile } from "react-icons/fa";
 import "./App.css";
 import {
-  chatCompletion,
+  chat,
   getSettings,
   saveSettings,
   replayHistory,
@@ -10,14 +10,21 @@ import {
   onChatCompletionUpdate,
   cancelOutstandingRequest,
 } from "./commands";
-import { IChatCompletionMessage, ISettings } from "./types";
+import { fileToAttachment } from "./helpers";
+import { IChatCompletionMessage, ISettings, MessageContent } from "./types";
 import { ChatBubble } from "./components/ChatBubble";
 import { SettingsModal } from "./components/SettingsModal";
+
+type Attachment = {
+  type: string; // Mime type e.g. "image/png"
+  content: string; // data URL of the content
+  filename: string;
+};
 
 function App() {
   const [messages, setMessages] = useState<IChatCompletionMessage[]>([]);
   const [input, setInput] = useState("");
-  const [attachments, setAttachments] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const rootDirInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
@@ -29,7 +36,7 @@ function App() {
     modelName: "",
     rootDir: "",
     sofficePath: "",
-    providerOrder: ""
+    providerOrder: "",
   });
 
   useEffect(() => {
@@ -77,7 +84,10 @@ function App() {
             // Find the most recent tool call with matching ID that doesn't have a result yet
             let foundIndex = -1;
             for (let i = prev.length - 1; i >= 0; i--) {
-              if (prev[i].tool_call_id === update.tool_call_id && !prev[i].toolResult) {
+              if (
+                prev[i].tool_call_id === update.tool_call_id &&
+                !prev[i].toolResult
+              ) {
                 foundIndex = i;
                 break;
               }
@@ -87,9 +97,9 @@ function App() {
               return prev.map((m, index) =>
                 index === foundIndex
                   ? {
-                    ...m,
-                    toolResult: update.tool_result,
-                  }
+                      ...m,
+                      toolResult: update.tool_result,
+                    }
                   : m
               );
             }
@@ -98,9 +108,9 @@ function App() {
             return prev.map((m) =>
               m.tool_call_id === update.tool_call_id
                 ? {
-                  ...m,
-                  toolResult: update.tool_result,
-                }
+                    ...m,
+                    toolResult: update.tool_result,
+                  }
                 : m
             );
           });
@@ -124,10 +134,18 @@ function App() {
   useEffect(() => {
     setTimeout(() => {
       if (chatContainerRef.current) {
-        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        chatContainerRef.current.scrollTop =
+          chatContainerRef.current.scrollHeight;
       }
     }, 100);
   }, [messages]);
+
+  useEffect(() => {
+    if (messageInputRef.current) {
+      messageInputRef.current.style.height = "auto";
+      messageInputRef.current.style.height = `${messageInputRef.current.scrollHeight}px`;
+    }
+  }, [input]);
 
   const handleSettingsChange = (newSettings: Partial<ISettings>) => {
     const updatedSettings = { ...settings, ...newSettings };
@@ -136,25 +154,37 @@ function App() {
   };
 
   const handleSend = async () => {
-    if (input.trim() === "" || isTyping) return;
-    let content: any = [{ type: "text", text: input }];
-    if (attachments.length > 0) {
-      content = [
-        ...content,
-        ...attachments.map((a) => ({
-          type: "image_url",
-          image_url: { url: a },
-        })),
-      ];
+    if ((input.trim() === "" && attachments.length === 0) || isTyping) return;
+
+    const messageContent: MessageContent = [];
+
+    if (input.trim() !== "") {
+      messageContent.push({ type: "text", text: input });
     }
 
-    const userMessage: IChatCompletionMessage = { role: "user", content };
+    attachments.forEach((a) => {
+      if (a.type.startsWith("image/")) {
+        messageContent.push({
+          type: "image_url",
+          image_url: { url: a.content },
+        });
+      } else {
+        messageContent.push({
+          type: "file",
+          file: {
+            filename: a.filename,
+            file_data: a.content,
+          },
+        });
+      }
+    });
 
-    setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setAttachments([]);
 
-    chatCompletion(userMessage);
+    if (messageContent.length > 0) {
+      chat(messageContent);
+    }
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -164,21 +194,21 @@ function App() {
     }
   };
 
+  const saveAttachment = (item: {
+    type: string;
+    content: string;
+    filename: string;
+  }) => {
+    setAttachments((prev) => [...prev, item]);
+  };
+
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = event.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf("image") !== -1) {
-        const file = items[i].getAsFile();
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            if (e.target?.result) {
-              setAttachments((prev) => [...prev, e.target?.result as string]);
-            }
-          };
-          reader.readAsDataURL(file);
-        }
+    for (const item of items) {
+      if (item.kind === "file") {
+        event.preventDefault();
       }
+      fileToAttachment(item, saveAttachment);
     }
   };
 
@@ -253,42 +283,62 @@ function App() {
             role="assistant"
             content={[{ type: "text", text: "Thinking..." }]}
             isNotification
-            onCopy={() => { }}
+            onCopy={() => {}}
           />
         )}
       </div>
       <div id="input-container">
-        {attachments.map((a, i) => (
-          <img
-            key={i}
-            src={a}
-            alt="attachment"
-            className="attachment-thumbnail"
-            onClick={() => setAttachments((prev) => prev.filter((_, j) => i !== j))}
-          />
-        ))}
-        <textarea
-          ref={messageInputRef}
-          id="message-input"
-          placeholder="Type a message..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-        ></textarea>
-        {isTyping ? (
-          <button
-            className="send-button"
-            id="stop-button"
-            onClick={handleCancel}
-          >
-            <FaSquare />
-          </button>
-        ) : (
-          <button className="send-button" onClick={handleSend}>
-            <FaPaperPlane />
-          </button>
-        )}
+        <div id="attachment-container">
+          {attachments.map((a, i) =>
+            a.type.startsWith("image/") ? (
+              <img
+                key={i}
+                src={a.content}
+                alt={a.filename}
+                title={a.filename}
+                className="attachment-thumbnail"
+                onClick={() =>
+                  setAttachments((prev) => prev.filter((_, j) => i !== j))
+                }
+              />
+            ) : (
+              <div
+                key={i}
+                title={a.filename}
+                onClick={() =>
+                  setAttachments((prev) => prev.filter((_, j) => i !== j))
+                }
+              >
+                <FaFile className="attachment-thumbnail" id="file-attachment" />
+              </div>
+            )
+          )}
+        </div>
+        <div style={{ width: "100%", display: "flex" }}>
+          <textarea
+            ref={messageInputRef}
+            id="message-input"
+            placeholder="Type a message..."
+            rows={1}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+          ></textarea>
+          {isTyping ? (
+            <button
+              className="send-button"
+              id="stop-button"
+              onClick={handleCancel}
+            >
+              <FaSquare />
+            </button>
+          ) : (
+            <button className="send-button" onClick={handleSend}>
+              <FaPaperPlane />
+            </button>
+          )}
+        </div>
       </div>
       {openSettingsModal && (
         <SettingsModal

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { IChatCompletionMessage, IChatCompletionUpdate, ISettings } from "./types";
+import { IChatCompletionUpdate, ISettings, MessageContent } from "./types";
 
 export const getSettings = async (): Promise<ISettings> => {
 	return await invoke("get_settings");
@@ -22,10 +22,10 @@ export const cancelOutstandingRequest = async (): Promise<void> => {
 }
 
 
-export const chatCompletion = async (
-	message: IChatCompletionMessage,
+export const chat = async (
+	content: MessageContent,
 ): Promise<void> => {
-	await invoke("chat_completion", { message });
+	await invoke("chat", { content: content });
 };
 
 export const onChatCompletionUpdate = async (

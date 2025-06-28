@@ -52,9 +52,13 @@ h1 {
   background: none;
   border: none;
   color: white;
-  font-size: 24px;
+  font-size: 20px;
   cursor: pointer;
   margin-right: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
 }
 #chat-container {
   flex-grow: 1;
@@ -66,6 +70,7 @@ h1 {
 #input-container {
   display: flex;
   padding: 10px;
+  flex-direction: column;
   border-top: 1px solid #ddd;
   align-items: flex-end;
   position: relative;
@@ -80,6 +85,21 @@ h1 {
   cursor: pointer;
 }
 
+.attachment-thumbnail#file-attachment {
+  width: 40px;
+  height: 40px;
+}
+
+#attachment-container {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  align-items: center;
+  padding-bottom: 10px;
+  max-height: 90px;
+  overflow-y: auto;
+}
+
 #message-input {
   font-family: inherit;
   flex-grow: 1;
@@ -88,6 +108,7 @@ h1 {
   padding: 10px 15px;
   font-size: 14px;
   resize: none;
+  height: auto;
   overflow-y: auto;
   box-sizing: border-box;
   min-height: 40px;

@@ -11,7 +11,7 @@ enum EventPayload<'a> {
     Start,
     End,
     Message {
-        message: ChatCompletionMessage,
+        message: ChatMessage,
     },
     ToolCall {
         tool_name: &'a str,
@@ -25,7 +25,7 @@ enum EventPayload<'a> {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
-pub struct ChatCompletionMessage {
+pub struct ChatMessage {
     pub role: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub content: Vec<Content>,
@@ -34,7 +34,7 @@ pub struct ChatCompletionMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub injected_user_message: Option<Box<ChatCompletionMessage>>,
+    pub injected_user_message: Option<Box<ChatMessage>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
@@ -63,7 +63,7 @@ pub struct ImageUrl {
 pub struct IncomingMessage {
     pub role: String,
     #[serde(default)]
-    content: MessageContent,
+    content: IncomingContent,
     #[serde(default)]
     pub tool_calls: Option<Vec<ToolCall>>,
 }
@@ -71,22 +71,22 @@ pub struct IncomingMessage {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 #[derive(Default)]
-enum MessageContent {
+enum IncomingContent {
     Text(String),
     Parts(Vec<Content>),
     #[default]
     None,
 }
 
-impl From<IncomingMessage> for ChatCompletionMessage {
+impl From<IncomingMessage> for ChatMessage {
     fn from(msg: IncomingMessage) -> Self {
         let content = match msg.content {
-            MessageContent::Text(text) => vec![Content::Text { text }],
-            MessageContent::Parts(parts) => parts,
-            MessageContent::None => vec![],
+            IncomingContent::Text(text) => vec![Content::Text { text }],
+            IncomingContent::Parts(parts) => parts,
+            IncomingContent::None => vec![],
         };
 
-        ChatCompletionMessage {
+        ChatMessage {
             role: msg.role,
             content,
             tool_calls: msg.tool_calls,
@@ -96,10 +96,20 @@ impl From<IncomingMessage> for ChatCompletionMessage {
     }
 }
 
-impl ChatCompletionMessage {
+impl ChatMessage {
     pub fn new(role: &str, content: Vec<Content>) -> Self {
         Self {
             role: role.to_string(),
+            content,
+            tool_calls: None,
+            tool_call_id: None,
+            injected_user_message: None,
+        }
+    }
+
+    pub fn from_user_content(content: Vec<Content>) -> Self {
+        Self {
+            role: "user".to_string(),
             content,
             tool_calls: None,
             tool_call_id: None,
@@ -115,7 +125,7 @@ impl ChatCompletionMessage {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ChatCompletionOptions {
+pub struct ChatOptions {
     #[serde(rename = "modelName")]
     pub model_name: String,
 }
@@ -134,7 +144,7 @@ pub struct FunctionCall {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ChatCompletionResponse {
+pub struct ChatResponse {
     pub choices: Vec<Choice>,
 }
 
@@ -192,7 +202,13 @@ impl EventReplayer {
         Ok(())
     }
 
-    pub fn replay(&self, messages: &[ChatCompletionMessage]) -> Result<()> {
+    pub fn emit_message(&self, message: ChatMessage) -> Result<()> {
+        self.window
+            .emit("chat_completion_update", EventPayload::Message { message })?;
+        Ok(())
+    }
+
+    pub fn replay(&self, messages: &[ChatMessage]) -> Result<()> {
         for message in messages {
             // Assistant message with tool calls
             if let Some(tool_calls) = &message.tool_calls {
@@ -215,12 +231,7 @@ impl EventReplayer {
             }
             // All other messages
             else {
-                self.window.emit(
-                    "chat_completion_update",
-                    EventPayload::Message {
-                        message: message.clone(),
-                    },
-                )?;
+                self.emit_message(message.clone())?;
             }
         }
         Ok(())
@@ -228,16 +239,12 @@ impl EventReplayer {
 }
 pub struct ChatProcessor {
     replayer: EventReplayer,
-    options: ChatCompletionOptions,
-    messages: Vec<ChatCompletionMessage>,
+    options: ChatOptions,
+    messages: Vec<ChatMessage>,
 }
 
 impl ChatProcessor {
-    pub fn new(
-        window: tauri::Window,
-        options: ChatCompletionOptions,
-        messages: Vec<ChatCompletionMessage>,
-    ) -> Self {
+    pub fn new(window: tauri::Window, options: ChatOptions, messages: Vec<ChatMessage>) -> Self {
         Self {
             replayer: EventReplayer::new(window),
             options,
@@ -245,7 +252,7 @@ impl ChatProcessor {
         }
     }
 
-    pub async fn run(mut self) -> Result<Vec<ChatCompletionMessage>> {
+    pub async fn run(mut self) -> Result<Vec<ChatMessage>> {
         let _ = self.replayer.emit_start();
 
         loop {
@@ -258,11 +265,11 @@ impl ChatProcessor {
             .await?;
 
             let choice = &res.choices[0];
-            let message: ChatCompletionMessage = choice.message.clone().into();
+            let message: ChatMessage = choice.message.clone().into();
 
             if let Some(tool_calls) = message.tool_calls.clone() {
                 let assistant_tool_call_message =
-                    ChatCompletionMessage::new("assistant", vec![]).tool_calls(tool_calls.clone());
+                    ChatMessage::new("assistant", vec![]).tool_calls(tool_calls.clone());
                 self.messages.push(assistant_tool_call_message);
 
                 let new_messages = self.handle_tool_calls(tool_calls).await?;
@@ -314,10 +321,7 @@ impl ChatProcessor {
         Ok((tool_call.id, result))
     }
 
-    pub async fn handle_tool_calls(
-        &self,
-        tool_calls: Vec<ToolCall>,
-    ) -> Result<Vec<ChatCompletionMessage>> {
+    pub async fn handle_tool_calls(&self, tool_calls: Vec<ToolCall>) -> Result<Vec<ChatMessage>> {
         let mut new_messages = Vec::new();
 
         let tool_futs = tool_calls.into_iter().map(|tool_call| {
@@ -338,11 +342,11 @@ impl ChatProcessor {
                         .to_string();
 
                     // The user_message is nested in the JSON, deserialize it separately
-                    if let Ok(user_message) = serde_json::from_value::<ChatCompletionMessage>(
-                        file_result["user_message"].clone(),
-                    ) {
+                    if let Ok(user_message) =
+                        serde_json::from_value::<ChatMessage>(file_result["user_message"].clone())
+                    {
                         // 1. Add the simple tool message for display, with the rich user message nested inside.
-                        new_messages.push(ChatCompletionMessage {
+                        new_messages.push(ChatMessage {
                             role: "tool".to_string(),
                             content: vec![Content::Text {
                                 text: display_message,
@@ -358,7 +362,7 @@ impl ChatProcessor {
             }
 
             // Default handling for all other tools
-            new_messages.push(ChatCompletionMessage {
+            new_messages.push(ChatMessage {
                 role: "tool".to_string(),
                 content: vec![Content::Text { text: result_str }],
                 tool_call_id: Some(id),
@@ -372,11 +376,11 @@ impl ChatProcessor {
 }
 
 pub async fn call_openrouter(
-    messages: &[ChatCompletionMessage],
+    messages: &[ChatMessage],
     model_name: &str,
     system_prompt: &str,
     tools: &Vec<tools::Tool>,
-) -> super::Result<ChatCompletionResponse> {
+) -> super::Result<ChatResponse> {
     println!("Sending messages to OpenRouter: {messages:?}");
     let settings = get_settings_fn()?;
     let client = reqwest::Client::new();
@@ -384,7 +388,7 @@ pub async fn call_openrouter(
     if !system_prompt.is_empty() {
         final_messages.insert(
             0,
-            ChatCompletionMessage::new(
+            ChatMessage::new(
                 "system",
                 vec![Content::Text {
                     text: system_prompt.to_string(),
@@ -408,18 +412,17 @@ pub async fn call_openrouter(
 
     let text = res.text().await?;
     println!("Got response from OpenRouter: {text}",);
-    let response: ChatCompletionResponse =
-        match serde_json::from_str::<ChatCompletionResponse>(&text) {
-            Ok(res) => res,
-            Err(_) => ChatCompletionResponse {
-                choices: vec![Choice {
-                    message: IncomingMessage {
-                        role: "assistant".to_string(),
-                        content: MessageContent::Text(text),
-                        tool_calls: None,
-                    },
-                }],
-            },
-        };
+    let response: ChatResponse = match serde_json::from_str::<ChatResponse>(&text) {
+        Ok(res) => res,
+        Err(_) => ChatResponse {
+            choices: vec![Choice {
+                message: IncomingMessage {
+                    role: "assistant".to_string(),
+                    content: IncomingContent::Text(text),
+                    tool_calls: None,
+                },
+            }],
+        },
+    };
     Ok(response)
 }
