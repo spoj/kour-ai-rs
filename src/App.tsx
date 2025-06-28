@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { FaCog, FaPaperPlane, FaTrash, FaSquare, FaFile } from "react-icons/fa";
 import "./App.css";
 import {
-  chatCompletion,
+  chat,
   getSettings,
   saveSettings,
   replayHistory,
@@ -92,9 +92,9 @@ function App() {
               return prev.map((m, index) =>
                 index === foundIndex
                   ? {
-                      ...m,
-                      toolResult: update.tool_result,
-                    }
+                    ...m,
+                    toolResult: update.tool_result,
+                  }
                   : m
               );
             }
@@ -103,9 +103,9 @@ function App() {
             return prev.map((m) =>
               m.tool_call_id === update.tool_call_id
                 ? {
-                    ...m,
-                    toolResult: update.tool_result,
-                  }
+                  ...m,
+                  toolResult: update.tool_result,
+                }
                 : m
             );
           });
@@ -161,13 +161,10 @@ function App() {
       ];
     }
 
-    const userMessage: IChatCompletionMessage = { role: "user", content };
-
-    setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setAttachments([]);
 
-    chatCompletion(userMessage);
+    chat(content);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -290,7 +287,7 @@ function App() {
             role="assistant"
             content={[{ type: "text", text: "Thinking..." }]}
             isNotification
-            onCopy={() => {}}
+            onCopy={() => { }}
           />
         )}
       </div>

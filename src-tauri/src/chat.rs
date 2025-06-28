@@ -107,6 +107,16 @@ impl ChatMessage {
         }
     }
 
+    pub fn from_user_content(content: Vec<Content>) -> Self {
+        Self {
+            role: "user".to_string(),
+            content,
+            tool_calls: None,
+            tool_call_id: None,
+            injected_user_message: None,
+        }
+    }
+
     pub fn tool_calls(mut self, tool_calls: Vec<ToolCall>) -> Self {
         self.tool_calls = Some(tool_calls);
         self.content = vec![]; // Empty vec will be omitted by serde
@@ -192,6 +202,12 @@ impl EventReplayer {
         Ok(())
     }
 
+    pub fn emit_message(&self, message: ChatMessage) -> Result<()> {
+        self.window
+            .emit("chat_completion_update", EventPayload::Message { message })?;
+        Ok(())
+    }
+
     pub fn replay(&self, messages: &[ChatMessage]) -> Result<()> {
         for message in messages {
             // Assistant message with tool calls
@@ -215,12 +231,7 @@ impl EventReplayer {
             }
             // All other messages
             else {
-                self.window.emit(
-                    "chat_completion_update",
-                    EventPayload::Message {
-                        message: message.clone(),
-                    },
-                )?;
+                self.emit_message(message.clone())?;
             }
         }
         Ok(())
@@ -401,18 +412,17 @@ pub async fn call_openrouter(
 
     let text = res.text().await?;
     println!("Got response from OpenRouter: {text}",);
-    let response: ChatResponse =
-        match serde_json::from_str::<ChatResponse>(&text) {
-            Ok(res) => res,
-            Err(_) => ChatResponse {
-                choices: vec![Choice {
-                    message: IncomingMessage {
-                        role: "assistant".to_string(),
-                        content: IncomingContent::Text(text),
-                        tool_calls: None,
-                    },
-                }],
-            },
-        };
+    let response: ChatResponse = match serde_json::from_str::<ChatResponse>(&text) {
+        Ok(res) => res,
+        Err(_) => ChatResponse {
+            choices: vec![Choice {
+                message: IncomingMessage {
+                    role: "assistant".to_string(),
+                    content: IncomingContent::Text(text),
+                    tool_calls: None,
+                },
+            }],
+        },
+    };
     Ok(response)
 }
