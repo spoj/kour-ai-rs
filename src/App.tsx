@@ -10,6 +10,7 @@ import {
   onChatCompletionUpdate,
   cancelOutstandingRequest,
 } from "./commands";
+import { fileToAttachment } from "./helpers";
 import { IChatCompletionMessage, ISettings, MessageContent } from "./types";
 import { ChatBubble } from "./components/ChatBubble";
 import { SettingsModal } from "./components/SettingsModal";
@@ -193,66 +194,21 @@ function App() {
     }
   };
 
+  const saveAttachment = (item: {
+    type: string;
+    content: string;
+    filename: string;
+  }) => {
+    setAttachments((prev) => [...prev, item]);
+  };
+
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = event.clipboardData.items;
     for (const item of items) {
       if (item.kind === "file") {
         event.preventDefault();
-        const file = item.getAsFile();
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const tar = e.target;
-            if (tar) {
-              setAttachments((prev) => [
-                ...prev,
-                {
-                  type: file.type,
-                  content: tar.result as string,
-                  filename: file.name,
-                },
-              ]);
-            }
-          };
-          reader.readAsDataURL(file);
-        }
-      } else if (item.type.includes("text/html")) {
-        item.getAsString(async (html) => {
-          const tempDiv = document.createElement("div");
-          tempDiv.innerHTML = html;
-          const img = tempDiv.querySelector("img");
-          if (!img?.src) return;
-
-          const imgSrc = img.src;
-          if (imgSrc.startsWith("data:")) {
-            const mimeType =
-              imgSrc.substring(imgSrc.indexOf(":") + 1, imgSrc.indexOf(";")) ||
-              "";
-            setAttachments((prev) => [
-              ...prev,
-              {
-                type: mimeType,
-                content: imgSrc,
-                filename: "pasted_image.png",
-              },
-            ]);
-            return;
-          }
-
-          if (imgSrc.startsWith("blob:") || imgSrc.startsWith("http")) {
-            setAttachments((prev) => [
-              ...prev,
-              {
-                type: imgSrc.substring(imgSrc.lastIndexOf(".") + 1),
-                content: imgSrc,
-                filename: `pasted_image${imgSrc.substring(
-                  imgSrc.lastIndexOf(".")
-                )}`,
-              },
-            ]);
-          }
-        });
       }
+      fileToAttachment(item, saveAttachment);
     }
   };
 
@@ -332,54 +288,57 @@ function App() {
         )}
       </div>
       <div id="input-container">
-        {attachments.map((a, i) =>
-          a.type.startsWith("image/") ? (
-            <img
-              key={i}
-              src={a.content}
-              alt={a.filename}
-              title={a.filename}
-              className="attachment-thumbnail"
-              onClick={() =>
-                setAttachments((prev) => prev.filter((_, j) => i !== j))
-              }
-            />
-          ) : (
-            <div
-              key={i}
-              className="attachment-thumbnail"
-              title={a.filename}
-              onClick={() =>
-                setAttachments((prev) => prev.filter((_, j) => i !== j))
-              }
+        <div id="attachment-container">
+          {attachments.map((a, i) =>
+            a.type.startsWith("image/") ? (
+              <img
+                key={i}
+                src={a.content}
+                alt={a.filename}
+                title={a.filename}
+                className="attachment-thumbnail"
+                onClick={() =>
+                  setAttachments((prev) => prev.filter((_, j) => i !== j))
+                }
+              />
+            ) : (
+              <div
+                key={i}
+                title={a.filename}
+                onClick={() =>
+                  setAttachments((prev) => prev.filter((_, j) => i !== j))
+                }
+              >
+                <FaFile className="attachment-thumbnail" id="file-attachment" />
+              </div>
+            )
+          )}
+        </div>
+        <div style={{ width: "100%", display: "flex" }}>
+          <textarea
+            ref={messageInputRef}
+            id="message-input"
+            placeholder="Type a message..."
+            rows={1}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+          ></textarea>
+          {isTyping ? (
+            <button
+              className="send-button"
+              id="stop-button"
+              onClick={handleCancel}
             >
-              <FaFile />
-            </div>
-          )
-        )}
-        <textarea
-          ref={messageInputRef}
-          id="message-input"
-          placeholder="Type a message..."
-          rows={1}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-        ></textarea>
-        {isTyping ? (
-          <button
-            className="send-button"
-            id="stop-button"
-            onClick={handleCancel}
-          >
-            <FaSquare />
-          </button>
-        ) : (
-          <button className="send-button" onClick={handleSend}>
-            <FaPaperPlane />
-          </button>
-        )}
+              <FaSquare />
+            </button>
+          ) : (
+            <button className="send-button" onClick={handleSend}>
+              <FaPaperPlane />
+            </button>
+          )}
+        </div>
       </div>
       {openSettingsModal && (
         <SettingsModal
