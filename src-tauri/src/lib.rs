@@ -1,208 +1,33 @@
 mod chat;
 mod error;
-pub mod file_handler;
+mod file_handler;
 mod settings;
 mod tools;
 mod utils;
 
-use self::chat::{ChatCompletionMessage, ChatCompletionOptions, Content};
-use self::error::Error;
-use self::settings::Settings;
-use serde::Serialize;
+use crate::chat::{ChatCompletionMessage, ChatCompletionOptions};
+use crate::chat::{ChatProcessor, EventReplayer};
+use crate::error::Error;
+use crate::settings::Settings;
 use serde_json::{from_value, to_value};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
-use tauri::{Emitter, Manager};
+use tauri::Manager;
 use tauri::{State, Wry};
 use tauri_plugin_store::{Store, StoreBuilder};
 use tokio::select;
-use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 type Result<T> = std::result::Result<T, Error>;
 
 pub static STORE: OnceLock<Arc<Store<Wry>>> = OnceLock::new();
 pub static CACHE_DIR: OnceLock<PathBuf> = OnceLock::new();
-pub static SYSTEM_PROMPT: &str = include_str!("DEFAULT_PROMPT.md");
 
-#[derive(Serialize, Clone)]
-#[serde(tag = "type")]
-enum EventPayload<'a> {
-    Start,
-    End,
-    Message {
-        message: ChatCompletionMessage,
-    },
-    ToolCall {
-        tool_name: &'a str,
-        tool_call_id: &'a str,
-        tool_args: &'a str,
-    },
-    ToolDone {
-        tool_call_id: &'a str,
-        tool_result: &'a str,
-    },
-}
 struct AppStateInner {
-    cancel: Arc<Mutex<Option<CancellationToken>>>,
-    history: Arc<RwLock<Vec<ChatCompletionMessage>>>,
+    cancel: Mutex<Option<CancellationToken>>,
+    history: RwLock<Vec<ChatCompletionMessage>>,
 }
 type AppState<'a> = State<'a, AppStateInner>;
-
-struct EventReplayer {
-    window: tauri::Window,
-}
-
-impl EventReplayer {
-    fn new(window: tauri::Window) -> Self {
-        Self { window }
-    }
-
-    fn emit_tool_call(&self, name: &str, id: &str, arguments: &str) -> Result<()> {
-        self.window.emit(
-            "chat_completion_update",
-            EventPayload::ToolCall {
-                tool_name: name,
-                tool_call_id: id,
-                tool_args: arguments,
-            },
-        )?;
-        Ok(())
-    }
-
-    fn emit_tool_result(&self, id: &str, result: &str) -> Result<()> {
-        self.window.emit(
-            "chat_completion_update",
-            EventPayload::ToolDone {
-                tool_call_id: id,
-                tool_result: result,
-            },
-        )?;
-        Ok(())
-    }
-
-    fn replay(&self, messages: &[ChatCompletionMessage]) -> Result<()> {
-        for message in messages {
-            // Assistant message with tool calls
-            if let Some(tool_calls) = &message.tool_calls {
-                for tool_call in tool_calls {
-                    self.emit_tool_call(
-                        &tool_call.function.name,
-                        &tool_call.id,
-                        &tool_call.function.arguments,
-                    )?;
-                }
-            }
-            // Tool message with the result
-            else if message.role == "tool" {
-                if let Some(tool_call_id) = &message.tool_call_id {
-                    if let Some(Content::Text { text }) = message.content.first() {
-                        self.emit_tool_result(tool_call_id, text)?;
-                    }
-                }
-                // We do NOT replay the injected user message, it's for the LLM only
-            }
-            // All other messages
-            else {
-                self.window.emit(
-                    "chat_completion_update",
-                    EventPayload::Message {
-                        message: message.clone(),
-                    },
-                )?;
-            }
-        }
-        Ok(())
-    }
-}
-struct ChatProcessor {
-    window: tauri::Window,
-    options: ChatCompletionOptions,
-    messages: Vec<ChatCompletionMessage>,
-    tx: mpsc::Sender<chat::ChatUpdate>,
-}
-
-impl ChatProcessor {
-    fn new(
-        window: tauri::Window,
-        options: ChatCompletionOptions,
-        messages: Vec<ChatCompletionMessage>,
-    ) -> Self {
-        let (tx, rx) = mpsc::channel(100);
-        let mut processor = Self {
-            window,
-            options,
-            messages,
-            tx,
-        };
-        processor.start_update_listener(rx);
-        processor
-    }
-
-    fn start_update_listener(&mut self, mut rx: mpsc::Receiver<chat::ChatUpdate>) {
-        let replayer = EventReplayer::new(self.window.clone());
-        tokio::spawn(async move {
-            while let Some(update) = rx.recv().await {
-                let _ = match update {
-                    chat::ChatUpdate::ToolCall {
-                        name,
-                        id,
-                        arguments,
-                    } => replayer.emit_tool_call(&name, &id, &arguments),
-                    chat::ChatUpdate::ToolResult { id, result } => {
-                        replayer.emit_tool_result(&id, &result)
-                    }
-                };
-            }
-        });
-    }
-
-    async fn run(mut self) -> Result<Vec<ChatCompletionMessage>> {
-        self.window
-            .emit("chat_completion_update", &EventPayload::Start)?;
-
-        loop {
-            let res = chat::call_openrouter(
-                &self.messages,
-                &self.options.model_name,
-                SYSTEM_PROMPT,
-                &tools::TOOLS,
-            )
-            .await?;
-
-            let choice = &res.choices[0];
-            let message: ChatCompletionMessage = choice.message.clone().into();
-
-            if let Some(tool_calls) = message.tool_calls.clone() {
-                let assistant_tool_call_message =
-                    ChatCompletionMessage::new("assistant", vec![]).tool_calls(tool_calls.clone());
-                self.messages.push(assistant_tool_call_message);
-
-                let new_messages = chat::handle_tool_calls(tool_calls, self.tx.clone()).await?;
-                for msg in new_messages {
-                    let mut tool_message = msg;
-                    if let Some(user_msg) = tool_message.injected_user_message.take() {
-                        self.messages.push(tool_message);
-                        self.messages.push(*user_msg);
-                    } else {
-                        self.messages.push(tool_message);
-                    }
-                }
-                // After handling tools, continue the loop to let the assistant respond.
-            } else {
-                // It's a final text response. Add it to history, emit, and break the loop.
-                self.messages.push(message.clone());
-                EventReplayer::new(self.window.clone()).replay(&[message])?;
-                break;
-            }
-        }
-
-        self.window
-            .emit("chat_completion_update", &EventPayload::End)?;
-
-        Ok(self.messages)
-    }
-}
 
 pub fn get_settings_fn() -> Result<Settings> {
     let store = STORE
@@ -249,26 +74,27 @@ async fn chat_completion(
     let options = ChatCompletionOptions {
         model_name: settings.model_name,
     };
-    let mut history = state.history.read().unwrap().to_vec();
+    let mut history = state.history.read().unwrap().to_vec(); // unwrap: won't try to recover from poisoned lock
     history.push(message);
     let cancel_token = CancellationToken::new();
     {
-        let mut guard = state.cancel.lock().unwrap();
+        let mut guard = state.cancel.lock().unwrap(); // unwrap: won't try to recover from poisoned lock
         if guard.is_none() {
             *guard = Some(cancel_token.clone());
         } else {
-            return Err(Error::Send("more than 1 request".to_string()));
+            return Err(Error::Conflict("more than 1 request".to_string()));
         }
     }
 
     select! {
         _ = cancel_token.cancelled() => {
-            window.clone().emit("chat_completion_update", &EventPayload::End)?;
-            *state.cancel.lock().unwrap() = None
+            let replayer = EventReplayer::new(window.clone());
+            let _ = replayer.emit_done();
+            *state.cancel.lock().unwrap() = None; // unwrap: won't try to recover from poisoned lock
         }
         Ok(new_history) = ChatProcessor::new(window.clone(), options, history).run() => {
-            *state.cancel.lock().unwrap() = None;
-            let mut history = state.history.write().unwrap();
+            *state.cancel.lock().unwrap() = None; // unwrap: won't try to recover from poisoned lock
+            let mut history = state.history.write().unwrap(); // unwrap: won't try to recover from poisoned lock
             *history = new_history;
         }
     }
@@ -276,7 +102,7 @@ async fn chat_completion(
 }
 #[tauri::command]
 async fn replay_history(window: tauri::Window, state: AppState<'_>) -> Result<()> {
-    let history = state.history.read().unwrap().clone();
+    let history = state.history.read().unwrap().clone(); // unwrap: won't try to recover from poisoned lock
     EventReplayer::new(window).replay(&history)?;
     Ok(())
 }
@@ -284,7 +110,7 @@ async fn replay_history(window: tauri::Window, state: AppState<'_>) -> Result<()
 #[tauri::command]
 fn clear_history(state: AppState<'_>) -> Result<()> {
     cancel_outstanding_request(state.clone())?;
-    let mut history = state.history.write().unwrap();
+    let mut history = state.history.write().unwrap(); // unwrap: won't try to recover from poisoned lock
     history.clear();
     Ok(())
 }
@@ -292,6 +118,7 @@ fn clear_history(state: AppState<'_>) -> Result<()> {
 #[tauri::command]
 fn cancel_outstanding_request(state: AppState<'_>) -> Result<()> {
     if let Some(cancel_token) = state.cancel.lock().unwrap().as_ref() {
+        // unwrap: won't try to recover from poisoned lock
         cancel_token.cancel();
     }
     Ok(())
@@ -314,11 +141,13 @@ pub fn run() {
             STORE.get_or_init(|| {
                 StoreBuilder::new(app.handle(), "store.bin")
                     .build()
-                    .unwrap()
+                    .unwrap() // unwrap: crash if cannot initialize store
             });
-            CACHE_DIR.get_or_init(|| app.path().app_cache_dir().unwrap());
-            let history = Arc::new(RwLock::new(vec![]));
-            let cancel = Arc::new(Mutex::new(None));
+            CACHE_DIR.get_or_init(
+                || app.path().app_cache_dir().unwrap(), // unwrap: crash if cannot find cache dir
+            );
+            let history = RwLock::new(vec![]);
+            let cancel = Mutex::new(None);
             let inner_state = AppStateInner { cancel, history };
             app.manage(inner_state);
             Ok(())

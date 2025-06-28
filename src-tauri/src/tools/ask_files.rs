@@ -65,7 +65,7 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
                         .await??;
                 
                 let mut messages = vec![
-                    ChatCompletionMessage::new("user", vec![Content::Text { text: format!("File: {}\n\nQuery: {}", filename, query) }])
+                    ChatCompletionMessage::new("user", vec![Content::Text { text: format!("File: {filename}\n\nQuery: {query}") }])
                 ];
 
                 messages[0].content.extend(file_content);

@@ -18,10 +18,10 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             api_key: "".to_string(),
-            model_name: "openai/gpt-4o".to_string(),
+            model_name: "google/gemini-2.5-pro".to_string(),
             root_dir: "".to_string(),
             soffice_path: "".to_string(),
-            provider_order: "openai,google,anthropic".to_string(),
+            provider_order: "google-vertex".to_string(),
         }
     }
 }
