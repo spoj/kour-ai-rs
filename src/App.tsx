@@ -96,9 +96,9 @@ function App() {
               return prev.map((m, index) =>
                 index === foundIndex
                   ? {
-                    ...m,
-                    toolResult: update.tool_result,
-                  }
+                      ...m,
+                      toolResult: update.tool_result,
+                    }
                   : m
               );
             }
@@ -107,9 +107,9 @@ function App() {
             return prev.map((m) =>
               m.tool_call_id === update.tool_call_id
                 ? {
-                  ...m,
-                  toolResult: update.tool_result,
-                }
+                    ...m,
+                    toolResult: update.tool_result,
+                  }
                 : m
             );
           });
@@ -240,24 +240,16 @@ function App() {
           }
 
           if (imgSrc.startsWith("blob:") || imgSrc.startsWith("http")) {
-            try {
-              const response = await fetch(imgSrc);
-              const blob = await response.blob();
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                setAttachments((prev) => [
-                  ...prev,
-                  {
-                    type: blob.type,
-                    content: reader.result as string,
-                    filename: "pasted_image.png",
-                  },
-                ]);
-              };
-              reader.readAsDataURL(blob);
-            } catch (error) {
-              console.error("Error fetching pasted image:", error);
-            }
+            setAttachments((prev) => [
+              ...prev,
+              {
+                type: imgSrc.substring(imgSrc.lastIndexOf(".") + 1),
+                content: imgSrc,
+                filename: `pasted_image${imgSrc.substring(
+                  imgSrc.lastIndexOf(".")
+                )}`,
+              },
+            ]);
           }
         });
       }
@@ -335,7 +327,7 @@ function App() {
             role="assistant"
             content={[{ type: "text", text: "Thinking..." }]}
             isNotification
-            onCopy={() => { }}
+            onCopy={() => {}}
           />
         )}
       </div>
