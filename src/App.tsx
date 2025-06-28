@@ -10,16 +10,20 @@ import {
   onChatCompletionUpdate,
   cancelOutstandingRequest,
 } from "./commands";
-import { IChatCompletionMessage, ISettings } from "./types";
+import { IChatCompletionMessage, ISettings, MessageContent } from "./types";
 import { ChatBubble } from "./components/ChatBubble";
 import { SettingsModal } from "./components/SettingsModal";
+
+type Attachment = {
+  type: string; // Mime type e.g. "image/png"
+  content: string; // data URL of the content
+  filename: string;
+};
 
 function App() {
   const [messages, setMessages] = useState<IChatCompletionMessage[]>([]);
   const [input, setInput] = useState("");
-  const [attachments, setAttachments] = useState<
-    { type: string; content: string; filename: string }[]
-  >([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const rootDirInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
@@ -151,33 +155,28 @@ function App() {
   const handleSend = async () => {
     if ((input.trim() === "" && attachments.length === 0) || isTyping) return;
 
-    const messageContent: any[] = [];
+    const messageContent: MessageContent = [];
+
     if (input.trim() !== "") {
       messageContent.push({ type: "text", text: input });
     }
 
-    if (attachments.length > 0) {
-      const attachmentContent = attachments.map((a) => {
-        if (a.type.startsWith("image/")) {
-          return {
-            type: "image_url",
-            image_url: { url: a.content },
-          };
-        } else {
-          const file_data = a.content.includes(",")
-            ? a.content.split(",")[1]
-            : a.content;
-          return {
-            type: "file",
-            file: {
-              filename: a.filename,
-              file_data: file_data,
-            },
-          };
-        }
-      });
-      messageContent.push(...attachmentContent);
-    }
+    attachments.forEach((a) => {
+      if (a.type.startsWith("image/")) {
+        messageContent.push({
+          type: "image_url",
+          image_url: { url: a.content },
+        });
+      } else {
+        messageContent.push({
+          type: "file",
+          file: {
+            filename: a.filename,
+            file_data: a.content,
+          },
+        });
+      }
+    });
 
     setInput("");
     setAttachments([]);
@@ -196,9 +195,9 @@ function App() {
 
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = event.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
+    for (const item of items) {
       if (item.kind === "file") {
+        event.preventDefault();
         const file = item.getAsFile();
         if (file) {
           const reader = new FileReader();
@@ -217,20 +216,48 @@ function App() {
           };
           reader.readAsDataURL(file);
         }
-      } else if (item.type.indexOf("html") !== -1) {
-        item.getAsString((html) => {
+      } else if (item.type.includes("text/html")) {
+        item.getAsString(async (html) => {
           const tempDiv = document.createElement("div");
           tempDiv.innerHTML = html;
           const img = tempDiv.querySelector("img");
-          if (img && img.src) {
+          if (!img?.src) return;
+
+          const imgSrc = img.src;
+          if (imgSrc.startsWith("data:")) {
+            const mimeType =
+              imgSrc.substring(imgSrc.indexOf(":") + 1, imgSrc.indexOf(";")) ||
+              "";
             setAttachments((prev) => [
               ...prev,
               {
-                type: "image/pasted",
-                content: img.src,
+                type: mimeType,
+                content: imgSrc,
                 filename: "pasted_image.png",
               },
             ]);
+            return;
+          }
+
+          if (imgSrc.startsWith("blob:") || imgSrc.startsWith("http")) {
+            try {
+              const response = await fetch(imgSrc);
+              const blob = await response.blob();
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                setAttachments((prev) => [
+                  ...prev,
+                  {
+                    type: blob.type,
+                    content: reader.result as string,
+                    filename: "pasted_image.png",
+                  },
+                ]);
+              };
+              reader.readAsDataURL(blob);
+            } catch (error) {
+              console.error("Error fetching pasted image:", error);
+            }
           }
         });
       }
