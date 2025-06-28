@@ -18,7 +18,7 @@ function App() {
   const [messages, setMessages] = useState<IChatCompletionMessage[]>([]);
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<
-    { type: string; content: string }[]
+    { type: string; content: string; filename: string }[]
   >([]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const rootDirInputRef = useRef<HTMLInputElement>(null);
@@ -149,22 +149,42 @@ function App() {
   };
 
   const handleSend = async () => {
-    if (input.trim() === "" || isTyping) return;
-    let content: any = [{ type: "text", text: input }];
+    if ((input.trim() === "" && attachments.length === 0) || isTyping) return;
+
+    const messageContent: any[] = [];
+    if (input.trim() !== "") {
+      messageContent.push({ type: "text", text: input });
+    }
+
     if (attachments.length > 0) {
-      content = [
-        ...content,
-        ...attachments.map((a) => ({
-          type: "image_url",
-          image_url: { url: a },
-        })),
-      ];
+      const attachmentContent = attachments.map((a) => {
+        if (a.type.startsWith("image/")) {
+          return {
+            type: "image_url",
+            image_url: { url: a.content },
+          };
+        } else {
+          const file_data = a.content.includes(",")
+            ? a.content.split(",")[1]
+            : a.content;
+          return {
+            type: "file",
+            file: {
+              filename: a.filename,
+              file_data: file_data,
+            },
+          };
+        }
+      });
+      messageContent.push(...attachmentContent);
     }
 
     setInput("");
     setAttachments([]);
 
-    chat(content);
+    if (messageContent.length > 0) {
+      chat(messageContent);
+    }
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -177,38 +197,39 @@ function App() {
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = event.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
-      if (
-        items[i].type.indexOf("image") !== -1 ||
-        items[i].type.indexOf("pdf") !== -1
-      ) {
-        const file = items[i].getAsFile();
+      const item = items[i];
+      if (item.kind === "file") {
+        const file = item.getAsFile();
         if (file) {
           const reader = new FileReader();
           reader.onload = (e) => {
-            if (e.target?.result) {
+            const tar = e.target;
+            if (tar) {
               setAttachments((prev) => [
                 ...prev,
                 {
-                  type:
-                    items[i].type.indexOf("pdf") !== -1
-                      ? "file_pdf"
-                      : "image_url",
-                  content: e.target?.result as string,
+                  type: file.type,
+                  content: tar.result as string,
+                  filename: file.name,
                 },
               ]);
             }
           };
           reader.readAsDataURL(file);
         }
-      } else if (items[i].type.indexOf("html") !== -1) {
-        items[i].getAsString((html) => {
+      } else if (item.type.indexOf("html") !== -1) {
+        item.getAsString((html) => {
           const tempDiv = document.createElement("div");
           tempDiv.innerHTML = html;
           const img = tempDiv.querySelector("img");
-          if (img) {
+          if (img && img.src) {
             setAttachments((prev) => [
               ...prev,
-              { type: "image_url", content: img.src },
+              {
+                type: "image/pasted",
+                content: img.src,
+                filename: "pasted_image.png",
+              },
             ]);
           }
         });
@@ -293,23 +314,28 @@ function App() {
       </div>
       <div id="input-container">
         {attachments.map((a, i) =>
-          a.type !== "file_pdf" ? (
+          a.type.startsWith("image/") ? (
             <img
               key={i}
               src={a.content}
-              alt="attachment"
+              alt={a.filename}
+              title={a.filename}
               className="attachment-thumbnail"
               onClick={() =>
                 setAttachments((prev) => prev.filter((_, j) => i !== j))
               }
             />
           ) : (
-            <FaFile
+            <div
+              key={i}
               className="attachment-thumbnail"
+              title={a.filename}
               onClick={() =>
                 setAttachments((prev) => prev.filter((_, j) => i !== j))
               }
-            />
+            >
+              <FaFile />
+            </div>
           )
         )}
         <textarea
