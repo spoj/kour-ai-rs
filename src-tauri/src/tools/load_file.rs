@@ -1,4 +1,4 @@
-use crate::chat::{ChatCompletionMessage, Content};
+use crate::chat::{ChatMessage, Content};
 use crate::error::Error;
 use crate::file_handler;
 use crate::tools::{Function, Tool};
@@ -17,7 +17,7 @@ pub struct LoadFileArgs {
 pub struct LoadFileResult {
     pub r#type: String, // Always "file_loaded" to identify this special result.
     pub display_message: String,
-    pub user_message: ChatCompletionMessage,
+    pub user_message: ChatMessage,
 }
 
 pub async fn load_file(args: LoadFileArgs) -> Result<LoadFileResult> {
@@ -42,7 +42,7 @@ pub async fn load_file(args: LoadFileArgs) -> Result<LoadFileResult> {
     file_content.insert(0, instructional_text);
     
     // Create the user message that contains the file attachment.
-    let user_message = ChatCompletionMessage::new("user", file_content);
+    let user_message = ChatMessage::new("user", file_content);
 
     let result = LoadFileResult {
         r#type: "file_loaded".to_string(),

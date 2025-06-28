@@ -5,7 +5,7 @@ mod settings;
 mod tools;
 mod utils;
 
-use crate::chat::{ChatCompletionMessage, ChatCompletionOptions};
+use crate::chat::{ChatMessage, ChatOptions};
 use crate::chat::{ChatProcessor, EventReplayer};
 use crate::error::Error;
 use crate::settings::Settings;
@@ -25,7 +25,7 @@ pub static CACHE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 struct AppStateInner {
     cancel: Mutex<Option<CancellationToken>>,
-    history: RwLock<Vec<ChatCompletionMessage>>,
+    history: RwLock<Vec<ChatMessage>>,
 }
 type AppState<'a> = State<'a, AppStateInner>;
 
@@ -67,11 +67,11 @@ fn set_settings(settings: Settings) -> Result<()> {
 #[tauri::command]
 async fn chat_completion(
     window: tauri::Window,
-    message: ChatCompletionMessage,
+    message: ChatMessage,
     state: AppState<'_>,
 ) -> Result<()> {
     let settings = get_settings_fn()?;
-    let options = ChatCompletionOptions {
+    let options = ChatOptions {
         model_name: settings.model_name,
     };
     let mut history = state.history.read().unwrap().to_vec(); // unwrap: won't try to recover from poisoned lock

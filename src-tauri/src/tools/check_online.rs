@@ -1,4 +1,4 @@
-use crate::chat::{ChatCompletionMessage, Content};
+use crate::chat::{ChatMessage, Content};
 use crate::error::Error;
 use crate::tools::{Function, Tool};
 use crate::Result;
@@ -31,7 +31,7 @@ pub async fn check_online(args: CheckOnlineArgs) -> Result<CheckOnlineResult> {
         ));
     }
 
-    let messages = vec![ChatCompletionMessage::new(
+    let messages = vec![ChatMessage::new(
         "user",
         vec![
             Content::Text {
@@ -49,7 +49,7 @@ pub async fn check_online(args: CheckOnlineArgs) -> Result<CheckOnlineResult> {
     let response = crate::chat::call_openrouter(&messages, SEARCH_MODEL, "", &vec![]).await?;
 
     if let Some(choice) = response.choices.first() {
-        let chat_message: ChatCompletionMessage = choice.message.clone().into();
+        let chat_message: ChatMessage = choice.message.clone().into();
         if let Some(Content::Text { text }) = chat_message.content.first() {
             // Assuming annotations are part of the response, though not typed in our current struct
             // We'll just pass an empty array for now. A more robust impl would parse this.
