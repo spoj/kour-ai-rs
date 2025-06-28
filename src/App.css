@@ -92,9 +92,12 @@ h1 {
 
 #attachment-container {
   display: flex;
+  flex-wrap: wrap;
   width: 100%;
   align-items: center;
   padding-bottom: 10px;
+  max-height: 90px;
+  overflow-y: scroll;
 }
 
 #message-input {
