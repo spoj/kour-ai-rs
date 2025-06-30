@@ -10,7 +10,18 @@ const renderContent = (content: MessageContent) => {
   }
   return content.map((item, index) => {
     if (item.type === "text") {
-      return <ReactMarkdown key={index}>{item.text}</ReactMarkdown>;
+      return (
+        <ReactMarkdown
+          key={index}
+          components={{
+            a: ({ node, ...props }) => (
+              <a {...props} target="_blank" rel="noopener noreferrer" />
+            ),
+          }}
+        >
+          {item.text}
+        </ReactMarkdown>
+      );
     } else if (item.type === "image_url") {
       return (
         <img
