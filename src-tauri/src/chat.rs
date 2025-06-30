@@ -1,6 +1,7 @@
-use crate::{get_settings_fn, tools, Result};
+use crate::{Result, get_settings_fn, tools};
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 use tauri::Emitter;
 
 pub static SYSTEM_PROMPT: &str = include_str!("DEFAULT_PROMPT.md");
@@ -63,7 +64,7 @@ pub struct ImageUrl {
 pub struct IncomingMessage {
     pub role: String,
     #[serde(default)]
-    content: IncomingContent,
+    pub content: IncomingContent,
     #[serde(default)]
     pub tool_calls: Option<Vec<ToolCall>>,
 }
@@ -71,7 +72,7 @@ pub struct IncomingMessage {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 #[derive(Default)]
-enum IncomingContent {
+pub enum IncomingContent {
     Text(String),
     Parts(Vec<Content>),
     #[default]
@@ -222,10 +223,10 @@ impl EventReplayer {
             }
             // Tool message with the result
             else if message.role == "tool" {
-                if let Some(tool_call_id) = &message.tool_call_id {
-                    if let Some(Content::Text { text }) = message.content.first() {
-                        self.emit_tool_result(tool_call_id, text)?;
-                    }
+                if let Some(tool_call_id) = &message.tool_call_id
+                    && let Some(Content::Text { text }) = message.content.first()
+                {
+                    self.emit_tool_result(tool_call_id, text)?;
                 }
                 // We do NOT replay the injected user message, it's for the LLM only
             }
@@ -261,6 +262,7 @@ impl ChatProcessor {
                 &self.options.model_name,
                 SYSTEM_PROMPT,
                 &tools::TOOLS,
+                None,
             )
             .await?;
 
@@ -334,30 +336,30 @@ impl ChatProcessor {
             let (id, result_str) = tool_result??;
 
             // Try to deserialize the result into our special LoadFileResult structure
-            if let Ok(file_result) = serde_json::from_str::<serde_json::Value>(&result_str) {
-                if file_result.get("type").and_then(|t| t.as_str()) == Some("file_loaded") {
-                    let display_message = file_result["display_message"]
-                        .as_str()
-                        .unwrap_or("")
-                        .to_string();
+            if let Ok(file_result) = serde_json::from_str::<serde_json::Value>(&result_str)
+                && file_result.get("type").and_then(|t| t.as_str()) == Some("file_loaded")
+            {
+                let display_message = file_result["display_message"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
 
-                    // The user_message is nested in the JSON, deserialize it separately
-                    if let Ok(user_message) =
-                        serde_json::from_value::<ChatMessage>(file_result["user_message"].clone())
-                    {
-                        // 1. Add the simple tool message for display, with the rich user message nested inside.
-                        new_messages.push(ChatMessage {
-                            role: "tool".to_string(),
-                            content: vec![Content::Text {
-                                text: display_message,
-                            }],
-                            tool_call_id: Some(id),
-                            tool_calls: None,
-                            injected_user_message: Some(Box::new(user_message)),
-                        });
+                // The user_message is nested in the JSON, deserialize it separately
+                if let Ok(user_message) =
+                    serde_json::from_value::<ChatMessage>(file_result["user_message"].clone())
+                {
+                    // 1. Add the simple tool message for display, with the rich user message nested inside.
+                    new_messages.push(ChatMessage {
+                        role: "tool".to_string(),
+                        content: vec![Content::Text {
+                            text: display_message,
+                        }],
+                        tool_call_id: Some(id),
+                        tool_calls: None,
+                        injected_user_message: Some(Box::new(user_message)),
+                    });
 
-                        continue; // Skip the default handling below
-                    }
+                    continue; // Skip the default handling below
                 }
             }
 
@@ -380,6 +382,7 @@ pub async fn call_openrouter(
     model_name: &str,
     system_prompt: &str,
     tools: &Vec<tools::Tool>,
+    schema: Option<Value>,
 ) -> super::Result<ChatResponse> {
     println!("Sending messages to OpenRouter: {messages:?}");
     let settings = get_settings_fn()?;
@@ -396,17 +399,33 @@ pub async fn call_openrouter(
             ),
         );
     }
+    let mut json_to_send = json!({
+        "model": model_name,
+        "messages": final_messages,
+        "tools": tools,
+        "provider": {
+            "order": settings.provider_order.split(',').collect::<Vec<_>>(),
+        }
+    });
+    if let Some(schema) = schema
+        && let Some(m) = json_to_send.as_object_mut()
+    {
+        m.insert(
+            "response_format".to_string(),
+            json!({
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "output",
+                    "strict": true,
+                    "schema": schema
+                }
+            }),
+        );
+    }
     let res = client
         .post("https://openrouter.ai/api/v1/chat/completions")
         .bearer_auth(&settings.api_key)
-        .json(&serde_json::json!({
-            "model": model_name,
-            "messages": final_messages,
-            "tools": tools,
-            "provider": {
-                "order": settings.provider_order.split(',').collect::<Vec<_>>(),
-            }
-        }))
+        .json(&json_to_send)
         .send()
         .await?;
 

@@ -1,9 +1,10 @@
-use crate::chat::{ChatMessage, Content};
+use crate::Result;
+use crate::chat::{ChatMessage, Content, call_openrouter};
 use crate::error::Error;
 use crate::tools::{Function, Tool};
-use crate::Result;
+use schemars::{JsonSchema, schema_for};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{from_str, to_value};
 use tokio::task;
 
 const SEARCH_MODEL: &str = "perplexity/sonar";
@@ -15,15 +16,14 @@ pub struct CheckOnlineArgs {
     pub broader_context: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, JsonSchema)]
 pub struct CheckOnlineResult {
     content: String,
-    citations: serde_json::Value, // Annotations can be complex, so Value is flexible
+    citations: Vec<String>,
 }
 
 pub async fn check_online(args: CheckOnlineArgs) -> Result<CheckOnlineResult> {
-    let settings = task::spawn_blocking(crate::get_settings_fn)
-        .await??;
+    let settings = task::spawn_blocking(crate::get_settings_fn).await??;
 
     if settings.api_key.is_empty() {
         return Err(Error::Tool(
@@ -45,23 +45,17 @@ pub async fn check_online(args: CheckOnlineArgs) -> Result<CheckOnlineResult> {
             },
         ],
     )];
+    let schema = to_value(schema_for!(CheckOnlineResult)).unwrap(); // unwrap: all input controlled by code
+    let response = call_openrouter(&messages, SEARCH_MODEL, "", &vec![], Some(schema)).await?;
 
-    let response = crate::chat::call_openrouter(&messages, SEARCH_MODEL, "", &vec![]).await?;
-
-    if let Some(choice) = response.choices.first() {
-        let chat_message: ChatMessage = choice.message.clone().into();
-        if let Some(Content::Text { text }) = chat_message.content.first() {
-            // Assuming annotations are part of the response, though not typed in our current struct
-            // We'll just pass an empty array for now. A more robust impl would parse this.
-            let result = CheckOnlineResult {
-                content: text.clone(),
-                citations: json!([]),
-            };
-            return Ok(result);
-        }
+    let choice = &response.choices[0];
+    let message: ChatMessage = choice.message.clone().into();
+    if let Some(Content::Text { text }) = message.content.first() {
+        return Ok(from_str(text)?);
     }
-    
-    Err(Error::Tool("Failed to get a valid response from the online search tool.".to_string()))
+    Err(Error::Tool(
+        "Failed to get a valid response from the online search tool.".to_string(),
+    ))
 }
 
 pub fn get_tool() -> Tool {
@@ -69,7 +63,8 @@ pub fn get_tool() -> Tool {
         r#type: "function".to_string(),
         function: Function {
             name: "check_online".to_string(),
-            description: "Perform an internet search for facts using the Perplexity model.".to_string(),
+            description: "Perform an internet search for facts using the Perplexity model."
+                .to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {

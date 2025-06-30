@@ -3,7 +3,7 @@ name = "kour-ai-rs"
 version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -54,3 +54,4 @@ regex = "1"
 sanitize-filename = "0.5.0"
 html2md = "0.2"
 tokio-util = "0.7.15"
+schemars = "1.0.3"
