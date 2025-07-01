@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use regex::Regex;
 use sanitize_filename::sanitize;
@@ -22,14 +22,20 @@ fn format_addresses(addresses: &[(String, String)]) -> String {
         .join(", ")
 }
 
-fn process_email(email: &Email, output_dir: &Path) -> Result<()> {
+fn process_email(email: &Email, output_dir: &Path) -> Result<Vec<PathBuf>> {
     fs::create_dir_all(output_dir)?;
+    let mut extracted_files = Vec::new();
 
     let md_path = output_dir.join("EMAIL.md");
-    let mut file = fs::File::create(md_path).expect("Failed to create file");
+    let mut file = fs::File::create(&md_path).expect("Failed to create file");
+    extracted_files.push(md_path);
 
     if let Some(from) = &email.from {
-        writeln!(file, "From: {}", format_addresses(&[from.clone()]))?;
+        writeln!(
+            file,
+            "From: {}",
+            format_addresses(std::slice::from_ref(from))
+        )?;
     }
     if let Some(date) = email.sent_date {
         writeln!(file, "Sent: {date}")?;
@@ -58,7 +64,8 @@ fn process_email(email: &Email, output_dir: &Path) -> Result<()> {
 
     for attachment in &email.attachments {
         let file_path = output_dir.join(sanitize(&attachment.name));
-        fs::write(file_path, &attachment.data).expect("Failed to write attachment");
+        fs::write(&file_path, &attachment.data).expect("Failed to write attachment");
+        extracted_files.push(file_path);
     }
 
     for embedded_message in &email.embedded_messages {
@@ -68,13 +75,14 @@ fn process_email(email: &Email, output_dir: &Path) -> Result<()> {
             .unwrap_or("embedded_email");
         let dir_name = sanitize(subject);
         let new_dir = output_dir.join(dir_name);
-        let _ = process_email(embedded_message, &new_dir);
+        let mut embedded_files = process_email(embedded_message, &new_dir)?;
+        extracted_files.append(&mut embedded_files);
     }
 
-    Ok(())
+    Ok(extracted_files)
 }
 
-pub fn extract_msg(file_path: &Path, output_dir: &Path) -> Result<()> {
+pub fn extract_msg(file_path: &Path, output_dir: &Path) -> Result<Vec<PathBuf>> {
     let email = Email::from_path(file_path);
     process_email(&email, output_dir)
 }
