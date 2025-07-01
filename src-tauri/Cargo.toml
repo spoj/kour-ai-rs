@@ -45,7 +45,6 @@ infer = "0.16.0"
 calamine = "0.28"
 base64 = "0.22.1"
 walkdir = "2.5.0"
-
 sha2 = "0.10.8"
 tempfile = "3.10.1"
 anyhow = "1.0.86"
@@ -54,3 +53,8 @@ regex = "1"
 sanitize-filename = "0.5.0"
 html2md = "0.2"
 tokio-util = "0.7.15"
+<<<<<<< Updated upstream
+=======
+schemars = "1.0.3"
+tiny_msg = "0.2.0"
+>>>>>>> Stashed changes
