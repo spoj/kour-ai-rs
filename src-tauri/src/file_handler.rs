@@ -1,8 +1,8 @@
+use crate::Result;
 use crate::chat::{Content, FileData, ImageUrl};
 use crate::error::Error;
-use crate::Result;
-use base64::{engine::general_purpose, Engine as _};
-use calamine::{open_workbook_auto_from_rs, Reader};
+use base64::{Engine as _, engine::general_purpose};
+use calamine::{Reader, open_workbook_auto_from_rs};
 use csv::Writer;
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -151,7 +151,7 @@ pub fn process_file_for_llm(path: &Path) -> Result<Vec<Content>> {
     let file_buffer = fs::read(path)?;
     let file_type = determine_file_type(path);
 
-    let result = match file_type {
+    match file_type {
         FileType::Image(mime) => {
             let encoded = general_purpose::STANDARD.encode(&file_buffer);
             let data_url = format!("data:{mime};base64,{encoded}");
@@ -199,7 +199,5 @@ pub fn process_file_for_llm(path: &Path) -> Result<Vec<Content>> {
             Ok(vec![Content::Text { text: content }])
         }
         _ => Err(Error::Tool("Unsupported file type".to_string())),
-    };
-
-    result
+    }
 }

@@ -1,12 +1,13 @@
-use serde::{Deserialize};
+use schemars::{schema_for, JsonSchema};
+use serde::{Deserialize, Serialize};
 use tokio::task;
 use crate::error::Error;
 use crate::utils::jailed::Jailed;
 use futures::stream::{self, StreamExt};
 use std::path::Path;
-use serde_json::{json, Value};
+use serde_json::{from_str, json, to_value, Value};
 use crate::tools::{Function, Tool};
-use crate::chat::{ChatMessage, Content};
+use crate::chat::{call_openrouter, ChatMessage, Content, IncomingContent};
 
 use crate::Result;
 
@@ -19,6 +20,11 @@ pub struct AskFilesArgs {
     pub filenames: Vec<String>,
 }
 
+#[derive(Serialize, Deserialize, JsonSchema)]
+pub struct AskFileResults {
+    answer: String,
+    extracts: Vec<String>, 
+}
 pub fn get_tool() -> Tool {
     Tool {
         r#type: "function".to_string(),
@@ -69,13 +75,14 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
                 ];
 
                 messages[0].content.extend(file_content);
+                let schema = to_value(schema_for!(AskFileResults)).unwrap(); // unwrap: all input controlled by code
 
                 let response =
-                    crate::chat::call_openrouter(&messages, model_name, "You are a helpful assistant that answers questions about files. Your answer must be grounded.", &vec![]).await?;
-                let choice = &response.choices[0];
-                let message: ChatMessage = choice.message.clone().into();
-                if let Some(Content::Text { text }) = message.content.first() {
-                    return Ok(json!({ filename: text, }));
+                    call_openrouter(&messages, model_name, "You are a helpful assistant that answers questions about files. Your answer must be grounded.", &vec![], Some(schema)).await?;
+                if let IncomingContent::Text(text) =  &response.choices[0].message.content 
+                && let Ok(output) = from_str::<AskFileResults>(text)
+                {
+                    return Ok(json!({filename:output}));
                 }
                 
                 Err(Error::Tool("MapError".to_string()))
