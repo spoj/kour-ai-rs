@@ -528,6 +528,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cfb"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8a4f8e55be323b378facfcf1f06aa97f6ec17cf4ac84fb17325093aaf62da41"
+dependencies = [
+ "byteorder",
+ "fnv",
+ "uuid",
+]
+
+[[package]]
 name = "cfg-expr"
 version = "0.15.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -591,6 +602,16 @@ checksum = "ba5a308b75df32fe02788e748662718f03fde005016435c444eea572398219fd"
 dependencies = [
  "bytes",
  "memchr",
+]
+
+[[package]]
+name = "compressed-rtf"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50bd502b5779b9f999a2d69115f7e2fb1662883aa5a0e50e33cff684dae101d9"
+dependencies = [
+ "byteorder",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -1987,7 +2008,7 @@ version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc150e5ce2330295b8616ce0e3f53250e53af31759a9dbedad1621ba29151847"
 dependencies = [
- "cfb",
+ "cfb 0.7.3",
 ]
 
 [[package]]
@@ -1996,7 +2017,7 @@ version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a588916bfdfd92e71cacef98a63d9b1f0d74d6599980d11894290e7ddefffcf7"
 dependencies = [
- "cfb",
+ "cfb 0.7.3",
 ]
 
 [[package]]
@@ -2196,6 +2217,7 @@ dependencies = [
  "tauri-plugin-store",
  "tempfile",
  "thiserror 2.0.12",
+ "tiny_msg",
  "tokio",
  "tokio-util",
  "walkdir",
@@ -4564,6 +4586,18 @@ checksum = "3526739392ec93fd8b359c8e98514cb3e8e021beb4e5f597b00a0221f8ed8a49"
 dependencies = [
  "num-conv",
  "time-core",
+]
+
+[[package]]
+name = "tiny_msg"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00042a51e99ddbce3570ff4a285e397eeb5876111d4beed6677c621262fae216"
+dependencies = [
+ "cfb 0.10.0",
+ "chrono",
+ "compressed-rtf",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
