@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use mail_parser::{Address, Message, MessageParser, MimeHeaders};
 use regex::Regex;
@@ -24,17 +24,19 @@ fn format_addresses(address: &Address) -> String {
         .join(", ")
 }
 
-pub fn extract_eml(message: &Message, output_dir: &Path) -> Result<()> {
+pub fn extract_eml(message: &Message, output_dir: &Path) -> Result<Vec<PathBuf>> {
     fs::create_dir_all(output_dir)?;
+    let mut extracted_files = Vec::new();
 
     let md_path = output_dir.join("EMAIL.md");
-    let mut file = fs::File::create(md_path).expect("Failed to create file");
+    let mut file = fs::File::create(&md_path).expect("Failed to create file");
+    extracted_files.push(md_path);
 
     if let Some(from) = message.from() {
         writeln!(file, "From: {}", format_addresses(from))?;
     }
     if let Some(date) = message.date() {
-        writeln!(file, "Sent: {date}",)?;
+        writeln!(file, "Sent: {date}")?;
     }
     if let Some(to) = message.to() {
         writeln!(file, "To: {}", format_addresses(to))?;
@@ -43,7 +45,7 @@ pub fn extract_eml(message: &Message, output_dir: &Path) -> Result<()> {
         writeln!(file, "CC: {}", format_addresses(cc))?;
     }
     if let Some(subject) = message.subject() {
-        writeln!(file, "Subject: {subject}",)?;
+        writeln!(file, "Subject: {subject}")?;
     }
 
     writeln!(file, "\n---")?;
@@ -64,12 +66,14 @@ pub fn extract_eml(message: &Message, output_dir: &Path) -> Result<()> {
                 let subject = embedded_message.subject().unwrap_or("embedded_email");
                 let dir_name = sanitize(subject);
                 let new_dir = output_dir.join(dir_name);
-                let _ = extract_eml(&embedded_message, &new_dir);
+                let mut embedded_files = extract_eml(&embedded_message, &new_dir)?;
+                extracted_files.append(&mut embedded_files);
             }
         } else if let Some(filename) = attachment.attachment_name() {
             let file_path = output_dir.join(filename);
-            fs::write(file_path, attachment.contents()).expect("Failed to write attachment");
+            fs::write(&file_path, attachment.contents()).expect("Failed to write attachment");
+            extracted_files.push(file_path);
         }
     }
-    Ok(())
+    Ok(extracted_files)
 }
