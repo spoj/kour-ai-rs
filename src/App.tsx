@@ -14,6 +14,7 @@ import { fileToAttachment } from "./helpers";
 import { IChatCompletionMessage, ISettings, MessageContent } from "./types";
 import { ChatBubble } from "./components/ChatBubble";
 import { SettingsModal } from "./components/SettingsModal";
+import { getVersion } from "@tauri-apps/api/app";
 
 type Attachment = {
   type: string; // Mime type e.g. "image/png"
@@ -25,6 +26,7 @@ function App() {
   const [messages, setMessages] = useState<IChatCompletionMessage[]>([]);
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [appVersion, setAppVersion] = useState("");
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const rootDirInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
@@ -40,6 +42,7 @@ function App() {
   });
 
   useEffect(() => {
+    getVersion().then(setAppVersion);
     getSettings().then(setSettings);
     messageInputRef.current?.focus();
 
@@ -227,11 +230,12 @@ function App() {
     });
   };
 
+
   return (
     <div className="container">
       <header>
         <a href="/" style={{ color: "white", textDecoration: "none" }}>
-          <h1>Kour-AI</h1>
+          <h1 title={`version: ${appVersion}`}>Kour-AI</h1>
         </a>
         <div id="path-container">
           <input
