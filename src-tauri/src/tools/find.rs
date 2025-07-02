@@ -1,8 +1,9 @@
+use crate::Result;
 use crate::error::Error;
 use crate::utils::jailed::Jailed;
-use crate::Result;
 
 use super::{Function, Tool};
+use glob::MatchOptions;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::task;
@@ -41,6 +42,11 @@ fn find_internal(root_dir: &str, glob_pattern: &str) -> Result<Vec<String>> {
         ));
     }
     let jail = Path::new(root_dir);
+    let options = MatchOptions {
+        case_sensitive: false,
+        require_literal_separator: true,
+        require_literal_leading_dot: false,
+    };
 
     // Use the Jailed trait to prevent traversal attacks.
     // We only join the non-glob part of the pattern to validate the base directory.
@@ -52,7 +58,7 @@ fn find_internal(root_dir: &str, glob_pattern: &str) -> Result<Vec<String>> {
         .to_str()
         .ok_or_else(|| Error::Tool("Invalid pattern path".to_string()))?;
 
-    let entries: Vec<_> = glob::glob(full_pattern_str)
+    let entries: Vec<_> = glob::glob_with(full_pattern_str, options)
         .map_err(|e| Error::Tool(format!("Invalid glob pattern: {e}")))?
         .flatten()
         .collect();
