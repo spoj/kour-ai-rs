@@ -1,10 +1,10 @@
 use crate::Result;
-use crate::chat::{OutgoingMessage, Content, call_openrouter};
+use crate::chat::{Content, IncomingContent, call_openrouter};
 use crate::error::Error;
 use crate::tools::{Function, Tool};
 use schemars::{JsonSchema, schema_for};
 use serde::{Deserialize, Serialize};
-use serde_json::{from_str, to_value};
+use serde_json::{from_str, json, to_value};
 use tokio::task;
 
 const SEARCH_MODEL: &str = "perplexity/sonar";
@@ -31,26 +31,23 @@ pub async fn check_online(args: CheckOnlineArgs) -> Result<CheckOnlineResult> {
         ));
     }
 
-    let messages = vec![OutgoingMessage::new(
-        "user",
-        vec![
-            Content::Text {
-                text: "Research user query on the internet. take the broader context in consideration. Give both answer and citations.".to_string(),
-            },
-            Content::Text {
-                text: format!("Broader context:\n{}", args.broader_context),
-            },
-            Content::Text {
-                text: format!("Query:\n{}", args.query),
-            },
-        ],
-    )];
+    let message = json!({
+    "role":"user",
+    "content":vec![
+        Content::Text {
+            text: "Research user query on the internet. take the broader context in consideration. Give both answer and citations.".to_string(),
+        },
+        Content::Text {
+            text: format!("Broader context:\n{}", args.broader_context),
+        },
+        Content::Text {
+            text: format!("Query:\n{}", args.query),
+        },
+    ]
+    });
     let schema = to_value(schema_for!(CheckOnlineResult)).unwrap(); // unwrap: all input controlled by code
-    let response = call_openrouter(&messages, SEARCH_MODEL, "", &vec![], Some(schema)).await?;
-
-    let choice = &response.choices[0];
-    let message: OutgoingMessage = choice.message.clone().into();
-    if let Some(Content::Text { text }) = message.content.first() {
+    let response = call_openrouter(&[message], SEARCH_MODEL, "", &vec![], Some(schema)).await?;
+    if let IncomingContent::Text(text) = &response.choices[0].message.content {
         return Ok(from_str(text)?);
     }
     Err(Error::Tool(

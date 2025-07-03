@@ -6,10 +6,10 @@ mod settings;
 mod tools;
 mod utils;
 
-use crate::chat::{ChatOptions, Content, OutgoingMessage};
+use crate::chat::{ChatOptions, Content};
 use crate::chat::{ChatProcessor, EventReplayer};
 use crate::error::Error;
-use crate::interaction::Interaction;
+use crate::interaction::{Interaction, Interactor, User};
 use crate::settings::Settings;
 use serde_json::{from_value, to_value};
 use std::path::PathBuf;
@@ -75,7 +75,7 @@ async fn chat(window: tauri::Window, content: Vec<Content>, state: AppState<'_>)
     let replayer = EventReplayer::new(window.clone());
     let mut history = state.history.read().unwrap().to_vec(); // unwrap: won't try to recover from poisoned lock
 
-    let new_interaction = Interaction::from_user(content);
+    let new_interaction = User::sends(content);
     history.push(new_interaction.clone());
     let _ = replayer.emit_interaction(&new_interaction);
 

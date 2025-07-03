@@ -1,10 +1,11 @@
-use crate::chat::{OutgoingMessage, Content};
+use crate::Result;
+use crate::chat::Content;
 use crate::error::Error;
 use crate::file_handler;
 use crate::tools::{Function, Tool};
 use crate::utils::jailed::Jailed;
-use crate::Result;
 use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 use std::path::Path;
 use tokio::task;
 
@@ -17,7 +18,7 @@ pub struct LoadFileArgs {
 pub struct LoadFileResult {
     pub r#type: String, // Always "file_loaded" to identify this special result.
     pub display_message: String,
-    pub user_message: OutgoingMessage,
+    pub user_message: Value,
 }
 
 pub async fn load_file(args: LoadFileArgs) -> Result<LoadFileResult> {
@@ -38,11 +39,16 @@ pub async fn load_file(args: LoadFileArgs) -> Result<LoadFileResult> {
         task::spawn_blocking(move || file_handler::process_file_for_llm(&safe_path)).await??;
 
     // Prepend an instructional message for the LLM.
-    let instructional_text = Content::Text { text: format!("The content of the file '{}' has been loaded. Here is the full content for your context. Please use this content to answer any subsequent questions.", &args.filename)};
+    let instructional_text = Content::Text {
+        text: format!(
+            "The content of the file '{}' has been loaded. Here is the full content for your context. Please use this content to answer any subsequent questions.",
+            &args.filename
+        ),
+    };
     file_content.insert(0, instructional_text);
-    
+
     // Create the user message that contains the file attachment.
-    let user_message = OutgoingMessage::new("user", file_content);
+    let user_message = json!({"role":"user", "content":vec![file_content]});
 
     let result = LoadFileResult {
         r#type: "file_loaded".to_string(),

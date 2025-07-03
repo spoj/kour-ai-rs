@@ -1,7 +1,11 @@
-use crate::{Result, get_settings_fn, interaction::Interaction, tools};
+use crate::{
+    Result, get_settings_fn,
+    interaction::{Interaction, Interactor, Llm},
+    tools,
+};
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{Value, json, to_string_pretty};
 use tauri::Emitter;
 
 pub static SYSTEM_PROMPT: &str = include_str!("DEFAULT_PROMPT.md");
@@ -75,49 +79,6 @@ pub enum IncomingContent {
     Parts(Vec<Content>),
     #[default]
     None,
-}
-
-impl From<IncomingMessage> for OutgoingMessage {
-    fn from(msg: IncomingMessage) -> Self {
-        let content = match msg.content {
-            IncomingContent::Text(text) => vec![Content::Text { text }],
-            IncomingContent::Parts(parts) => parts,
-            IncomingContent::None => vec![],
-        };
-
-        OutgoingMessage {
-            role: msg.role,
-            content,
-            tool_calls: msg.tool_calls,
-            tool_call_id: None,
-        }
-    }
-}
-
-impl OutgoingMessage {
-    pub fn new(role: &str, content: Vec<Content>) -> Self {
-        Self {
-            role: role.to_string(),
-            content,
-            tool_calls: None,
-            tool_call_id: None,
-        }
-    }
-
-    pub fn from_user_content(content: Vec<Content>) -> Self {
-        Self {
-            role: "user".to_string(),
-            content,
-            tool_calls: None,
-            tool_call_id: None,
-        }
-    }
-
-    pub fn tool_calls(mut self, tool_calls: Vec<ToolCall>) -> Self {
-        self.tool_calls = Some(tool_calls);
-        self.content = vec![]; // Empty vec will be omitted by serde
-        self
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -257,34 +218,6 @@ impl EventReplayer {
         Ok(())
     }
 
-    pub fn replay(&self, messages: &[OutgoingMessage]) -> Result<()> {
-        for message in messages {
-            // Assistant message with tool calls
-            if let Some(tool_calls) = &message.tool_calls {
-                for tool_call in tool_calls {
-                    self.emit_tool_call(
-                        &tool_call.function.name,
-                        &tool_call.id,
-                        &tool_call.function.arguments,
-                    )?;
-                }
-            }
-            // Tool message with the result
-            else if message.role == "tool" {
-                if let Some(tool_call_id) = &message.tool_call_id
-                    && let Some(Content::Text { text }) = message.content.first()
-                {
-                    self.emit_tool_result(tool_call_id, text)?;
-                }
-                // We do NOT replay the injected user message, it's for the LLM only
-            }
-            // All other messages
-            else {
-                self.emit_message(message.clone())?;
-            }
-        }
-        Ok(())
-    }
 }
 pub struct ChatProcessor {
     replayer: EventReplayer,
@@ -305,7 +238,7 @@ impl ChatProcessor {
         let _ = self.replayer.emit_start();
 
         loop {
-            let to_llm: Vec<_> = self.interactions.iter().flat_map(|i| i.to_llm()).collect();
+            let to_llm: Vec<_> = Llm::render(&self.interactions);
             let res = call_openrouter(
                 &to_llm,
                 &self.options.model_name,
@@ -317,7 +250,7 @@ impl ChatProcessor {
 
             let choice = &res.choices[0];
             let incoming_message = choice.message.clone();
-            let interaction = Interaction::from_llm(incoming_message.clone());
+            let interaction = Llm::sends(incoming_message.clone());
 
             if let Some(tool_calls) = incoming_message.tool_calls.clone() {
                 self.interactions.push(interaction);
@@ -391,26 +324,25 @@ impl ChatProcessor {
 }
 
 pub async fn call_openrouter(
-    messages: &[OutgoingMessage],
+    messages: &[Value],
     model_name: &str,
     system_prompt: &str,
     tools: &Vec<tools::Tool>,
     schema: Option<Value>,
 ) -> super::Result<ChatResponse> {
-    println!("Sending messages to OpenRouter: {messages:?}");
+    println!(
+        "Sending messages to OpenRouter: {}",
+        messages
+            .iter()
+            .map(|j| to_string_pretty(j).unwrap())
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    );
     let settings = get_settings_fn()?;
     let client = reqwest::Client::new();
     let mut final_messages = messages.to_vec();
     if !system_prompt.is_empty() {
-        final_messages.insert(
-            0,
-            OutgoingMessage::new(
-                "system",
-                vec![Content::Text {
-                    text: system_prompt.to_string(),
-                }],
-            ),
-        );
+        final_messages.insert(0, json!({"role":"system","content":system_prompt}));
     }
     let mut json_to_send = json!({
         "model": model_name,

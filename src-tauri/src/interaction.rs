@@ -1,6 +1,10 @@
-use crate::chat::{OutgoingMessage, Content, IncomingMessage, ToolCall};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use serde_json::json;
 
-#[derive(Clone)]
+use crate::chat::{Content, IncomingContent, IncomingMessage, ToolCall};
+
+#[derive(Clone, Serialize, Deserialize)]
 pub enum Interaction {
     LlmResponse {
         content: Vec<Content>,
@@ -17,88 +21,105 @@ pub enum Interaction {
     },
 }
 
-impl Interaction {
-    pub fn from_llm(incoming_message: IncomingMessage) -> Self {
-        let tool_calls = incoming_message.tool_calls;
-        let content = match incoming_message.content {
-            crate::chat::IncomingContent::Text(t) => vec![Content::Text { text: t }],
-            crate::chat::IncomingContent::Parts(contents) => contents,
-            crate::chat::IncomingContent::None => vec![],
+pub trait Interactor {
+    type RenderType;
+    type SendType;
+    fn render(interactions: &[Interaction]) -> Vec<Self::RenderType>;
+    fn sends(data: Self::SendType) -> Interaction;
+}
+
+pub struct User;
+pub struct Llm;
+
+impl Interactor for Llm {
+    type RenderType = Value;
+    type SendType = IncomingMessage;
+    fn render(interactions: &[Interaction]) -> Vec<Value> {
+        interactions
+            .iter()
+            .flat_map(|i| match i {
+                Interaction::LlmResponse {
+                    content,
+                    tool_calls,
+                } => {
+                    if let Some(tool_calls) = tool_calls {
+                        vec![json!({
+                    "role": "assistant",
+                    "tool_calls": tool_calls})]
+                    } else {
+                        vec![json!({
+                    "role": "assistant",
+                    "content": content})]
+                    }
+                }
+                Interaction::ToolResult {
+                    tool_call_id,
+                    response,
+                    #[allow(unused_variables)]
+                    for_llm,
+                    #[allow(unused_variables)]
+                    for_user,
+                } => vec![json!({
+                "role": "tool",
+                "content": response,
+                "tool_call_id": tool_call_id,
+                })],
+                Interaction::UserMessage { content } => vec![json!({
+                        "role": "user",
+                        "content": content,
+                })],
+            })
+            .collect()
+    }
+
+    fn sends(data: IncomingMessage) -> Interaction {
+        let tool_calls = data.tool_calls;
+        let content = match data.content {
+            IncomingContent::Text(t) => vec![Content::Text { text: t }],
+            IncomingContent::Parts(contents) => contents,
+            IncomingContent::None => vec![],
         };
         Interaction::LlmResponse {
             content,
             tool_calls,
         }
     }
-    pub fn from_user(content: Vec<Content>) -> Self {
-        Self::UserMessage { content }
+}
+impl Interactor for User {
+    type RenderType = Value;
+    type SendType = Vec<Content>;
+    fn render(interactions: &[Interaction]) -> Vec<Value> {
+        interactions
+            .iter()
+            .flat_map(|i| match i {
+                Interaction::LlmResponse {
+                    content,
+                    tool_calls,
+                } => vec![json!({
+                    "role": "assistant",
+                    "content": content,
+                    "tool_calls": tool_calls})],
+                Interaction::ToolResult {
+                    tool_call_id,
+                    response,
+                    #[allow(unused_variables)]
+                    for_llm,
+                    #[allow(unused_variables)]
+                    for_user,
+                } => vec![json!({
+                "role": "tool",
+                "content": response,
+                "tool_call_id": tool_call_id,
+                })],
+                Interaction::UserMessage { content } => vec![json!({
+                        "role": "user",
+                        "content": content,
+                })],
+            })
+            .collect()
     }
-    pub fn to_llm(&self) -> Vec<OutgoingMessage> {
-        match self {
-            Interaction::LlmResponse {
-                content,
-                tool_calls,
-            } => vec![OutgoingMessage {
-                role: "assistant".to_string(),
-                content: content.to_owned(),
-                tool_calls: tool_calls.to_owned(),
-                tool_call_id: None,
-            }],
-            Interaction::ToolResult {
-                tool_call_id,
-                response,
-                #[allow(unused_variables)]
-                for_llm,
-                #[allow(unused_variables)]
-                for_user,
-            } => vec![OutgoingMessage {
-                role: "tool".to_string(),
-                content: vec![Content::Text {
-                    text: response.to_owned(),
-                }],
-                tool_calls: None,
-                tool_call_id: Some(tool_call_id.to_owned()),
-            }],
-            Interaction::UserMessage { content } => vec![OutgoingMessage {
-                role: "user".to_string(),
-                content: content.to_owned(),
-                tool_calls: None,
-                tool_call_id: None,
-            }],
-        }
-    }
-    pub fn to_user(&self) -> Vec<OutgoingMessage> {
-        match self {
-            Interaction::LlmResponse {
-                content,
-                tool_calls,
-            } => vec![OutgoingMessage {
-                role: "assistant".to_string(),
-                content: content.to_owned(),
-                tool_calls: tool_calls.to_owned(),
-                tool_call_id: None,
-            }],
-            Interaction::ToolResult {
-                tool_call_id,
-                response,
-                #[allow(unused_variables)]
-                for_llm,
-                #[allow(unused_variables)]
-                for_user,
-            } => vec![OutgoingMessage {
-                role: "tool".to_string(),
-                content: vec![Content::Text {
-                    text: response.to_owned(),
-                }],
-                tool_calls: None,
-                tool_call_id: Some(tool_call_id.to_owned()),
-            }],
-            Interaction::UserMessage { content } => vec![OutgoingMessage {
-                role: "user".to_string(),
-                content: content.to_owned(),
-                tool_calls: None,
-                tool_call_id: None,
-            }],
-        }
+
+    fn sends(data: Vec<Content>) -> Interaction {
+        Interaction::UserMessage { content: data }
     }
 }
