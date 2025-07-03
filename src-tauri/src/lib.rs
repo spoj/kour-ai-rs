@@ -2,15 +2,19 @@ mod chat;
 mod error;
 mod file_handler;
 mod interaction;
+mod openrouter;
 mod settings;
 mod tools;
+mod ui_events;
 mod utils;
 
-use crate::chat::{ChatOptions, Content};
-use crate::chat::{ChatProcessor, EventReplayer};
+use crate::chat::ChatProcessor;
+use crate::chat::Content;
 use crate::error::Error;
-use crate::interaction::{Interaction, Interactor, User};
+use crate::interaction::{Interaction, Source};
+use crate::openrouter::ChatOptions;
 use crate::settings::Settings;
+use crate::ui_events::UIEvents;
 use serde_json::{from_value, to_value};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
@@ -72,10 +76,10 @@ async fn chat(window: tauri::Window, content: Vec<Content>, state: AppState<'_>)
     let options = ChatOptions {
         model_name: settings.model_name,
     };
-    let replayer = EventReplayer::new(window.clone());
+    let replayer = UIEvents::new(window.clone());
     let mut history = state.history.read().unwrap().to_vec(); // unwrap: won't try to recover from poisoned lock
 
-    let new_interaction = User::sends(content);
+    let new_interaction = UIEvents::sends(content);
     history.push(new_interaction.clone());
     let _ = replayer.emit_interaction(&new_interaction);
 
@@ -105,7 +109,7 @@ async fn chat(window: tauri::Window, content: Vec<Content>, state: AppState<'_>)
 #[tauri::command]
 async fn replay_history(window: tauri::Window, state: AppState<'_>) -> Result<()> {
     let history = state.history.read().unwrap().clone(); // unwrap: won't try to recover from poisoned lock
-    EventReplayer::new(window).replay_interactions(&history)?;
+    UIEvents::new(window).replay_interactions(&history)?;
     Ok(())
 }
 

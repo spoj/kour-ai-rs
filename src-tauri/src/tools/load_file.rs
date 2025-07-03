@@ -2,10 +2,9 @@ use crate::Result;
 use crate::chat::Content;
 use crate::error::Error;
 use crate::file_handler;
-use crate::tools::{Function, Tool};
+use crate::tools::{Function, Tool, ToolPayload};
 use crate::utils::jailed::Jailed;
-use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde::Deserialize;
 use std::path::Path;
 use tokio::task;
 
@@ -14,14 +13,7 @@ pub struct LoadFileArgs {
     pub filename: String,
 }
 
-#[derive(Serialize)]
-pub struct LoadFileResult {
-    pub r#type: String, // Always "file_loaded" to identify this special result.
-    pub display_message: String,
-    pub user_message: Value,
-}
-
-pub async fn load_file(args: LoadFileArgs) -> Result<LoadFileResult> {
+pub async fn load_file(args: LoadFileArgs) -> Result<ToolPayload> {
     let root_dir = task::spawn_blocking(crate::get_settings_fn)
         .await?
         .map(|s| s.root_dir)?;
@@ -47,16 +39,7 @@ pub async fn load_file(args: LoadFileArgs) -> Result<LoadFileResult> {
     };
     file_content.insert(0, instructional_text);
 
-    // Create the user message that contains the file attachment.
-    let user_message = json!({"role":"user", "content":vec![file_content]});
-
-    let result = LoadFileResult {
-        r#type: "file_loaded".to_string(),
-        display_message: format!("Loaded {}", &args.filename),
-        user_message,
-    };
-
-    Ok(result)
+    Ok(ToolPayload::from("file_loaded".to_string())?.llm(file_content))
 }
 
 pub fn get_tool() -> Tool {

@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tokio::{fs, task};
 
-use crate::error::Error;
-use crate::tools::{Function, Tool};
 use crate::Result;
+use crate::error::Error;
+use crate::tools::{Function, Tool, ToolPayload};
 
 pub mod extract_eml;
 pub mod extract_msg;
@@ -23,7 +23,7 @@ pub struct ExtractResult {
     pub total_files: usize,
 }
 
-pub async fn extract(args: ExtractArgs) -> Result<ExtractResult> {
+pub async fn extract(args: ExtractArgs) -> Result<ToolPayload> {
     let root_dir = task::spawn_blocking(crate::get_settings_fn)
         .await?
         .map(|s| s.root_dir)?;
@@ -102,7 +102,7 @@ pub async fn extract(args: ExtractArgs) -> Result<ExtractResult> {
         extracted_files,
     };
 
-    Ok(result)
+    ToolPayload::from(result)
 }
 
 pub fn get_tool() -> Tool {

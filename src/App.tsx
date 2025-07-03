@@ -69,7 +69,13 @@ function App() {
           setIsTyping(false);
           break;
         case "Message":
-          setMessages((prev) => [...prev, update.message]);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: update.role as "user" | "assistant",
+              content: update.content,
+            },
+          ]);
           break;
         case "ToolCall":
           const toolCallMessage: IChatCompletionMessage = {
