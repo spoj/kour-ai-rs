@@ -1,13 +1,15 @@
 mod chat;
 mod error;
 mod file_handler;
+mod interaction;
 mod settings;
 mod tools;
 mod utils;
 
-use crate::chat::{ChatMessage, ChatOptions, Content};
+use crate::chat::{ChatOptions, Content, OutgoingMessage};
 use crate::chat::{ChatProcessor, EventReplayer};
 use crate::error::Error;
+use crate::interaction::Interaction;
 use crate::settings::Settings;
 use serde_json::{from_value, to_value};
 use std::path::PathBuf;
@@ -25,7 +27,7 @@ pub static CACHE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 struct AppStateInner {
     cancel: Mutex<Option<CancellationToken>>,
-    history: RwLock<Vec<ChatMessage>>,
+    history: RwLock<Vec<Interaction>>,
 }
 type AppState<'a> = State<'a, AppStateInner>;
 
@@ -73,9 +75,9 @@ async fn chat(window: tauri::Window, content: Vec<Content>, state: AppState<'_>)
     let replayer = EventReplayer::new(window.clone());
     let mut history = state.history.read().unwrap().to_vec(); // unwrap: won't try to recover from poisoned lock
 
-    let received_message = ChatMessage::from_user_content(content);
-    history.push(received_message.clone());
-    let _ = replayer.emit_message(received_message);
+    let new_interaction = Interaction::from_user(content);
+    history.push(new_interaction.clone());
+    let _ = replayer.emit_interaction(&new_interaction);
 
     let cancel_token = CancellationToken::new();
     {
@@ -103,7 +105,7 @@ async fn chat(window: tauri::Window, content: Vec<Content>, state: AppState<'_>)
 #[tauri::command]
 async fn replay_history(window: tauri::Window, state: AppState<'_>) -> Result<()> {
     let history = state.history.read().unwrap().clone(); // unwrap: won't try to recover from poisoned lock
-    EventReplayer::new(window).replay(&history)?;
+    EventReplayer::new(window).replay_interactions(&history)?;
     Ok(())
 }
 

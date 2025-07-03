@@ -7,7 +7,7 @@ use futures::stream::{self, StreamExt};
 use std::path::Path;
 use serde_json::{from_str, json, to_value, Value};
 use crate::tools::{Function, Tool};
-use crate::chat::{call_openrouter, ChatMessage, Content, IncomingContent};
+use crate::chat::{call_openrouter, OutgoingMessage, Content, IncomingContent};
 
 use crate::Result;
 
@@ -71,7 +71,7 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
                         .await??;
                 
                 let mut messages = vec![
-                    ChatMessage::new("user", vec![Content::Text { text: format!("File: {filename}\n\nQuery: {query}") }])
+                    OutgoingMessage::new("user", vec![Content::Text { text: format!("File: {filename}\n\nQuery: {query}") }])
                 ];
 
                 messages[0].content.extend(file_content);

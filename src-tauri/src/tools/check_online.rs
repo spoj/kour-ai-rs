@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::chat::{ChatMessage, Content, call_openrouter};
+use crate::chat::{OutgoingMessage, Content, call_openrouter};
 use crate::error::Error;
 use crate::tools::{Function, Tool};
 use schemars::{JsonSchema, schema_for};
@@ -31,7 +31,7 @@ pub async fn check_online(args: CheckOnlineArgs) -> Result<CheckOnlineResult> {
         ));
     }
 
-    let messages = vec![ChatMessage::new(
+    let messages = vec![OutgoingMessage::new(
         "user",
         vec![
             Content::Text {
@@ -49,7 +49,7 @@ pub async fn check_online(args: CheckOnlineArgs) -> Result<CheckOnlineResult> {
     let response = call_openrouter(&messages, SEARCH_MODEL, "", &vec![], Some(schema)).await?;
 
     let choice = &response.choices[0];
-    let message: ChatMessage = choice.message.clone().into();
+    let message: OutgoingMessage = choice.message.clone().into();
     if let Some(Content::Text { text }) = message.content.first() {
         return Ok(from_str(text)?);
     }
