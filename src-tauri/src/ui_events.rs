@@ -1,9 +1,6 @@
-use std::{cmp::Ordering, convert};
-
 use crate::{
     Result,
-    interaction::Content,
-    interaction::{Interaction, Source, Target},
+    interaction::{Content, History, Interaction, Source, Target},
 };
 use serde::Serialize;
 use tauri::Emitter;
@@ -58,10 +55,7 @@ impl<'a> Target<'a> for UIEvents {
             Interaction::ToolResult {
                 tool_call_id,
                 response,
-                #[allow(unused_variables)]
-                for_llm,
-                #[allow(unused_variables)]
-                for_user,
+                ..
             } => vec![EventPayload::ToolDone {
                 tool_call_id,
                 tool_result: response,
@@ -122,14 +116,14 @@ impl UIEvents {
     }
 
     pub fn emit_interaction(&self, interaction: &Interaction) -> Result<()> {
-        for payload in Self::render(&[interaction.to_owned()]) {
+        for payload in Self::convert(interaction) {
             let _ = self.window.emit("chat_completion_update", payload);
         }
         Ok(())
     }
 
-    pub fn replay_interactions(&self, interactions: &[Interaction]) -> Result<()> {
-        for i in interactions {
+    pub fn replay_history(&self, history: &History) -> Result<()> {
+        for i in &history.inner {
             let _ = self.emit_interaction(i);
         }
         Ok(())

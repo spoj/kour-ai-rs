@@ -4,8 +4,8 @@ use serde_json::Value;
 use serde_json::json;
 use serde_json::to_string_pretty;
 
-use crate::interaction::Content;
 use crate::get_settings_fn;
+use crate::interaction::Content;
 use crate::interaction::Interaction;
 use crate::interaction::Source;
 use crate::interaction::Target;
@@ -82,8 +82,7 @@ impl<'a> Target<'a> for Openrouter {
                 tool_call_id,
                 response,
                 for_llm,
-                #[allow(unused_variables)]
-                for_user,
+                ..
             } => {
                 let mut out = vec![json!({
                 "role": "tool",

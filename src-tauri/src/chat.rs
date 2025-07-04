@@ -1,12 +1,11 @@
 use crate::{
     Result,
-    interaction::{Interaction, Source, Target},
+    interaction::{History, Interaction, Source, Target},
     openrouter::{ChatOptions, Openrouter, ToolCall},
-    tools::{self, ToolPayload},
+    tools,
     ui_events::UIEvents,
 };
 use futures::future::join_all;
-use serde::{Deserialize, Serialize};
 use serde_json::to_string;
 
 pub static SYSTEM_PROMPT: &str = include_str!("DEFAULT_PROMPT.md");
@@ -14,23 +13,23 @@ pub static SYSTEM_PROMPT: &str = include_str!("DEFAULT_PROMPT.md");
 pub struct ChatProcessor {
     ui: UIEvents,
     options: ChatOptions,
-    interactions: Vec<Interaction>,
+    history: History,
 }
 
 impl ChatProcessor {
-    pub fn new(window: tauri::Window, options: ChatOptions, messages: Vec<Interaction>) -> Self {
+    pub fn new(window: tauri::Window, options: ChatOptions, history: History) -> Self {
         Self {
             ui: UIEvents::new(window),
             options,
-            interactions: messages,
+            history,
         }
     }
 
-    pub async fn run(mut self) -> Result<Vec<Interaction>> {
+    pub async fn run(mut self) -> Result<History> {
         let _ = self.ui.emit_start();
 
         loop {
-            let to_llm: Vec<_> = Openrouter::render(&self.interactions);
+            let to_llm: Vec<_> = Openrouter::render(&self.history);
             let res = Openrouter::call(
                 &to_llm,
                 &self.options.model_name,
@@ -45,17 +44,17 @@ impl ChatProcessor {
             let interaction = Openrouter::sends(incoming_message.clone());
 
             if let Some(tool_calls) = incoming_message.tool_calls.clone() {
-                self.interactions.push(interaction);
+                self.history.push(interaction);
 
                 let new_interactions = self.handle_tool_calls(tool_calls).await?;
                 for msg in new_interactions {
                     let tool_message = msg;
-                    self.interactions.push(tool_message);
+                    self.history.push(tool_message);
                 }
                 // After handling tools, continue the loop to let the assistant respond.
             } else {
                 // It's a final text response. Add it to history, emit, and break the loop.
-                self.interactions.push(interaction.clone());
+                self.history.push(interaction.clone());
                 self.ui.emit_interaction(&interaction)?;
                 break;
             }
@@ -63,7 +62,7 @@ impl ChatProcessor {
 
         self.ui.emit_done()?;
 
-        Ok(self.interactions)
+        Ok(self.history)
     }
 
     async fn execute_tool_call(replayer: UIEvents, tool_call: ToolCall) -> Interaction {

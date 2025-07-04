@@ -10,11 +10,11 @@ mod utils;
 
 use crate::chat::ChatProcessor;
 use crate::error::Error;
-use crate::interaction::{Content, Interaction, Source};
+use crate::interaction::{Content, History, Source};
 use crate::openrouter::ChatOptions;
-use crate::settings::Settings;
+use crate::settings::{Settings, get_settings_fn};
 use crate::ui_events::UIEvents;
-use serde_json::{from_value, to_value};
+use serde_json::to_value;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use tauri::Manager;
@@ -30,20 +30,9 @@ pub static CACHE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 struct AppStateInner {
     cancel: Mutex<Option<CancellationToken>>,
-    history: RwLock<Vec<Interaction>>,
+    history: RwLock<History>,
 }
 type AppState<'a> = State<'a, AppStateInner>;
-
-pub fn get_settings_fn() -> Result<Settings> {
-    let store = STORE
-        .get()
-        .ok_or(Error::Io(std::io::ErrorKind::NotFound.into()))?;
-    let settings = store
-        .get("settings")
-        .and_then(|v| from_value(v).ok())
-        .unwrap_or_default();
-    Ok(settings)
-}
 
 pub fn get_cache_dir() -> Result<std::path::PathBuf> {
     let cache_dir = crate::CACHE_DIR
@@ -76,7 +65,7 @@ async fn chat(window: tauri::Window, content: Vec<Content>, state: AppState<'_>)
         model_name: settings.model_name,
     };
     let replayer = UIEvents::new(window.clone());
-    let mut history = state.history.read().unwrap().to_vec(); // unwrap: won't try to recover from poisoned lock
+    let mut history = state.history.read().unwrap().clone(); // unwrap: won't try to recover from poisoned lock
 
     let new_interaction = UIEvents::sends(content);
     history.push(new_interaction.clone());
@@ -108,7 +97,7 @@ async fn chat(window: tauri::Window, content: Vec<Content>, state: AppState<'_>)
 #[tauri::command]
 async fn replay_history(window: tauri::Window, state: AppState<'_>) -> Result<()> {
     let history = state.history.read().unwrap().clone(); // unwrap: won't try to recover from poisoned lock
-    UIEvents::new(window).replay_interactions(&history)?;
+    UIEvents::new(window).replay_history(&history)?;
     Ok(())
 }
 
@@ -151,7 +140,7 @@ pub fn run() {
             CACHE_DIR.get_or_init(
                 || app.path().app_cache_dir().unwrap(), // unwrap: crash if cannot find cache dir
             );
-            let history = RwLock::new(vec![]);
+            let history = RwLock::new(Default::default());
             let cancel = Mutex::new(None);
             let inner_state = AppStateInner { cancel, history };
             app.manage(inner_state);

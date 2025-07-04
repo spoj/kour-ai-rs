@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, from_str, to_string, to_value};
 use std::sync::LazyLock;
 
-use crate::{Result, interaction::Content, error::Error, interaction::Interaction};
+use crate::{Result, error::Error, interaction::Content, interaction::Interaction};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Tool {
@@ -49,6 +49,7 @@ impl ToolPayload {
         dbg!(&self);
         self
     }
+    #[allow(dead_code)]
     fn user(mut self, for_user: Vec<Content>) -> Self {
         self.for_user = for_user;
         self
@@ -79,7 +80,7 @@ pub static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
 
 pub async fn tool_executor(name: &str, arguments: &str) -> ToolPayload {
     async fn tool_executor_inner(name: &str, arguments: &str) -> crate::Result<ToolPayload> {
-        let x = match name {
+        match name {
             "ls" => Ok(ls::ls(from_str(arguments)?).await?),
             "roll_dice" => Ok(roll_dice::execute(from_str(arguments)?).await),
             "find" => Ok(find::find(from_str(arguments)?).await?),
@@ -90,8 +91,7 @@ pub async fn tool_executor(name: &str, arguments: &str) -> ToolPayload {
             "load_file" => Ok(load_file::load_file(from_str(arguments)?).await?),
             "check_online" => Ok(check_online::check_online(from_str(arguments)?).await?),
             _ => Err(Error::Tool("Tool Not Found".to_string())),
-        };
-        x
+        }
     }
 
     tool_executor_inner(name, arguments)

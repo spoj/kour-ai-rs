@@ -40,12 +40,30 @@ pub enum Interaction {
     },
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct History {
+    pub inner: Vec<Interaction>,
+}
+
+impl History {
+    pub fn push(&mut self, new: Interaction) {
+        self.inner.push(new);
+    }
+    pub fn clear(&mut self) {
+        self.inner.clear();
+    }
+}
+
 pub trait Target<'a> {
     type RenderType: 'a;
 
     fn convert(interactions: &'a Interaction) -> Vec<Self::RenderType>;
-    fn render(interactions: &'a [Interaction]) -> Vec<Self::RenderType> {
-        interactions.iter().flat_map(|i| Self::convert(i)).collect()
+    fn render(history: &'a History) -> Vec<Self::RenderType> {
+        history
+            .inner
+            .iter()
+            .flat_map(|i| Self::convert(i))
+            .collect()
     }
 }
 pub trait Source {
