@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, from_str, to_string, to_value};
 use std::sync::LazyLock;
 
-use crate::{Result, chat::Content, error::Error, interaction::Interaction};
+use crate::{Result, interaction::Content, error::Error, interaction::Interaction};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Tool {
@@ -26,6 +26,7 @@ pub struct Function {
     pub parameters: Value,
 }
 
+#[derive(Debug)]
 pub struct ToolPayload {
     pub response: Value,
     pub for_llm: Vec<Content>,
@@ -45,16 +46,17 @@ impl ToolPayload {
     }
     fn llm(mut self, for_llm: Vec<Content>) -> Self {
         self.for_llm = for_llm;
+        dbg!(&self);
         self
     }
     fn user(mut self, for_user: Vec<Content>) -> Self {
         self.for_user = for_user;
         self
     }
-    fn finalize(self, tool_call_id: String) -> Result<Interaction> {
+    pub fn finalize(self, tool_call_id: String) -> Result<Interaction> {
         Ok(Interaction::ToolResult {
             tool_call_id,
-            response: to_string(&self.response).map_err(|e| crate::error::Error::Json(e))?,
+            response: to_string(&self.response).map_err(crate::error::Error::Json)?,
             for_llm: self.for_llm,
             for_user: self.for_user,
         })
@@ -75,17 +77,28 @@ pub static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
     ]
 });
 
-pub async fn tool_executor(name: &str, arguments: &str) -> crate::Result<ToolPayload> {
-    match name {
-        "ls" => Ok(ls::ls(from_str(arguments)?).await?),
-        "roll_dice" => Ok(roll_dice::execute(from_str(arguments)?).await),
-        "find" => Ok(find::find(from_str(arguments)?).await?),
-        "read_notes" => Ok(notes::read_notes().await?),
-        "append_notes" => Ok(notes::append_notes(from_str(arguments)?).await?),
-        "ask_files" => Ok(ask_files::ask_files(from_str(arguments)?).await?),
-        "extract" => Ok(extract::extract(from_str(arguments)?).await?),
-        "load_file" => Ok(load_file::load_file(from_str(arguments)?).await?),
-        "check_online" => Ok(check_online::check_online(from_str(arguments)?).await?),
-        _ => Err(Error::Tool("Tool Not Found".to_string())),
+pub async fn tool_executor(name: &str, arguments: &str) -> ToolPayload {
+    async fn tool_executor_inner(name: &str, arguments: &str) -> crate::Result<ToolPayload> {
+        let x = match name {
+            "ls" => Ok(ls::ls(from_str(arguments)?).await?),
+            "roll_dice" => Ok(roll_dice::execute(from_str(arguments)?).await),
+            "find" => Ok(find::find(from_str(arguments)?).await?),
+            "read_notes" => Ok(notes::read_notes().await?),
+            "append_notes" => Ok(notes::append_notes(from_str(arguments)?).await?),
+            "ask_files" => Ok(ask_files::ask_files(from_str(arguments)?).await?),
+            "extract" => Ok(extract::extract(from_str(arguments)?).await?),
+            "load_file" => Ok(load_file::load_file(from_str(arguments)?).await?),
+            "check_online" => Ok(check_online::check_online(from_str(arguments)?).await?),
+            _ => Err(Error::Tool("Tool Not Found".to_string())),
+        };
+        x
     }
+
+    tool_executor_inner(name, arguments)
+        .await
+        .unwrap_or(ToolPayload {
+            response: Value::String("Error".to_string()),
+            for_llm: vec![],
+            for_user: vec![],
+        })
 }

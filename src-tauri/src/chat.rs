@@ -2,36 +2,14 @@ use crate::{
     Result,
     interaction::{Interaction, Source, Target},
     openrouter::{ChatOptions, Openrouter, ToolCall},
-    tools,
+    tools::{self, ToolPayload},
     ui_events::UIEvents,
 };
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
-use serde_json::to_value;
+use serde_json::to_string;
 
 pub static SYSTEM_PROMPT: &str = include_str!("DEFAULT_PROMPT.md");
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
-#[serde(tag = "type")]
-pub enum Content {
-    #[serde(rename = "text")]
-    Text { text: String },
-    #[serde(rename = "image_url")]
-    ImageUrl { image_url: ImageUrl },
-    #[serde(rename = "file")]
-    File { file: FileData },
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
-pub struct FileData {
-    pub filename: String,
-    pub file_data: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
-pub struct ImageUrl {
-    pub url: String,
-}
 
 pub struct ChatProcessor {
     ui: UIEvents,
@@ -88,28 +66,20 @@ impl ChatProcessor {
         Ok(self.interactions)
     }
 
-    async fn execute_tool_call(
-        replayer: UIEvents,
-        tool_call: ToolCall,
-    ) -> Result<(String, String)> {
+    async fn execute_tool_call(replayer: UIEvents, tool_call: ToolCall) -> Interaction {
         let _ = replayer.emit_tool_call(
             &tool_call.function.name,
             &tool_call.id,
             &tool_call.function.arguments,
         );
 
-        let json_value =
-            match tools::tool_executor(&tool_call.function.name, &tool_call.function.arguments)
-                .await
-            {
-                Ok(value) => value.response,
-                Err(e) => to_value(e.to_string()).unwrap(),
-            };
+        let tool_payload =
+            tools::tool_executor(&tool_call.function.name, &tool_call.function.arguments).await;
 
-        let result = serde_json::to_string(&json_value).unwrap_or_else(|_| json_value.to_string());
+        let result = to_string(&tool_payload.response).unwrap_or("Json error".to_string());
         let _ = replayer.emit_tool_result(&tool_call.id, &result);
 
-        Ok((tool_call.id, result))
+        tool_payload.finalize(tool_call.id.to_string()).unwrap()
     }
 
     pub async fn handle_tool_calls(&self, tool_calls: Vec<ToolCall>) -> Result<Vec<Interaction>> {
@@ -119,17 +89,10 @@ impl ChatProcessor {
             .into_iter()
             .map(|tool_call| tokio::spawn(Self::execute_tool_call(self.ui.clone(), tool_call)));
 
-        let tool_results = join_all(tool_futs).await;
+        let tool_payloads = join_all(tool_futs).await;
 
-        for tool_result in tool_results {
-            let (id, result_str) = tool_result??;
-
-            new_messages.push(Interaction::ToolResult {
-                tool_call_id: id,
-                response: result_str,
-                for_llm: vec![],
-                for_user: vec![],
-            });
+        for tool_payload in tool_payloads {
+            new_messages.push(tool_payload?);
         }
 
         Ok(new_messages)

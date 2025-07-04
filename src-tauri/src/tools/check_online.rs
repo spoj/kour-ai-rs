@@ -1,6 +1,6 @@
 use crate::Result;
-use crate::chat::Content;
 use crate::error::Error;
+use crate::interaction::Content;
 use crate::openrouter::{IncomingContent, Openrouter};
 use crate::tools::{Function, Tool, ToolPayload};
 use schemars::{JsonSchema, schema_for};

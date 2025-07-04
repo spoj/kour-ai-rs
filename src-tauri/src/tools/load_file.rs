@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::chat::Content;
+use crate::interaction::Content;
 use crate::error::Error;
 use crate::file_handler;
 use crate::tools::{Function, Tool, ToolPayload};

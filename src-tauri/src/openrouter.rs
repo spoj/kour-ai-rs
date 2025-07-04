@@ -4,7 +4,7 @@ use serde_json::Value;
 use serde_json::json;
 use serde_json::to_string_pretty;
 
-use crate::chat::Content;
+use crate::interaction::Content;
 use crate::get_settings_fn;
 use crate::interaction::Interaction;
 use crate::interaction::Source;
@@ -62,42 +62,47 @@ pub struct FunctionCall {
 
 impl<'a> Target<'a> for Openrouter {
     type RenderType = Value;
-    fn render(interactions: &[Interaction]) -> Vec<Value> {
-        interactions
-            .iter()
-            .flat_map(|i| match i {
-                Interaction::LlmResponse {
-                    content,
-                    tool_calls,
-                } => {
-                    if let Some(tool_calls) = tool_calls {
-                        vec![json!({
+    fn convert(interaction: &Interaction) -> Vec<Value> {
+        match interaction {
+            Interaction::LlmResponse {
+                content,
+                tool_calls,
+            } => {
+                if let Some(tool_calls) = tool_calls {
+                    vec![json!({
                     "role": "assistant",
                     "tool_calls": tool_calls})]
-                    } else {
-                        vec![json!({
+                } else {
+                    vec![json!({
                     "role": "assistant",
                     "content": content})]
-                    }
                 }
-                Interaction::ToolResult {
-                    tool_call_id,
-                    response,
-                    #[allow(unused_variables)]
-                    for_llm,
-                    #[allow(unused_variables)]
-                    for_user,
-                } => vec![json!({
+            }
+            Interaction::ToolResult {
+                tool_call_id,
+                response,
+                for_llm,
+                #[allow(unused_variables)]
+                for_user,
+            } => {
+                let mut out = vec![json!({
                 "role": "tool",
                 "content": response,
                 "tool_call_id": tool_call_id,
-                })],
-                Interaction::UserMessage { content } => vec![json!({
-                        "role": "user",
-                        "content": content,
-                })],
-            })
-            .collect()
+                })];
+                if !for_llm.is_empty() {
+                    out.push(json!({
+                    "role": "user",
+                    "content": for_llm,
+                    }));
+                }
+                out
+            }
+            Interaction::UserMessage { content } => vec![json!({
+                    "role": "user",
+                    "content": content,
+            })],
+        }
     }
 }
 impl Source for Openrouter {

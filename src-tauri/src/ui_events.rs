@@ -1,6 +1,8 @@
+use std::{cmp::Ordering, convert};
+
 use crate::{
     Result,
-    chat::Content,
+    interaction::Content,
     interaction::{Interaction, Source, Target},
 };
 use serde::Serialize;
@@ -33,45 +35,42 @@ pub enum EventPayload<'a> {
 
 impl<'a> Target<'a> for UIEvents {
     type RenderType = EventPayload<'a>;
-    fn render(interactions: &'a [Interaction]) -> Vec<EventPayload<'a>> {
-        interactions
-            .iter()
-            .flat_map(|i| match i {
-                Interaction::LlmResponse {
+    fn convert(interaction: &'a Interaction) -> Vec<EventPayload<'a>> {
+        match interaction {
+            Interaction::LlmResponse {
+                content,
+                tool_calls,
+            } => {
+                let mut out = vec![];
+                out.push(EventPayload::Message {
+                    role: "assistant",
                     content,
-                    tool_calls,
-                } => {
-                    let mut out = vec![];
-                    out.push(EventPayload::Message {
-                        role: "assistant",
-                        content,
-                    });
-                    if let Some(tool_calls) = tool_calls {
-                        out.extend(tool_calls.iter().map(|t| EventPayload::ToolCall {
-                            tool_name: &t.function.name,
-                            tool_call_id: &t.id,
-                            tool_args: &t.function.arguments,
-                        }));
-                    }
-                    out
+                });
+                if let Some(tool_calls) = tool_calls {
+                    out.extend(tool_calls.iter().map(|t| EventPayload::ToolCall {
+                        tool_name: &t.function.name,
+                        tool_call_id: &t.id,
+                        tool_args: &t.function.arguments,
+                    }));
                 }
-                Interaction::ToolResult {
-                    tool_call_id,
-                    response,
-                    #[allow(unused_variables)]
-                    for_llm,
-                    #[allow(unused_variables)]
-                    for_user,
-                } => vec![EventPayload::ToolDone {
-                    tool_call_id,
-                    tool_result: response,
-                }],
-                Interaction::UserMessage { content } => vec![EventPayload::Message {
-                    role: "user",
-                    content,
-                }],
-            })
-            .collect()
+                out
+            }
+            Interaction::ToolResult {
+                tool_call_id,
+                response,
+                #[allow(unused_variables)]
+                for_llm,
+                #[allow(unused_variables)]
+                for_user,
+            } => vec![EventPayload::ToolDone {
+                tool_call_id,
+                tool_result: response,
+            }],
+            Interaction::UserMessage { content } => vec![EventPayload::Message {
+                role: "user",
+                content,
+            }],
+        }
     }
 }
 

@@ -9,9 +9,8 @@ mod ui_events;
 mod utils;
 
 use crate::chat::ChatProcessor;
-use crate::chat::Content;
 use crate::error::Error;
-use crate::interaction::{Interaction, Source};
+use crate::interaction::{Content, Interaction, Source};
 use crate::openrouter::ChatOptions;
 use crate::settings::Settings;
 use crate::ui_events::UIEvents;

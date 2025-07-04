@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::chat::{Content, FileData, ImageUrl};
+use crate::interaction::{Content, FileData, ImageUrl};
 use crate::error::Error;
 use base64::{Engine as _, engine::general_purpose};
 use calamine::{Reader, open_workbook_auto_from_rs};
