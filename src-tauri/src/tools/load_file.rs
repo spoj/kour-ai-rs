@@ -1,7 +1,7 @@
 use crate::Result;
-use crate::interaction::Content;
 use crate::error::Error;
 use crate::file_handler;
+use crate::interaction::Content;
 use crate::tools::{Function, Tool, ToolPayload};
 use crate::utils::jailed::Jailed;
 use serde::Deserialize;
@@ -39,7 +39,7 @@ pub async fn load_file(args: LoadFileArgs) -> Result<ToolPayload> {
     };
     file_content.insert(0, instructional_text);
 
-    Ok(ToolPayload::from("file_loaded".to_string()).llm(file_content))
+    Ok(ToolPayload::from(Ok("file_loaded".to_string())).llm(file_content))
 }
 
 pub fn get_tool() -> Tool {

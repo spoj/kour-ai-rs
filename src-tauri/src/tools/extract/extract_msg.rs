@@ -56,7 +56,7 @@ fn process_email(email: &Email, output_dir: &Path) -> Result<Vec<PathBuf>> {
     writeln!(file, "\n---")?;
 
     if let Some(body) = &email.body {
-        let re = Regex::new(r"(?s)<!--.*?-->").unwrap();
+        let re = Regex::new(r"(?s)<!--.*?-->").unwrap(); // unwrap: code supplied regex
         let cleaned_html = re.replace_all(body, "");
         let markdown = html2md::parse_html(&cleaned_html);
         writeln!(file, "{markdown}")?;

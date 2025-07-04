@@ -78,7 +78,7 @@ impl ChatProcessor {
         let result = to_string(&tool_payload.response).unwrap_or("Json error".to_string());
         let _ = replayer.emit_tool_result(&tool_call.id, &result);
 
-        tool_payload.finalize(tool_call.id.to_string()).unwrap()
+        tool_payload.finalize(tool_call.id.to_string())
     }
 
     pub async fn handle_tool_calls(&self, tool_calls: Vec<ToolCall>) -> Result<Vec<Interaction>> {

@@ -11,7 +11,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, from_str, to_string, to_value};
 use std::sync::LazyLock;
 
-use crate::{Result, interaction::Content, interaction::Interaction};
+use crate::{
+    Result,
+    error::Error,
+    interaction::{Content, Interaction},
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Tool {
@@ -28,7 +32,7 @@ pub struct Function {
 
 #[derive(Debug)]
 pub struct ToolPayload {
-    pub response: Value,
+    pub response: Result<Value>,
     pub for_llm: Vec<Content>,
     pub for_user: Vec<Content>,
 }
@@ -42,7 +46,7 @@ where
     T: Serialize,
 {
     fn to_payload(self) -> ToolPayload {
-        ToolPayload::from(self.unwrap())
+        ToolPayload::from(self)
     }
 }
 
@@ -53,7 +57,10 @@ impl ToolPayloadable for ToolPayload {
 }
 impl ToolPayloadable for Result<ToolPayload> {
     fn to_payload(self) -> ToolPayload {
-        self.unwrap()
+        match self {
+            Ok(o) => o,
+            Err(e) => ToolPayload::from::<Error>(Err(e)),
+        }
     }
 }
 
@@ -63,18 +70,22 @@ where
     X: Deserialize<'a>,
     Y: ToolPayloadable,
 {
-    tool_fn(from_str(data).unwrap()).await.to_payload()
+    match from_str(data) {
+        Ok(data) => tool_fn(data).await.to_payload(),
+        Err(e) => ToolPayload::from::<Error>(Err(e.into())),
+    }
 }
 
 impl ToolPayload {
-    fn from<T>(response: T) -> Self
+    fn from<T>(response: Result<T>) -> Self
     where
         T: Serialize,
     {
         Self {
-            response: to_value(response).unwrap_or(Value::String(
-                "Unable to serialize tool response".to_string(),
-            )),
+            response: match response {
+                Ok(r) => to_value(r).map_err(|e| e.into()),
+                Err(e) => Err(e),
+            },
             for_llm: vec![],
             for_user: vec![],
         }
@@ -89,13 +100,14 @@ impl ToolPayload {
         self.for_user = for_user;
         self
     }
-    pub fn finalize(self, tool_call_id: String) -> Result<Interaction> {
-        Ok(Interaction::ToolResult {
+    pub fn finalize(self, tool_call_id: String) -> Interaction {
+        Interaction::ToolResult {
             tool_call_id,
-            response: to_string(&self.response).map_err(crate::error::Error::Json)?,
+            response: to_string(&self.response)
+                .unwrap_or("Error turning tool result to String".to_string()),
             for_llm: self.for_llm,
             for_user: self.for_user,
-        })
+        }
     }
 }
 

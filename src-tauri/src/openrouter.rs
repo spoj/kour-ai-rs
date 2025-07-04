@@ -133,7 +133,7 @@ impl Openrouter {
             "Sending messages to OpenRouter: {}",
             messages
                 .iter()
-                .map(|j| to_string_pretty(j).unwrap())
+                .map(|j| to_string_pretty(j).unwrap_or_default())
                 .collect::<Vec<_>>()
                 .join("\n\n")
         );
