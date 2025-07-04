@@ -1,4 +1,7 @@
-use crate::tools::{Function, Tool, ToolPayload};
+use crate::{
+    Result,
+    tools::{Function, Tool},
+};
 use rand::Rng;
 use serde::Deserialize;
 
@@ -20,7 +23,7 @@ pub fn get_tool() -> Tool {
     }
 }
 
-pub async fn execute(_args: RollDiceArgs) -> ToolPayload {
+pub async fn execute(_args: RollDiceArgs) -> Result<u8> {
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-    ToolPayload::from(rand::rng().random_range(1..=6)).unwrap()
+    Ok(rand::rng().random_range(1..=6))
 }

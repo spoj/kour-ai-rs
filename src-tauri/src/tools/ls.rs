@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::utils::jailed::Jailed;
-use crate::{Result, tools::ToolPayload};
+use crate::{Result};
 use std::path::Path;
 
 use super::{Function, Tool};
@@ -33,7 +33,7 @@ pub struct LsArgs {
     pub relative_path: String,
 }
 
-pub async fn ls(args: LsArgs) -> Result<ToolPayload> {
+pub async fn ls(args: LsArgs) -> Result<Vec<String>> {
     let root_dir = task::spawn_blocking(crate::get_settings_fn)
         .await?
         .map(|s| s.root_dir)?;
@@ -53,7 +53,7 @@ pub async fn ls(args: LsArgs) -> Result<ToolPayload> {
                 .flatten()
                 .map(|entry| entry.file_name().to_string_lossy().to_string())
                 .collect();
-            ToolPayload::from(result)
+            Ok(result)
         }
         Err(e) => Err(Error::Tool(format!("Error: failed to read dir: {e}"))),
     }

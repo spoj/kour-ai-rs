@@ -4,7 +4,7 @@ use tokio::{fs, task};
 
 use crate::Result;
 use crate::error::Error;
-use crate::tools::{Function, Tool, ToolPayload};
+use crate::tools::{Function, Tool};
 
 pub mod extract_eml;
 pub mod extract_msg;
@@ -23,7 +23,7 @@ pub struct ExtractResult {
     pub total_files: usize,
 }
 
-pub async fn extract(args: ExtractArgs) -> Result<ToolPayload> {
+pub async fn extract(args: ExtractArgs) -> Result<ExtractResult> {
     let root_dir = task::spawn_blocking(crate::get_settings_fn)
         .await?
         .map(|s| s.root_dir)?;
@@ -102,7 +102,7 @@ pub async fn extract(args: ExtractArgs) -> Result<ToolPayload> {
         extracted_files,
     };
 
-    ToolPayload::from(result)
+    Ok(result)
 }
 
 pub fn get_tool() -> Tool {

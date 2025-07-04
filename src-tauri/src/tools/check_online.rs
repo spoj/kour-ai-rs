@@ -2,7 +2,7 @@ use crate::Result;
 use crate::error::Error;
 use crate::interaction::Content;
 use crate::openrouter::{IncomingContent, Openrouter};
-use crate::tools::{Function, Tool, ToolPayload};
+use crate::tools::{Function, Tool};
 use schemars::{JsonSchema, schema_for};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, json, to_value};
@@ -23,7 +23,7 @@ pub struct CheckOnlineResult {
     citations: Vec<String>,
 }
 
-pub async fn check_online(args: CheckOnlineArgs) -> Result<ToolPayload> {
+pub async fn check_online(args: CheckOnlineArgs) -> Result<CheckOnlineResult> {
     let settings = task::spawn_blocking(crate::get_settings_fn).await??;
 
     if settings.api_key.is_empty() {
@@ -50,7 +50,7 @@ pub async fn check_online(args: CheckOnlineArgs) -> Result<ToolPayload> {
     let response = Openrouter::call(&[message], SEARCH_MODEL, "", &vec![], Some(schema)).await?;
     if let IncomingContent::Text(text) = &response.choices[0].message.content {
         let result: CheckOnlineResult = from_str(text)?;
-        return ToolPayload::from(result);
+        return Ok(result);
     }
     Err(Error::Tool(
         "Failed to get a valid response from the online search tool.".to_string(),

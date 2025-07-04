@@ -1,3 +1,5 @@
+use std::arch::x86_64::_popcnt64;
+
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;

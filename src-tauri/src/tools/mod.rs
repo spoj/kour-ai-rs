@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, from_str, to_string, to_value};
 use std::sync::LazyLock;
 
-use crate::{Result, error::Error, interaction::Content, interaction::Interaction};
+use crate::{Result, interaction::Content, interaction::Interaction};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Tool {
@@ -33,16 +33,51 @@ pub struct ToolPayload {
     pub for_user: Vec<Content>,
 }
 
+trait ToolPayloadable {
+    fn to_payload(self) -> ToolPayload;
+}
+
+impl<T> ToolPayloadable for Result<T>
+where
+    T: Serialize,
+{
+    fn to_payload(self) -> ToolPayload {
+        ToolPayload::from(self.unwrap())
+    }
+}
+
+impl ToolPayloadable for ToolPayload {
+    fn to_payload(self) -> ToolPayload {
+        self
+    }
+}
+impl ToolPayloadable for Result<ToolPayload> {
+    fn to_payload(self) -> ToolPayload {
+        self.unwrap()
+    }
+}
+
+async fn tool_execute<'a, F, X, Y>(tool_fn: F, data: &'a str) -> ToolPayload
+where
+    F: AsyncFn(X) -> Y,
+    X: Deserialize<'a>,
+    Y: ToolPayloadable,
+{
+    tool_fn(from_str(data).unwrap()).await.to_payload()
+}
+
 impl ToolPayload {
-    fn from<T>(response: T) -> Result<Self>
+    fn from<T>(response: T) -> Self
     where
         T: Serialize,
     {
-        Ok(Self {
-            response: to_value(response)?,
+        Self {
+            response: to_value(response).unwrap_or(Value::String(
+                "Unable to serialize tool response".to_string(),
+            )),
             for_llm: vec![],
             for_user: vec![],
-        })
+        }
     }
     fn llm(mut self, for_llm: Vec<Content>) -> Self {
         self.for_llm = for_llm;
@@ -78,27 +113,17 @@ pub static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
     ]
 });
 
-pub async fn tool_executor(name: &str, arguments: &str) -> ToolPayload {
-    async fn tool_executor_inner(name: &str, arguments: &str) -> crate::Result<ToolPayload> {
-        match name {
-            "ls" => Ok(ls::ls(from_str(arguments)?).await?),
-            "roll_dice" => Ok(roll_dice::execute(from_str(arguments)?).await),
-            "find" => Ok(find::find(from_str(arguments)?).await?),
-            "read_notes" => Ok(notes::read_notes().await?),
-            "append_notes" => Ok(notes::append_notes(from_str(arguments)?).await?),
-            "ask_files" => Ok(ask_files::ask_files(from_str(arguments)?).await?),
-            "extract" => Ok(extract::extract(from_str(arguments)?).await?),
-            "load_file" => Ok(load_file::load_file(from_str(arguments)?).await?),
-            "check_online" => Ok(check_online::check_online(from_str(arguments)?).await?),
-            _ => Err(Error::Tool("Tool Not Found".to_string())),
-        }
+pub async fn tool_dispatcher(name: &str, arguments: &str) -> ToolPayload {
+    match name {
+        "ls" => tool_execute(ls::ls, arguments).await,
+        "roll_dice" => tool_execute(roll_dice::execute, arguments).await,
+        "find" => tool_execute(find::find, arguments).await,
+        "read_notes" => tool_execute(notes::read_notes, arguments).await,
+        "append_notes" => tool_execute(notes::append_notes, arguments).await,
+        "ask_files" => tool_execute(ask_files::ask_files, arguments).await,
+        "extract" => tool_execute(extract::extract, arguments).await,
+        "load_file" => tool_execute(load_file::load_file, arguments).await,
+        "check_online" => tool_execute(check_online::check_online, arguments).await,
+        _ => todo!(),
     }
-
-    tool_executor_inner(name, arguments)
-        .await
-        .unwrap_or(ToolPayload {
-            response: Value::String("Error".to_string()),
-            for_llm: vec![],
-            for_user: vec![],
-        })
 }

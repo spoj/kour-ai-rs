@@ -6,8 +6,8 @@ use crate::openrouter::{IncomingContent, Openrouter};
 use crate::utils::jailed::Jailed;
 use futures::stream::{self, StreamExt};
 use std::path::Path;
-use serde_json::{from_str, json, to_value};
-use crate::tools::{Function, Tool, ToolPayload};
+use serde_json::{from_str, json, to_value, Value};
+use crate::tools::{Function, Tool};
 
 use crate::Result;
 
@@ -52,7 +52,7 @@ pub fn get_tool() -> Tool {
     }
 }
 
-pub async fn ask_files(args: AskFilesArgs) -> Result<ToolPayload> {
+pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
     let AskFilesArgs { query, filenames } = args;
     let settings = task::spawn_blocking(crate::get_settings_fn)
         .await??;
@@ -92,5 +92,5 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<ToolPayload> {
         .collect()
         .await;
     
-    ToolPayload::from(responses)
+    Ok(responses)
 }

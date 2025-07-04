@@ -1,21 +1,22 @@
 use crate::error::Error;
 use chrono::Local;
 use serde::Deserialize;
+use serde_json::Value;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use tokio::task;
 
 use crate::tools::Tool;
-use crate::tools::{Function, ToolPayload};
+use crate::tools::{Function};
 
-pub async fn read_notes() -> crate::Result<ToolPayload> {
+pub async fn read_notes(_args: Value) -> crate::Result<String> {
     let notes_path = get_notes_path().await?;
     if !notes_path.exists() {
-        return ToolPayload::from("No notes found.".to_string());
+        return Err(Error::Tool("file not found".to_string()));
     }
     let result = fs::read_to_string(notes_path).map_err(|e| Error::Tool(e.to_string()))?;
-    ToolPayload::from(result)
+    Ok(result)
 }
 
 #[derive(Deserialize)]
@@ -23,7 +24,7 @@ pub struct AppendNotesArgs {
     pub markdown_content: String,
 }
 
-pub async fn append_notes(args: AppendNotesArgs) -> crate::Result<ToolPayload> {
+pub async fn append_notes(args: AppendNotesArgs) -> crate::Result<String> {
     let notes_path = get_notes_path().await?;
     let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
     let note_entry = format!(
@@ -40,7 +41,7 @@ pub async fn append_notes(args: AppendNotesArgs) -> crate::Result<ToolPayload> {
     file.write_all(note_entry.as_bytes())
         .map_err(|e| Error::Tool(e.to_string()))?;
 
-    ToolPayload::from("Note appended successfully.".to_string())
+    Ok("Note appended successfully.".to_string())
 }
 
 async fn get_notes_path() -> crate::Result<PathBuf> {

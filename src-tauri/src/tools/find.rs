@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::utils::jailed::Jailed;
-use crate::{Result, tools::ToolPayload};
+use crate::{Result};
 
 use super::{Function, Tool};
 use glob::MatchOptions;
@@ -85,10 +85,10 @@ fn find_internal(root_dir: &str, glob_pattern: &str) -> Result<Vec<String>> {
     Ok(result)
 }
 
-pub async fn find(args: FindArgs) -> Result<ToolPayload> {
+pub async fn find(args: FindArgs) -> Result<Vec<String>> {
     let root_dir = task::spawn_blocking(crate::get_settings_fn)
         .await?
         .map(|s| s.root_dir)?;
     let result = find_internal(&root_dir, &args.glob)?;
-    ToolPayload::from(result)
+    Ok(result)
 }
