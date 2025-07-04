@@ -39,16 +39,17 @@ impl<'a> Target<'a> for UIEvents {
                 tool_calls,
             } => {
                 let mut out = vec![];
-                out.push(EventPayload::Message {
-                    role: "assistant",
-                    content,
-                });
                 if let Some(tool_calls) = tool_calls {
                     out.extend(tool_calls.iter().map(|t| EventPayload::ToolCall {
                         tool_name: &t.function.name,
                         tool_call_id: &t.id,
                         tool_args: &t.function.arguments,
                     }));
+                } else {
+                    out.push(EventPayload::Message {
+                        role: "assistant",
+                        content,
+                    });
                 }
                 out
             }
@@ -91,28 +92,6 @@ impl UIEvents {
         Self { window }
     }
 
-    pub fn emit_tool_call(&self, name: &str, id: &str, arguments: &str) -> Result<()> {
-        self.window.emit(
-            "chat_completion_update",
-            EventPayload::ToolCall {
-                tool_name: name,
-                tool_call_id: id,
-                tool_args: arguments,
-            },
-        )?;
-        Ok(())
-    }
-
-    pub fn emit_tool_result(&self, id: &str, result: &str) -> Result<()> {
-        self.window.emit(
-            "chat_completion_update",
-            EventPayload::ToolDone {
-                tool_call_id: id,
-                tool_result: result,
-            },
-        )?;
-        Ok(())
-    }
     pub fn emit_done(&self) -> Result<()> {
         self.window
             .emit("chat_completion_update", EventPayload::End)?;
@@ -133,8 +112,8 @@ impl UIEvents {
     }
 
     pub fn replay_history(&self, history: &History) -> Result<()> {
-        for i in &history.inner {
-            let _ = self.emit_interaction(i);
+        for payload in Self::render(history) {
+            let _ = self.window.emit("chat_completion_update", payload);
         }
         Ok(())
     }

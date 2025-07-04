@@ -74,7 +74,7 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
                     json!({"role":"user","content":format!("File: {filename}\n\nQuery: {query}")})
                 ];
 
-                messages.push(json!({"role":"user","content":vec![file_content]}));
+                messages.push(json!({"role":"user","content":file_content}));
                 let schema = to_value(schema_for!(AskFileResults)).unwrap(); // unwrap: all input controlled by code
 
                 let response =

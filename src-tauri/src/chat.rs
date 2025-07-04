@@ -6,7 +6,6 @@ use crate::{
     ui_events::UIEvents,
 };
 use futures::future::join_all;
-use serde_json::to_string;
 
 pub static SYSTEM_PROMPT: &str = include_str!("DEFAULT_PROMPT.md");
 
@@ -42,6 +41,7 @@ impl ChatProcessor {
             let choice = &res.choices[0];
             let incoming_message = choice.message.clone();
             let interaction = Openrouter::sends(incoming_message.clone());
+            self.ui.emit_interaction(&interaction)?;
 
             if let Some(tool_calls) = incoming_message.tool_calls.clone() {
                 self.history.push(interaction);
@@ -51,11 +51,8 @@ impl ChatProcessor {
                     let tool_message = msg;
                     self.history.push(tool_message);
                 }
-                // After handling tools, continue the loop to let the assistant respond.
             } else {
-                // It's a final text response. Add it to history, emit, and break the loop.
                 self.history.push(interaction.clone());
-                self.ui.emit_interaction(&interaction)?;
                 break;
             }
         }
@@ -66,12 +63,6 @@ impl ChatProcessor {
     }
 
     async fn execute_tool_call(replayer: UIEvents, tool_call: ToolCall) -> Interaction {
-        let _ = replayer.emit_tool_call(
-            &tool_call.function.name,
-            &tool_call.id,
-            &tool_call.function.arguments,
-        );
-
         let tool_payload =
             tools::tool_dispatcher(&tool_call.function.name, &tool_call.function.arguments).await;
 
