@@ -55,11 +55,21 @@ impl<'a> Target<'a> for UIEvents {
             Interaction::ToolResult {
                 tool_call_id,
                 response,
+                for_user,
                 ..
-            } => vec![EventPayload::ToolDone {
-                tool_call_id,
-                tool_result: response,
-            }],
+            } => {
+                let mut out = vec![EventPayload::ToolDone {
+                    tool_call_id,
+                    tool_result: response,
+                }];
+                if !for_user.is_empty() {
+                    out.push(EventPayload::Message {
+                        role: "assistant",
+                        content: for_user,
+                    });
+                }
+                out
+            }
             Interaction::UserMessage { content } => vec![EventPayload::Message {
                 role: "user",
                 content,

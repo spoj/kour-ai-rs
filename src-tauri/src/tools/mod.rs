@@ -4,6 +4,7 @@ mod extract;
 mod find;
 mod load_file;
 mod ls;
+mod make_file;
 mod notes;
 mod roll_dice;
 
@@ -121,6 +122,7 @@ pub static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
         ask_files::get_tool(),
         extract::get_tool(),
         load_file::get_tool(),
+        make_file::get_tool(),
         check_online::get_tool(),
     ]
 });
@@ -135,7 +137,8 @@ pub async fn tool_dispatcher(name: &str, arguments: &str) -> ToolPayload {
         "ask_files" => tool_execute(ask_files::ask_files, arguments).await,
         "extract" => tool_execute(extract::extract, arguments).await,
         "load_file" => tool_execute(load_file::load_file, arguments).await,
+        "make_file" => tool_execute(make_file::make_file, arguments).await,
         "check_online" => tool_execute(check_online::check_online, arguments).await,
-        _ => todo!(),
+        _ => ToolPayload::from::<Error>(Err(Error::Tool("no such tool".to_string()))),
     }
 }

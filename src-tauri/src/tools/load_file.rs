@@ -39,7 +39,9 @@ pub async fn load_file(args: LoadFileArgs) -> Result<ToolPayload> {
     };
     file_content.insert(0, instructional_text);
 
-    Ok(ToolPayload::from(Ok("file_loaded".to_string())).llm(file_content))
+    Ok(ToolPayload::from(Ok("file_loaded".to_string()))
+        .llm(file_content.clone())
+        .user(file_content))
 }
 
 pub fn get_tool() -> Tool {

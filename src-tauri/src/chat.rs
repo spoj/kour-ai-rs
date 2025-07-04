@@ -75,10 +75,9 @@ impl ChatProcessor {
         let tool_payload =
             tools::tool_dispatcher(&tool_call.function.name, &tool_call.function.arguments).await;
 
-        let result = to_string(&tool_payload.response).unwrap_or("Json error".to_string());
-        let _ = replayer.emit_tool_result(&tool_call.id, &result);
-
-        tool_payload.finalize(tool_call.id.to_string())
+        let interaction = tool_payload.finalize(tool_call.id.to_string());
+        let _ = replayer.emit_interaction(&interaction);
+        interaction
     }
 
     pub async fn handle_tool_calls(&self, tool_calls: Vec<ToolCall>) -> Result<Vec<Interaction>> {
