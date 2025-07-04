@@ -1,4 +1,7 @@
 use serde::{Deserialize, Serialize};
+use serde_json::from_value;
+
+use crate::{Result, STORE, error::Error};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Settings {
@@ -13,7 +16,16 @@ pub struct Settings {
     #[serde(rename = "providerOrder")]
     pub provider_order: String,
 }
-
+pub fn get_settings_fn() -> Result<Settings> {
+    let store = STORE
+        .get()
+        .ok_or(Error::Io(std::io::ErrorKind::NotFound.into()))?;
+    let settings = store
+        .get("settings")
+        .and_then(|v| from_value(v).ok())
+        .unwrap_or_default();
+    Ok(settings)
+}
 impl Default for Settings {
     fn default() -> Self {
         Self {

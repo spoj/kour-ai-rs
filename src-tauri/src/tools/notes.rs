@@ -1,20 +1,22 @@
 use crate::error::Error;
 use chrono::Local;
 use serde::Deserialize;
+use serde_json::Value;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use tokio::task;
 
-use crate::tools::Function;
 use crate::tools::Tool;
+use crate::tools::{Function};
 
-pub async fn read_notes() -> crate::Result<String> {
+pub async fn read_notes(_args: Value) -> crate::Result<String> {
     let notes_path = get_notes_path().await?;
     if !notes_path.exists() {
-        return Ok("No notes found.".to_string());
+        return Err(Error::Tool("file not found".to_string()));
     }
-    fs::read_to_string(notes_path).map_err(|e| Error::Tool(e.to_string()))
+    let result = fs::read_to_string(notes_path).map_err(|e| Error::Tool(e.to_string()))?;
+    Ok(result)
 }
 
 #[derive(Deserialize)]

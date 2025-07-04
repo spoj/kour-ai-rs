@@ -57,8 +57,7 @@ export interface IChatCompletionOptions {
 export type IChatCompletionUpdate =
   | { type: "Start" }
   | { type: "End" }
-  | { type: "Delta"; delta: string; is_notification: boolean }
-  | { type: "Message"; message: IChatCompletionMessage }
+  | { type: "Message"; role: string; content: MessageContent }
   | {
       type: "ToolCall";
       tool_name: string;

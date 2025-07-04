@@ -2,12 +2,12 @@ use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use tokio::task;
 use crate::error::Error;
+use crate::openrouter::{IncomingContent, Openrouter};
 use crate::utils::jailed::Jailed;
 use futures::stream::{self, StreamExt};
 use std::path::Path;
 use serde_json::{from_str, json, to_value, Value};
 use crate::tools::{Function, Tool};
-use crate::chat::{call_openrouter, ChatMessage, Content, IncomingContent};
 
 use crate::Result;
 
@@ -71,14 +71,14 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
                         .await??;
                 
                 let mut messages = vec![
-                    ChatMessage::new("user", vec![Content::Text { text: format!("File: {filename}\n\nQuery: {query}") }])
+                    json!({"role":"user","content":format!("File: {filename}\n\nQuery: {query}")})
                 ];
 
-                messages[0].content.extend(file_content);
+                messages.push(json!({"role":"user","content":file_content}));
                 let schema = to_value(schema_for!(AskFileResults)).unwrap(); // unwrap: all input controlled by code
 
                 let response =
-                    call_openrouter(&messages, model_name, "You are a helpful assistant that answers questions about files. Your answer must be grounded.", &vec![], Some(schema)).await?;
+                    Openrouter::call(&messages, model_name, "You are a helpful assistant that answers questions about files. Your answer must be grounded.", &vec![], Some(schema)).await?;
                 if let IncomingContent::Text(text) =  &response.choices[0].message.content 
                 && let Ok(output) = from_str::<AskFileResults>(text)
                 {

@@ -1,6 +1,6 @@
-use crate::Result;
 use crate::error::Error;
 use crate::utils::jailed::Jailed;
+use crate::{Result};
 
 use super::{Function, Tool};
 use glob::MatchOptions;
@@ -89,5 +89,6 @@ pub async fn find(args: FindArgs) -> Result<Vec<String>> {
     let root_dir = task::spawn_blocking(crate::get_settings_fn)
         .await?
         .map(|s| s.root_dir)?;
-    find_internal(&root_dir, &args.glob)
+    let result = find_internal(&root_dir, &args.glob)?;
+    Ok(result)
 }

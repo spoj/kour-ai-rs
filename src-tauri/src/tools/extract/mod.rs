@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tokio::{fs, task};
 
+use crate::Result;
 use crate::error::Error;
 use crate::tools::{Function, Tool};
-use crate::Result;
 
 pub mod extract_eml;
 pub mod extract_msg;

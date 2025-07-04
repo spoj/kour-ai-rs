@@ -1,10 +1,11 @@
 use crate::Result;
-use crate::chat::{ChatMessage, Content, call_openrouter};
 use crate::error::Error;
+use crate::interaction::Content;
+use crate::openrouter::{IncomingContent, Openrouter};
 use crate::tools::{Function, Tool};
 use schemars::{JsonSchema, schema_for};
 use serde::{Deserialize, Serialize};
-use serde_json::{from_str, to_value};
+use serde_json::{from_str, json, to_value};
 use tokio::task;
 
 const SEARCH_MODEL: &str = "perplexity/sonar";
@@ -31,27 +32,25 @@ pub async fn check_online(args: CheckOnlineArgs) -> Result<CheckOnlineResult> {
         ));
     }
 
-    let messages = vec![ChatMessage::new(
-        "user",
-        vec![
-            Content::Text {
-                text: "Research user query on the internet. take the broader context in consideration. Give both answer and citations.".to_string(),
-            },
-            Content::Text {
-                text: format!("Broader context:\n{}", args.broader_context),
-            },
-            Content::Text {
-                text: format!("Query:\n{}", args.query),
-            },
-        ],
-    )];
+    let message = json!({
+    "role":"user",
+    "content":vec![
+        Content::Text {
+            text: "Research user query on the internet. take the broader context in consideration. Give both answer and citations.".to_string(),
+        },
+        Content::Text {
+            text: format!("Broader context:\n{}", args.broader_context),
+        },
+        Content::Text {
+            text: format!("Query:\n{}", args.query),
+        },
+    ]
+    });
     let schema = to_value(schema_for!(CheckOnlineResult)).unwrap(); // unwrap: all input controlled by code
-    let response = call_openrouter(&messages, SEARCH_MODEL, "", &vec![], Some(schema)).await?;
-
-    let choice = &response.choices[0];
-    let message: ChatMessage = choice.message.clone().into();
-    if let Some(Content::Text { text }) = message.content.first() {
-        return Ok(from_str(text)?);
+    let response = Openrouter::call(&[message], SEARCH_MODEL, "", &vec![], Some(schema)).await?;
+    if let IncomingContent::Text(text) = &response.choices[0].message.content {
+        let result: CheckOnlineResult = from_str(text)?;
+        return Ok(result);
     }
     Err(Error::Tool(
         "Failed to get a valid response from the online search tool.".to_string(),

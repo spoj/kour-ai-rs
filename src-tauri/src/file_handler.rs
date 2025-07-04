@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::chat::{Content, FileData, ImageUrl};
+use crate::interaction::{Content, FileData, ImageUrl};
 use crate::error::Error;
 use base64::{Engine as _, engine::general_purpose};
 use calamine::{Reader, open_workbook_auto_from_rs};
@@ -76,7 +76,7 @@ pub fn convert_to_pdf(path: &Path) -> Result<Vec<u8>> {
         return Ok(cached_pdf);
     }
 
-    let soffice = crate::get_settings_fn()?.soffice_path;
+    let soffice = crate::settings::get_settings_fn()?.soffice_path;
     let temp_dir = Builder::new()
         .prefix("file_conversion")
         .tempdir()
