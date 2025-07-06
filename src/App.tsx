@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { FaCog, FaPaperPlane, FaTrash, FaSquare, FaFile } from "react-icons/fa";
+import { Bounce, ToastContainer } from "react-toastify";
 import "./App.css";
 import {
   chat,
@@ -236,7 +237,6 @@ function App() {
     });
   };
 
-
   return (
     <div className="container">
       <header>
@@ -357,6 +357,19 @@ function App() {
           onSave={handleSettingsChange}
         />
       )}
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss={false}
+        draggable
+        pauseOnHover={false}
+        theme="light"
+        transition={Bounce}
+      />
     </div>
   );
 }

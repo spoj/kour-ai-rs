@@ -2,6 +2,7 @@ import { useState } from "react";
 import { IChatCompletionMessage, MessageContent } from "../types";
 import ReactMarkdown from "react-markdown";
 import { FaCopy, FaAngleDown, FaAngleUp, FaDownload } from "react-icons/fa";
+import { Bounce, toast } from "react-toastify";
 import "./components.css";
 import { base64toBlob } from "../helpers";
 
@@ -47,6 +48,19 @@ const renderContent = (content: MessageContent) => {
             target="_blank"
             rel="noopener noreferrer"
             className="file-attachment-link"
+            onClick={() =>
+              toast.success(`${item.file.filename} downloaded successfully!`, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: false,
+                draggable: true,
+                progress: undefined,
+                theme: "light",
+                transition: Bounce,
+              })
+            }
           >
             <button>
               <FaDownload style={{ marginRight: "5px" }} />
