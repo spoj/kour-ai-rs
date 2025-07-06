@@ -201,3 +201,21 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+.file-attachment-link {
+  text-decoration: none;
+}
+
+.file-attachment-link button {
+  background-color: #1c65e9;
+  color: white;
+  padding: 10px 15px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.file-attachment-link button:hover {
+  background-color: #10419c;
+}

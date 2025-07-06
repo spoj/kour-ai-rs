@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { IChatCompletionMessage, MessageContent } from "../types";
 import ReactMarkdown from "react-markdown";
-import { FaCopy, FaAngleDown, FaAngleUp } from "react-icons/fa";
+import { FaCopy, FaAngleDown, FaAngleUp, FaDownload } from "react-icons/fa";
 import "./components.css";
 import { base64toBlob } from "../helpers";
 
@@ -41,12 +41,17 @@ const renderContent = (content: MessageContent) => {
         );
         return (
           <a
+            key={index}
             download={item.file.filename}
             href={URL.createObjectURL(blobVal)}
             target="_blank"
             rel="noopener noreferrer"
+            className="file-attachment-link"
           >
-            {item.file.filename}
+            <button>
+              <FaDownload style={{ marginRight: "5px" }} />
+              {item.file.filename}
+            </button>
           </a>
         );
       }
