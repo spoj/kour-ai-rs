@@ -3,11 +3,13 @@ import { IChatCompletionMessage, MessageContent } from "../types";
 import ReactMarkdown from "react-markdown";
 import { FaCopy, FaAngleDown, FaAngleUp } from "react-icons/fa";
 import "./components.css";
+import { base64toBlob } from "../helpers";
 
 const renderContent = (content: MessageContent) => {
   if (!content || !content.length) {
     return null;
   }
+
   return content.map((item, index) => {
     if (item.type === "text") {
       return (
@@ -31,6 +33,23 @@ const renderContent = (content: MessageContent) => {
           className="chat-image"
         />
       );
+    } else if (item.type === "file") {
+      if (item.file.file_data.split(";base64,")[1]) {
+        const blobVal = base64toBlob(
+          item.file.file_data.split(";base64,")[1],
+          item.file.file_data.split(";base54,")[0].split(":")[1]
+        );
+        return (
+          <a
+            download={item.file.filename}
+            href={URL.createObjectURL(blobVal)}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {item.file.filename}
+          </a>
+        );
+      }
     }
     return null;
   });
@@ -52,7 +71,9 @@ export const ChatBubble = ({
   // A bubble is a tool bubble if it has a tool name, or if it already has args/results from history
   const isTool = !!(toolName || toolArgs || toolResult);
 
-  const mainContent = toolName ? `Calling ${toolName}${toolResult ? " done." : ""}` : renderContent(content);
+  const mainContent = toolName
+    ? `Calling ${toolName}${toolResult ? " done." : ""}`
+    : renderContent(content);
 
   return (
     <div className={`chat-bubble-container ${role}`}>
