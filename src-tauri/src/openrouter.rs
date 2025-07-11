@@ -103,6 +103,32 @@ impl<'a> Target<'a> for Openrouter {
             })],
         }
     }
+
+    fn render(history: &'a crate::interaction::History) -> Vec<Self::RenderType> {
+        let mut output = vec![];
+        let mut deferred = vec![];
+        for inter in &history.inner {
+            let proposed = Self::convert(inter);
+            if let Interaction::ToolResult { .. } = inter {
+                for p in proposed {
+                    let role = p
+                        .as_object()
+                        .and_then(|o| o.get("role"))
+                        .and_then(|r| r.as_str());
+                    if role == Some("user") {
+                        deferred.push(p);
+                    } else {
+                        output.push(p);
+                    }
+                }
+            } else {
+                output.append(&mut deferred);
+                output.extend(proposed);
+            }
+        }
+        output.extend(deferred);
+        output
+    }
 }
 impl Source for Openrouter {
     type SendType = IncomingMessage;
