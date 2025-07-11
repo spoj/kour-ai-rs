@@ -7,8 +7,8 @@ use std::io::Write;
 use std::path::PathBuf;
 use tokio::task;
 
+use crate::tools::Function;
 use crate::tools::Tool;
-use crate::tools::{Function};
 
 pub async fn read_notes(_args: Value) -> crate::Result<String> {
     let notes_path = get_notes_path().await?;
@@ -63,8 +63,12 @@ pub fn read_notes_tool() -> Tool {
         r#type: "function".to_string(),
         function: Function {
             name: "read_notes".to_string(),
-            description: "Reads all notes from the _NOTES.txt file.".to_string(),
-            parameters: serde_json::Value::Object(serde_json::Map::new()),
+            description: "Reads all notes from the _NOTES.txt file".to_string(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {},
+                "required": []
+            }),
         },
     }
 }
@@ -75,19 +79,16 @@ pub fn append_notes_tool() -> Tool {
         function: Function {
             name: "append_notes".to_string(),
             description: "Appends a markdown string to the _NOTES.txt file.".to_string(),
-            parameters: serde_json::from_str(
-                r#"{
-                    "type": "object",
-                    "properties": {
-                        "markdown_content": {
-                            "type": "string",
-                            "description": "The markdown content to append to the notes."
-                        }
-                    },
-                    "required": ["markdown_content"]
-                }"#,
-            )
-            .unwrap_or_default(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "markdown_content": {
+                        "type": "string",
+                        "description": "The markdown content to append to the notes."
+                    }
+                },
+                "required": ["markdown_content"]
+            }),
         },
     }
 }

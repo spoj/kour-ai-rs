@@ -71,6 +71,10 @@ where
     X: Deserialize<'a>,
     Y: ToolPayloadable,
 {
+    let data = match data {
+        "" => "{}",
+        _ => data,
+    };
     match from_str(data) {
         Ok(data) => tool_fn(data).await.to_payload(),
         Err(e) => ToolPayload::from::<Error>(Err(e.into())),
