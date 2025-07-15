@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { ensureLibreoffice } from "../commands";
+import { useEffect, useState } from "react";
+import { platform } from "@tauri-apps/plugin-os";
+import { ensureLibreoffice, onLibreofficeUpdate } from "../commands";
 import "./components.css";
 import { ISettings } from "../types";
 
@@ -13,6 +14,34 @@ export const SettingsModal = ({
   onSave: (settings: Partial<ISettings>) => void;
 }) => {
   const [isDownloading, setIsDownloading] = useState(false);
+  const [status, setStatus] = useState<string>("");
+  const [os, setOs] = useState("");
+
+  useEffect(() => {
+    const getPlatform = async () => {
+      setOs(platform());
+    };
+    getPlatform();
+    const unlisten = onLibreofficeUpdate((update) => {
+      if (update.type === "Downloading") {
+        setStatus("Downloading...");
+      } else if (update.type === "Installing") {
+        setStatus("Installing...");
+      } else if (update.type === "Success") {
+        onSave({ sofficePath: update.payload });
+        setStatus("Installation successful!");
+        setIsDownloading(false);
+      } else if (update.type === "Error") {
+        setStatus(`Error: ${update.payload}`);
+        setIsDownloading(false);
+      }
+    });
+
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, []);
+
   const handleModalClick = (e: React.MouseEvent) => {
     e.stopPropagation();
   };
@@ -23,8 +52,8 @@ export const SettingsModal = ({
 
   const handleEnsureLibreoffice = async () => {
     setIsDownloading(true);
+    setStatus("");
     await ensureLibreoffice();
-    setIsDownloading(false);
   };
 
   return (
@@ -65,15 +94,29 @@ export const SettingsModal = ({
           >
             Optional: Set this to enable DOCX/PPTX support. Leave empty if
             LibreOffice is not installed.
-            <button
-              onClick={handleEnsureLibreoffice}
-              disabled={isDownloading}
-              style={{ marginLeft: "10px" }}
-            >
-              {isDownloading
-                ? "Downloading/Installing..."
-                : "Install LibreOffice automatically"}
-            </button>
+            {os === "windows" && (
+              <>
+                <button
+                  onClick={handleEnsureLibreoffice}
+                  disabled={isDownloading}
+                  style={{ marginLeft: "10px" }}
+                >
+                  {isDownloading
+                    ? status || "Starting..."
+                    : "Install LibreOffice automatically"}
+                </button>
+                {status && (
+                  <small
+                    style={{
+                      marginLeft: "10px",
+                      color: status.startsWith("Error") ? "red" : "green",
+                    }}
+                  >
+                    {status}
+                  </small>
+                )}
+              </>
+            )}
           </small>
           <label htmlFor="providerOrder">Provider Order:</label>
           <input

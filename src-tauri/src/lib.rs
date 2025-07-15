@@ -120,21 +120,18 @@ fn cancel_outstanding_request(state: AppState<'_>) -> Result<()> {
     Ok(())
 }
 #[tauri::command]
-async fn ensure_libreoffice() -> Result<()> {
-    let libreoffice = Libreoffice { 
-        local_dir: CACHE_DIR.get().unwrap().join("libreoffice"), 
-        url: "https://mirror-hk.koddos.net/tdf/libreoffice/stable/25.2.4/win/x86_64/LibreOffice_25.2.4_Win_x86-64.msi".to_string() 
+async fn ensure_libreoffice(window: tauri::Window) -> Result<()> {
+    let libreoffice = Libreoffice {
+        local_dir: CACHE_DIR.get().unwrap().join("libreoffice"),
     };
-    let path = libreoffice.ensure().await?;
-    let mut settings = get_settings_fn()?;
-    settings.soffice_path = path.to_string_lossy().into_owned();
-    set_settings(settings)?;
+    libreoffice.ensure(&window).await?;
     Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
