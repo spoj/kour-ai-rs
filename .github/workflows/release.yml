@@ -46,6 +46,10 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+
       - name: Build and upload artifacts
         uses: tauri-apps/tauri-action@v0
         env:
