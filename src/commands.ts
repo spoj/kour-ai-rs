@@ -21,6 +21,17 @@ export const cancelOutstandingRequest = async (): Promise<void> => {
 	await invoke("cancel_outstanding_request");
 }
 
+export const ensureLibreoffice = async (): Promise<void> => {
+	await invoke("ensure_libreoffice");
+}
+
+export const onLibreofficeUpdate = async (
+	callback: (update: any) => void
+) => {
+	return await listen("libreoffice_update", (event) => {
+		callback(event.payload);
+	});
+}
 
 export const chat = async (
 	content: MessageContent,
