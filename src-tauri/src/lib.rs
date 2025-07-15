@@ -2,6 +2,7 @@ mod chat;
 mod error;
 mod file_handler;
 mod interaction;
+mod libreoffice;
 mod openrouter;
 mod settings;
 mod tools;
@@ -11,6 +12,7 @@ mod utils;
 use crate::chat::ChatProcessor;
 use crate::error::Error;
 use crate::interaction::{Content, History, Source};
+use crate::libreoffice::Libreoffice;
 use crate::openrouter::ChatOptions;
 use crate::settings::{Settings, get_settings_fn};
 use crate::ui_events::UIEvents;
@@ -117,6 +119,18 @@ fn cancel_outstanding_request(state: AppState<'_>) -> Result<()> {
     }
     Ok(())
 }
+#[tauri::command]
+async fn ensure_libreoffice() -> Result<()> {
+    let libreoffice = Libreoffice { 
+        local_dir: CACHE_DIR.get().unwrap().join("libreoffice"), 
+        url: "https://mirror-hk.koddos.net/tdf/libreoffice/stable/25.2.4/win/x86_64/LibreOffice_25.2.4_Win_x86-64.msi".to_string() 
+    };
+    let path = libreoffice.ensure().await?;
+    let mut settings = get_settings_fn()?;
+    settings.soffice_path = path.to_string_lossy().into_owned();
+    set_settings(settings)?;
+    Ok(())
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -129,7 +143,8 @@ pub fn run() {
             chat,
             replay_history,
             clear_history,
-            cancel_outstanding_request
+            cancel_outstanding_request,
+            ensure_libreoffice
         ])
         .setup(|app| {
             STORE.get_or_init(|| {

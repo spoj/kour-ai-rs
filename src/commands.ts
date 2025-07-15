@@ -21,6 +21,9 @@ export const cancelOutstandingRequest = async (): Promise<void> => {
 	await invoke("cancel_outstanding_request");
 }
 
+export const ensureLibreoffice = async (): Promise<void> => {
+	await invoke("ensure_libreoffice");
+}
 
 export const chat = async (
 	content: MessageContent,

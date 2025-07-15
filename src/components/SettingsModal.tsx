@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { ensureLibreoffice } from "../commands";
 import "./components.css";
 import { ISettings } from "../types";
 
@@ -10,12 +12,19 @@ export const SettingsModal = ({
   onClose: Function;
   onSave: (settings: Partial<ISettings>) => void;
 }) => {
+  const [isDownloading, setIsDownloading] = useState(false);
   const handleModalClick = (e: React.MouseEvent) => {
     e.stopPropagation();
   };
 
   const handleClose = () => {
     onClose(false);
+  };
+
+  const handleEnsureLibreoffice = async () => {
+    setIsDownloading(true);
+    await ensureLibreoffice();
+    setIsDownloading(false);
   };
 
   return (
@@ -56,6 +65,15 @@ export const SettingsModal = ({
           >
             Optional: Set this to enable DOCX/PPTX support. Leave empty if
             LibreOffice is not installed.
+            <button
+              onClick={handleEnsureLibreoffice}
+              disabled={isDownloading}
+              style={{ marginLeft: "10px" }}
+            >
+              {isDownloading
+                ? "Downloading/Installing..."
+                : "Install LibreOffice automatically"}
+            </button>
           </small>
           <label htmlFor="providerOrder">Provider Order:</label>
           <input
