@@ -1,6 +1,8 @@
+use std::sync::{Arc, Mutex};
+
 use crate::{
     Result,
-    interaction::{History, Interaction, Source, Target},
+    interaction::{History, Source, Target},
     openrouter::{ChatOptions, Openrouter, ToolCall},
     tools,
     ui_events::UIEvents,
@@ -12,11 +14,11 @@ pub static SYSTEM_PROMPT: &str = include_str!("DEFAULT_PROMPT.md");
 pub struct ChatProcessor {
     ui: UIEvents,
     options: ChatOptions,
-    history: History,
+    history: Arc<Mutex<History>>,
 }
 
 impl ChatProcessor {
-    pub fn new(window: tauri::Window, options: ChatOptions, history: History) -> Self {
+    pub fn new(window: tauri::Window, options: ChatOptions, history: Arc<Mutex<History>>) -> Self {
         Self {
             ui: UIEvents::new(window),
             options,
@@ -24,11 +26,11 @@ impl ChatProcessor {
         }
     }
 
-    pub async fn run(mut self) -> Result<History> {
+    pub async fn run(&self) -> Result<()> {
         let _ = self.ui.emit_start();
 
         loop {
-            let to_llm: Vec<_> = Openrouter::render(&self.history);
+            let to_llm: Vec<_> = Openrouter::render(&self.history.lock().unwrap());
             let res = Openrouter::call(
                 &to_llm,
                 &self.options.model_name,
@@ -42,48 +44,31 @@ impl ChatProcessor {
             let incoming_message = choice.message.clone();
             let interaction = Openrouter::sends(incoming_message.clone());
             self.ui.emit_interaction(&interaction)?;
+            self.history.lock().unwrap().push(interaction);
 
             if let Some(tool_calls) = incoming_message.tool_calls.clone() {
-                self.history.push(interaction);
-
-                let new_interactions = self.handle_tool_calls(tool_calls).await?;
-                for msg in new_interactions {
-                    let tool_message = msg;
-                    self.history.push(tool_message);
-                }
+                self.handle_tool_calls(tool_calls).await?;
             } else {
-                self.history.push(interaction.clone());
                 break;
             }
         }
 
         self.ui.emit_done()?;
 
-        Ok(self.history)
+        Ok(())
     }
 
-    async fn execute_tool_call(replayer: UIEvents, tool_call: ToolCall) -> Interaction {
-        let tool_payload =
-            tools::tool_dispatcher(&tool_call.function.name, &tool_call.function.arguments).await;
+    pub async fn handle_tool_calls(&self, tool_calls: Vec<ToolCall>) -> Result<()> {
+        let tool_futs = tool_calls.into_iter().map(async |tool_call| {
+            let tool_payload =
+                tools::tool_dispatcher(&tool_call.function.name, &tool_call.function.arguments)
+                    .await;
 
-        let interaction = tool_payload.finalize(tool_call.id.to_string());
-        let _ = replayer.emit_interaction(&interaction);
-        interaction
-    }
-
-    pub async fn handle_tool_calls(&self, tool_calls: Vec<ToolCall>) -> Result<Vec<Interaction>> {
-        let mut new_messages = Vec::new();
-
-        let tool_futs = tool_calls
-            .into_iter()
-            .map(|tool_call| tokio::spawn(Self::execute_tool_call(self.ui.clone(), tool_call)));
-
-        let tool_payloads = join_all(tool_futs).await;
-
-        for tool_payload in tool_payloads {
-            new_messages.push(tool_payload?);
-        }
-
-        Ok(new_messages)
+            let interaction = tool_payload.finalize(tool_call.id.to_string());
+            let _ = self.ui.emit_interaction(&interaction);
+            self.history.lock().unwrap().push(interaction);
+        });
+        let _ = join_all(tool_futs).await;
+        Ok(())
     }
 }

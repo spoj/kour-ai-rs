@@ -18,7 +18,7 @@ use crate::settings::{Settings, get_settings_fn};
 use crate::ui_events::UIEvents;
 use serde_json::to_value;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, OnceLock, RwLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use tauri::Manager;
 use tauri::{State, Wry};
 use tauri_plugin_store::{Store, StoreBuilder};
@@ -32,7 +32,7 @@ pub static CACHE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 struct AppStateInner {
     cancel: Mutex<Option<CancellationToken>>,
-    history: RwLock<History>,
+    history: Arc<Mutex<History>>,
 }
 type AppState<'a> = State<'a, AppStateInner>;
 
@@ -66,13 +66,6 @@ async fn chat(window: tauri::Window, content: Vec<Content>, state: AppState<'_>)
     let options = ChatOptions {
         model_name: settings.model_name,
     };
-    let replayer = UIEvents::new(window.clone());
-    let mut history = state.history.read().unwrap().clone(); // unwrap: won't try to recover from poisoned lock
-
-    let new_interaction = UIEvents::sends(content);
-    history.push(new_interaction.clone());
-    let _ = replayer.emit_interaction(&new_interaction);
-
     let cancel_token = CancellationToken::new();
     {
         let mut guard = state.cancel.lock().unwrap(); // unwrap: won't try to recover from poisoned lock
@@ -83,22 +76,24 @@ async fn chat(window: tauri::Window, content: Vec<Content>, state: AppState<'_>)
         }
     }
 
+    let replayer = UIEvents::new(window.clone());
+    let new_interaction = UIEvents::sends(content);
+    let _ = replayer.emit_interaction(&new_interaction);
+    state.history.lock().unwrap().push(new_interaction); // unwrap: won't try to recover from poisoned lock
+    let proc = ChatProcessor::new(window.clone(), options, Arc::clone(&state.history));
     select! {
+        Ok(_) = {proc.run()} => {}
         _ = cancel_token.cancelled() => {
             let _ = replayer.emit_done();
-            *state.cancel.lock().unwrap() = None; // unwrap: won't try to recover from poisoned lock
-        }
-        Ok(new_history) = ChatProcessor::new(window.clone(), options, history).run() => {
-            *state.cancel.lock().unwrap() = None; // unwrap: won't try to recover from poisoned lock
-            let mut history = state.history.write().unwrap(); // unwrap: won't try to recover from poisoned lock
-            *history = new_history;
+            state.history.lock().unwrap().clean_unfinished_tool_calls();
         }
     }
+    *state.cancel.lock().unwrap() = None; // unwrap: won't try to recover from poisoned lock
     Ok(())
 }
 #[tauri::command]
 async fn replay_history(window: tauri::Window, state: AppState<'_>) -> Result<()> {
-    let history = state.history.read().unwrap().clone(); // unwrap: won't try to recover from poisoned lock
+    let history = state.history.lock().unwrap().clone(); // unwrap: won't try to recover from poisoned lock
     UIEvents::new(window).replay_history(&history)?;
     Ok(())
 }
@@ -106,7 +101,7 @@ async fn replay_history(window: tauri::Window, state: AppState<'_>) -> Result<()
 #[tauri::command]
 fn clear_history(state: AppState<'_>) -> Result<()> {
     cancel_outstanding_request(state.clone())?;
-    let mut history = state.history.write().unwrap(); // unwrap: won't try to recover from poisoned lock
+    let mut history = state.history.lock().unwrap(); // unwrap: won't try to recover from poisoned lock
     history.clear();
     Ok(())
 }
@@ -169,7 +164,7 @@ pub fn run() {
             CACHE_DIR.get_or_init(
                 || app.path().app_cache_dir().unwrap(), // unwrap: crash if cannot find cache dir
             );
-            let history = RwLock::new(Default::default());
+            let history = Arc::new(Mutex::new(Default::default()));
             let cancel = Mutex::new(None);
             let inner_state = AppStateInner { cancel, history };
             app.manage(inner_state);

@@ -1,4 +1,7 @@
-use std::{collections::HashSet, sync::atomic::{AtomicUsize, Ordering}};
+use std::{
+    collections::HashSet,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use serde::{Deserialize, Serialize};
 
