@@ -77,9 +77,11 @@ async fn chat(window: tauri::Window, content: Vec<Content>, state: AppState<'_>)
     }
 
     let replayer = UIEvents::new(window.clone());
-    let new_interaction = UIEvents::sends(content);
-    let _ = replayer.emit_interaction(&new_interaction);
-    state.history.lock().unwrap().push(new_interaction); // unwrap: won't try to recover from poisoned lock
+    if !content.is_empty() {
+        let new_interaction = UIEvents::sends(content);
+        let _ = replayer.emit_interaction(&new_interaction);
+        state.history.lock().unwrap().push(new_interaction); // unwrap: won't try to recover from poisoned lock
+    }
     let proc = ChatProcessor::new(window.clone(), options, Arc::clone(&state.history));
     select! {
         Ok(_) = {proc.run()} => {}
