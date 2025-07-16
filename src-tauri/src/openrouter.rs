@@ -67,6 +67,7 @@ impl<'a> Target<'a> for Openrouter {
             Interaction::LlmResponse {
                 content,
                 tool_calls,
+                ..
             } => {
                 if let Some(tool_calls) = tool_calls {
                     vec![json!({
@@ -97,7 +98,7 @@ impl<'a> Target<'a> for Openrouter {
                 }
                 out
             }
-            Interaction::UserMessage { content } => vec![json!({
+            Interaction::UserMessage { content, .. } => vec![json!({
                     "role": "user",
                     "content": content,
             })],
@@ -140,10 +141,7 @@ impl Source for Openrouter {
             IncomingContent::Parts(contents) => contents,
             IncomingContent::None => vec![],
         };
-        Interaction::LlmResponse {
-            content,
-            tool_calls,
-        }
+        Interaction::llm_response(content, tool_calls)
     }
 }
 
