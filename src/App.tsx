@@ -85,7 +85,13 @@ function App() {
           break;
         case "ToolCall":
           setMessages((prev) => {
-            if (prev.some((m) => m.id === update.id)) return prev;
+            if (
+              prev.some(
+                (m) =>
+                  m.id === update.id && m.tool_call_id === update.tool_call_id
+              )
+            )
+              return prev;
             return [
               ...prev,
               {
@@ -244,11 +250,14 @@ function App() {
     delete_message(id);
   };
 
-  const handleDeleteTool = (tool_call_id: string) => {
+  const handleDeleteTool = (llm_interaction_id: number, tool_call_id: string) => {
     setMessages((prev) =>
-      prev.filter((m) => m.tool_call_id !== tool_call_id)
+      prev.filter(
+        (m) =>
+          !(m.id === llm_interaction_id && m.tool_call_id === tool_call_id)
+      )
     );
-    delete_tool_interaction(tool_call_id);
+    delete_tool_interaction(llm_interaction_id, tool_call_id);
   };
 
   const handleCancel = () => {
@@ -301,11 +310,13 @@ function App() {
           .sort((a, b) => a.id - b.id)
           .map((m) => (
             <ChatBubble
-              key={m.id}
+              key={m.tool_call_id || m.id}
               {...m}
               onCopy={() => handleCopy(m.content)}
               onDelete={() => handleDelete(m.id)}
-              onDeleteTool={handleDeleteTool}
+              onDeleteTool={(llm_interaction_id, tool_call_id) =>
+                handleDeleteTool(llm_interaction_id, tool_call_id)
+              }
             />
           ))}
         {isTyping && (

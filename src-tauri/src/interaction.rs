@@ -107,11 +107,11 @@ impl Interaction {
                 tool_calls,
                 ..
             } => {
-                !content.iter().any(|c| !c.is_empty())
-                    || tool_calls.as_ref().is_some_and(|calls| !calls.is_empty())
+                content.iter().all(|c| c.is_empty())
+                    && tool_calls.as_ref().is_none_or(|c| c.is_empty())
             }
             Interaction::ToolResult { .. } => false,
-            Interaction::UserMessage { content, .. } => !content.iter().any(|c| !c.is_empty()),
+            Interaction::UserMessage { content, .. } => content.iter().all(|c| c.is_empty()),
         }
     }
 }
@@ -152,26 +152,31 @@ impl History {
         }
     }
 
-    pub fn delete_by_tool_id(&mut self, tool_call_id_to_delete: &str) {
-        // Remove the ToolResult with the given tool_call_id
-        self.inner.retain(|interaction| {
-            if let Interaction::ToolResult { tool_call_id, .. } = interaction {
-                tool_call_id != tool_call_id_to_delete
-            } else {
-                true
-            }
-        });
+    pub fn delete_by_tool_id(&mut self, llm_interaction_id: usize, tool_call_id_to_delete: &str) {
+        let llm_interaction_index = self.inner.iter().position(|i| i.id() == llm_interaction_id);
 
-        // Find any LlmResponse and remove the matching tool_call from it
-        for interaction in self.inner.iter_mut() {
-            if let Interaction::LlmResponse { tool_calls, .. } = interaction
+        if let Some(index) = llm_interaction_index {
+            // Remove the matching tool call from the LlmResponse
+            if let Some(interaction) = self.inner.get_mut(index)
+                && let Interaction::LlmResponse { tool_calls, .. } = interaction
                 && let Some(calls) = tool_calls
             {
                 calls.retain(|call| call.id != tool_call_id_to_delete);
             }
+
+            // Find and remove the corresponding ToolResult that appears after the LlmResponse
+            if let Some(tool_result_index) = self.inner.iter().skip(index).position(|i| {
+                if let Interaction::ToolResult { tool_call_id, .. } = i {
+                    tool_call_id == tool_call_id_to_delete
+                } else {
+                    false
+                }
+            }) {
+                self.inner.remove(index + tool_result_index);
+            }
         }
 
-        // Finally prune LLM messages that became empty
+        // Finally, prune any LLM messages that have become empty
         self.inner.retain(|interaction| !interaction.is_empty());
     }
 
@@ -182,14 +187,28 @@ impl History {
             match interaction {
                 Interaction::LlmResponse {
                     tool_calls: Some(calls),
+                    interaction_id,
                     ..
                 } => {
                     for call in calls {
-                        self.delete_by_tool_id(&call.id);
+                        self.delete_by_tool_id(interaction_id, &call.id);
                     }
                 }
                 Interaction::ToolResult { tool_call_id, .. } => {
-                    self.delete_by_tool_id(&tool_call_id);
+                    // find the corrosponding llm response
+                    if let Some(llm_interaction) = self.inner.iter().find(|i| {
+                        if let Interaction::LlmResponse {
+                            tool_calls: Some(calls),
+                            ..
+                        } = i
+                        {
+                            calls.iter().any(|c| c.id == tool_call_id)
+                        } else {
+                            false
+                        }
+                    }) {
+                        self.delete_by_tool_id(llm_interaction.id(), &tool_call_id);
+                    }
                 }
                 _ => {}
             }

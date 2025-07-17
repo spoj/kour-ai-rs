@@ -91,10 +91,11 @@ export const ChatBubble = ({
   tool_call_id,
   toolArgs,
   toolResult,
+  id,
 }: IChatCompletionMessage & {
   onCopy?: () => void;
   onDelete?: () => void;
-  onDeleteTool?: (tool_call_id: string) => void;
+  onDeleteTool?: (llm_interaction_id: number, tool_call_id: string) => void;
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -155,7 +156,7 @@ export const ChatBubble = ({
           </button>
           {isTool ? (
             <button
-              onClick={() => onDeleteTool?.(tool_call_id!)}
+              onClick={() => onDeleteTool?.(id, tool_call_id!)}
               title="Delete Tool Interaction"
             >
               <FaTrash />
