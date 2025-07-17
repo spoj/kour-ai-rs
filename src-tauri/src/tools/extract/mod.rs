@@ -110,7 +110,7 @@ pub fn get_tool() -> Tool {
         r#type: "function".to_string(),
         function: Function {
             name: "extract".to_string(),
-            description: "Extract content from email files (.msg, .eml) and zip archives (.zip)."
+            description: "Extracts content from email files (.msg, .eml) and zip archives (.zip) into a new '<original_filename>.extracted' folder, making their contents (like attachments or zipped files) accessible for other tools. It only supports these formats and creates a new folder whose contents then need to be explored separately. After extraction, use 'ls' on the '.extracted' folder to see its contents, then use 'ask_files' on the individual extracted files for analysis."
                 .to_string(),
             parameters: serde_json::json!({
                 "type": "object",

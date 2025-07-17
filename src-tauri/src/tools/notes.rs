@@ -63,7 +63,7 @@ pub fn read_notes_tool() -> Tool {
         r#type: "function".to_string(),
         function: Function {
             name: "read_notes".to_string(),
-            description: "Reads all notes from the _NOTES.txt file".to_string(),
+            description: "Reads the content of the `_NOTES.txt` file from the root directory. Use this to recall previous findings or context. Do NOT rely on read_notes for factuality or comprehensiveness. Only treat it as additional pools of direction to explore. This is because notes maybe stale (as the knowledge pool was updated) or that the notes are simplified for current user query. Everything that you answer users MUST be coming from querying primary documents, and NOT solely from your previous notes.".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {},
@@ -78,7 +78,7 @@ pub fn append_notes_tool() -> Tool {
         r#type: "function".to_string(),
         function: Function {
             name: "append_notes".to_string(),
-            description: "Appends a markdown string to the _NOTES.txt file.".to_string(),
+            description: "Appends a new markdown entry to the `_NOTES.md` file. Use this to record significant learnings, complex file structures, interrelations between files, or user instructions for future reference. Each entry is automatically timestamped. Rule of thumb: if it takes more than 4 tool calls for your to discover something, it's worth noting down.".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {

@@ -62,7 +62,7 @@ pub fn get_tool() -> Tool {
         r#type: "function".to_string(),
         function: Function {
             name: "check_online".to_string(),
-            description: "Perform an internet search for facts using the Perplexity model."
+            description: "Performs an internet search using Perplexity Sonar to find facts and answer queries. It's best for getting up-to-date information or answers to general knowledge questions."
                 .to_string(),
             parameters: serde_json::json!({
                 "type": "object",

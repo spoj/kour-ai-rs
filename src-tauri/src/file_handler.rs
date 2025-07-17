@@ -1,6 +1,6 @@
 use crate::Result;
-use crate::interaction::{Content, FileData, ImageUrl};
 use crate::error::Error;
+use crate::interaction::{Content, FileData, ImageUrl};
 use base64::{Engine as _, engine::general_purpose};
 use calamine::{Reader, open_workbook_auto_from_rs};
 use csv::Writer;
@@ -62,7 +62,11 @@ pub fn determine_file_type(path: &Path) -> FileType {
         "docx" => FileType::Docx,
         "pptx" => FileType::Pptx,
         "xlsx" => FileType::Xlsx,
-        "txt" | "md" | "csv" => FileType::Text,
+        "txt" | "md" | "csv" | "json" | "xml" | "html" | "css" | "js" | "ts" | "jsx" | "tsx"
+        | "py" | "rb" | "java" | "c" | "cpp" | "h" | "hpp" | "cs" | "go" | "php" | "swift"
+        | "kt" | "rs" | "toml" | "yaml" | "yml" | "ini" | "cfg" | "log" | "sh" | "bat" => {
+            FileType::Text
+        }
         _ => FileType::Unsupported,
     }
 }
