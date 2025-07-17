@@ -33,7 +33,6 @@ function App() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const rootDirInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
-  const hasReplayed = useRef(false);
   const [openSettingsModal, setOpenSettingsModal] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [settings, setSettings] = useState<ISettings>({
@@ -72,72 +71,63 @@ function App() {
           setIsTyping(false);
           break;
         case "Message":
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: update.id,
-              role: update.role as "user" | "assistant",
-              content: update.content,
-            },
-          ]);
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === update.id)) return prev;
+            return [
+              ...prev,
+              {
+                id: update.id,
+                role: update.role as "user" | "assistant",
+                content: update.content,
+              },
+            ];
+          });
           break;
         case "ToolCall":
-          const toolCallMessage: IChatCompletionMessage = {
-            id: update.id,
-            tool_call_id: update.tool_call_id,
-            role: "assistant",
-            content: [],
-            isNotification: true,
-            toolName: update.tool_name,
-            toolArgs: update.tool_args,
-          };
-          setMessages((prev) => [...prev, toolCallMessage]);
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === update.id)) return prev;
+            return [
+              ...prev,
+              {
+                id: update.id,
+                tool_call_id: update.tool_call_id,
+                role: "assistant",
+                content: [],
+                isNotification: true,
+                toolName: update.tool_name,
+                toolArgs: update.tool_args,
+              },
+            ];
+          });
           break;
         case "ToolDone":
           setMessages((prev) => {
-            // Find the most recent tool call with matching ID that doesn't have a result yet
+            const newMessages = [...prev];
             let foundIndex = -1;
-            for (let i = prev.length - 1; i >= 0; i--) {
-              if (
-                prev[i].tool_call_id === update.tool_call_id &&
-                !prev[i].toolResult
-              ) {
+            for (let i = newMessages.length - 1; i >= 0; i--) {
+              const m = newMessages[i];
+              if (m.tool_call_id === update.tool_call_id && !m.toolResult) {
                 foundIndex = i;
                 break;
               }
             }
 
             if (foundIndex !== -1) {
-              return prev.map((m, index) =>
-                index === foundIndex
-                  ? {
-                      ...m,
-                      toolResult: update.tool_result,
-                    }
-                  : m
-              );
+              const updatedMessage = {
+                ...newMessages[foundIndex],
+                toolResult: update.tool_result,
+              };
+              newMessages[foundIndex] = updatedMessage;
             }
-
-            // Fallback to original behavior if no match found
-            return prev.map((m) =>
-              m.tool_call_id === update.tool_call_id
-                ? {
-                    ...m,
-                    toolResult: update.tool_result,
-                  }
-                : m
-            );
+            return newMessages;
           });
           break;
       }
     });
 
-    if (!hasReplayed.current) {
-      // Clear messages before replaying history to prevent duplication
-      setMessages([]);
-      replayHistory();
-      hasReplayed.current = true;
-    }
+    // Clear messages before replaying history to prevent duplication
+    setMessages([]);
+    replayHistory();
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
@@ -292,15 +282,17 @@ function App() {
         </div>
       </header>
       <div id="chat-container" ref={chatContainerRef}>
-        {messages.map((m) => (
-          <ChatBubble
-            key={m.id}
-            {...m}
-            onCopy={() => handleCopy(m.content)}
-            onDelete={() => handleDelete(m.id)}
-            onDeleteTool={handleDeleteTool}
-          />
-        ))}
+        {messages
+          .sort((a, b) => a.id - b.id)
+          .map((m) => (
+            <ChatBubble
+              key={m.id}
+              {...m}
+              onCopy={() => handleCopy(m.content)}
+              onDelete={() => handleDelete(m.id)}
+              onDeleteTool={handleDeleteTool}
+            />
+          ))}
         {isTyping && (
           <ChatBubble
             id={0}
