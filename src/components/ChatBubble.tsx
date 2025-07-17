@@ -2,6 +2,8 @@ import { useState } from "react";
 import { IChatCompletionMessage, MessageContent } from "../types";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import {
   FaCopy,
   FaAngleDown,
@@ -28,6 +30,42 @@ const renderContent = (content: MessageContent) => {
             a: ({ node, ...props }) => (
               <a {...props} target="_blank" rel="noopener noreferrer" />
             ),
+            code({ node, className, children, ...props }) {
+              const { ref, ...rest } = props;
+              const match = /language-(\w+)/.exec(className || "");
+              const handleCopy = () => {
+                navigator.clipboard.writeText(String(children));
+              };
+
+              return match ? (
+                <div style={{ position: "relative" }}>
+                  <button
+                    onClick={handleCopy}
+                    style={{
+                      position: "absolute",
+                      top: "5px",
+                      right: "5px",
+                      zIndex: 1,
+                    }}
+                    title="Copy code"
+                  >
+                    <FaCopy />
+                  </button>
+                  <SyntaxHighlighter
+                    style={vscDarkPlus as any}
+                    language={match[1]}
+                    PreTag="div"
+                    {...rest}
+                  >
+                    {String(children).replace(/\n$/, "")}
+                  </SyntaxHighlighter>
+                </div>
+              ) : (
+                <code className={className} {...props}>
+                  {children}
+                </code>
+              );
+            },
           }}
         >
           {item.text}
