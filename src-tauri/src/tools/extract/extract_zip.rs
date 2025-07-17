@@ -7,8 +7,10 @@ use crate::error::Error;
 
 pub fn extract_zip(file_path: &Path, output_dir: &Path) -> Result<Vec<String>> {
     let source = std_fs::File::open(file_path)?;
-    zip_extract::extract(source, output_dir, true)
-        .map_err(|e| Error::Tool(format!("Failed to extract zip archive: {e}")))?;
+    let mut zip =
+        zip::ZipArchive::new(source).map_err(|_| Error::Tool("cannot extract".to_string()))?;
+    zip.extract(output_dir)
+        .map_err(|_| Error::Tool("cannot extract".to_string()))?;
 
     let mut extracted_files = Vec::new();
     for entry in WalkDir::new(output_dir) {
