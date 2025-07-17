@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { IChatCompletionMessage, MessageContent } from "../types";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   FaCopy,
   FaAngleDown,
@@ -22,6 +23,7 @@ const renderContent = (content: MessageContent) => {
       return (
         <ReactMarkdown
           key={index}
+          remarkPlugins={[remarkGfm]}
           components={{
             a: ({ node, ...props }) => (
               <a {...props} target="_blank" rel="noopener noreferrer" />
