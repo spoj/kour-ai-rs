@@ -29,8 +29,8 @@ export const delete_message = async (id: number): Promise<void> => {
 	await invoke("delete_message", { id });
 }
 
-export const delete_tool_interaction = async (tool_call_id: string): Promise<void> => {
-	await invoke("delete_tool_interaction", { toolCallId: tool_call_id });
+export const delete_tool_interaction = async (llm_interaction_id: number, tool_call_id: string): Promise<void> => {
+	await invoke("delete_tool_interaction", { llmInteractionId: llm_interaction_id, toolCallId: tool_call_id });
 }
 
 export const onLibreofficeUpdate = async (

@@ -125,9 +125,17 @@ fn delete_message(id: usize, state: AppState<'_>) -> Result<()> {
 }
 
 #[tauri::command]
-fn delete_tool_interaction(tool_call_id: String, state: AppState<'_>) -> Result<()> {
+fn delete_tool_interaction(
+    llm_interaction_id: usize,
+    tool_call_id: String,
+    state: AppState<'_>,
+) -> Result<()> {
     cancel_outstanding_request(state.clone())?;
-    state.history.lock().unwrap().delete_by_tool_id(&tool_call_id);
+    state
+        .history
+        .lock()
+        .unwrap()
+        .delete_by_tool_id(llm_interaction_id, &tool_call_id);
     Ok(())
 }
 
@@ -155,7 +163,7 @@ pub fn run() {
             cancel_outstanding_request,
             ensure_libreoffice,
             delete_message,
-            delete_tool_interaction
+            delete_tool_interaction,
         ])
         .setup(|app| {
             STORE.get_or_init(|| {
