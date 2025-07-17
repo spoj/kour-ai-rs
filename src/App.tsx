@@ -135,13 +135,17 @@ function App() {
     };
   }, []);
 
+  const prevMessagesLength = useRef(messages.length);
   useEffect(() => {
-    setTimeout(() => {
-      if (chatContainerRef.current) {
-        chatContainerRef.current.scrollTop =
-          chatContainerRef.current.scrollHeight;
-      }
-    }, 100);
+    if (messages.length > prevMessagesLength.current) {
+      setTimeout(() => {
+        if (chatContainerRef.current) {
+          chatContainerRef.current.scrollTop =
+            chatContainerRef.current.scrollHeight;
+        }
+      }, 100);
+    }
+    prevMessagesLength.current = messages.length;
   }, [messages]);
 
   useEffect(() => {
@@ -223,17 +227,28 @@ function App() {
   };
 
   const handleDelete = (id: number) => {
-    delete_message(id).then(() => {
-      setMessages([]);
-      replayHistory();
-    });
+    const message_to_delete = messages.find((m) => m.id === id);
+    if (!message_to_delete) return;
+
+    const tool_call_ids_to_delete = new Set(
+      message_to_delete.tool_calls?.map((tc) => tc.id)
+    );
+
+    setMessages((prev) =>
+      prev.filter(
+        (m) =>
+          m.id !== id &&
+          !(m.tool_call_id && tool_call_ids_to_delete.has(m.tool_call_id))
+      )
+    );
+    delete_message(id);
   };
 
   const handleDeleteTool = (tool_call_id: string) => {
-    delete_tool_interaction(tool_call_id).then(() => {
-      setMessages([]);
-      replayHistory();
-    });
+    setMessages((prev) =>
+      prev.filter((m) => m.tool_call_id !== tool_call_id)
+    );
+    delete_tool_interaction(tool_call_id);
   };
 
   const handleCancel = () => {
