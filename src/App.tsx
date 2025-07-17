@@ -10,6 +10,8 @@ import {
   clearHistory,
   onChatCompletionUpdate,
   cancelOutstandingRequest,
+  delete_message,
+  delete_tool_interaction,
 } from "./commands";
 import { fileToAttachment } from "./helpers";
 import { IChatCompletionMessage, ISettings, MessageContent } from "./types";
@@ -73,6 +75,7 @@ function App() {
           setMessages((prev) => [
             ...prev,
             {
+              id: update.id,
               role: update.role as "user" | "assistant",
               content: update.content,
             },
@@ -80,6 +83,7 @@ function App() {
           break;
         case "ToolCall":
           const toolCallMessage: IChatCompletionMessage = {
+            id: update.id,
             tool_call_id: update.tool_call_id,
             role: "assistant",
             content: [],
@@ -164,7 +168,7 @@ function App() {
   };
 
   const handleSend = async () => {
-    if ((input.trim() === "" && attachments.length === 0) || isTyping) return;
+    if (isTyping) return;
 
     const messageContent: MessageContent = [];
 
@@ -192,9 +196,7 @@ function App() {
     setInput("");
     setAttachments([]);
 
-    if (messageContent.length > 0) {
-      chat(messageContent);
-    }
+    chat(messageContent);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -228,6 +230,20 @@ function App() {
       .map((item: any) => item.text)
       .join("\n");
     navigator.clipboard.writeText(textToCopy);
+  };
+
+  const handleDelete = (id: number) => {
+    delete_message(id).then(() => {
+      setMessages([]);
+      replayHistory();
+    });
+  };
+
+  const handleDeleteTool = (tool_call_id: string) => {
+    delete_tool_interaction(tool_call_id).then(() => {
+      setMessages([]);
+      replayHistory();
+    });
   };
 
   const handleCancel = () => {
@@ -276,20 +292,18 @@ function App() {
         </div>
       </header>
       <div id="chat-container" ref={chatContainerRef}>
-        {messages.map((m, i) => (
+        {messages.map((m) => (
           <ChatBubble
-            key={i}
-            role={m.role}
-            content={m.content}
-            isNotification={m.isNotification}
+            key={m.id}
+            {...m}
             onCopy={() => handleCopy(m.content)}
-            toolName={m.toolName}
-            toolArgs={m.toolArgs}
-            toolResult={m.toolResult}
+            onDelete={() => handleDelete(m.id)}
+            onDeleteTool={handleDeleteTool}
           />
         ))}
         {isTyping && (
           <ChatBubble
+            id={0}
             role="assistant"
             content={[{ type: "text", text: "Thinking..." }]}
             isNotification

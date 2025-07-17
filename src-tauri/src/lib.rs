@@ -119,6 +119,21 @@ fn cancel_outstanding_request(state: AppState<'_>) -> Result<()> {
     }
     Ok(())
 }
+
+#[tauri::command]
+fn delete_message(id: usize, state: AppState<'_>) -> Result<()> {
+    cancel_outstanding_request(state.clone())?;
+    state.history.lock().unwrap().delete_by_id(id);
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_tool_interaction(tool_call_id: String, state: AppState<'_>) -> Result<()> {
+    cancel_outstanding_request(state.clone())?;
+    state.history.lock().unwrap().delete_by_tool_id(&tool_call_id);
+    Ok(())
+}
+
 #[tauri::command]
 async fn ensure_libreoffice(window: tauri::Window) -> Result<()> {
     let libreoffice = Libreoffice {
@@ -141,7 +156,9 @@ pub fn run() {
             replay_history,
             clear_history,
             cancel_outstanding_request,
-            ensure_libreoffice
+            ensure_libreoffice,
+            delete_message,
+            delete_tool_interaction
         ])
         .setup(|app| {
             STORE.get_or_init(|| {

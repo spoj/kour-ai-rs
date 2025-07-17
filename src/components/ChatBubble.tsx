@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { IChatCompletionMessage, MessageContent } from "../types";
 import ReactMarkdown from "react-markdown";
-import { FaCopy, FaAngleDown, FaAngleUp, FaDownload } from "react-icons/fa";
+import {
+  FaCopy,
+  FaAngleDown,
+  FaAngleUp,
+  FaDownload,
+  FaTrash,
+} from "react-icons/fa";
 import { Bounce, toast } from "react-toastify";
 import "./components.css";
 import { base64toBlob } from "../helpers";
@@ -79,11 +85,16 @@ export const ChatBubble = ({
   content,
   isNotification,
   onCopy,
+  onDelete,
+  onDeleteTool,
   toolName,
+  tool_call_id,
   toolArgs,
   toolResult,
 }: IChatCompletionMessage & {
   onCopy?: () => void;
+  onDelete?: () => void;
+  onDeleteTool?: (tool_call_id: string) => void;
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -100,6 +111,9 @@ export const ChatBubble = ({
         <div className="message-actions">
           <button onClick={onCopy} title="Copy">
             <FaCopy />
+          </button>
+          <button onClick={onDelete} title="Delete">
+            <FaTrash />
           </button>
         </div>
       )}
@@ -134,11 +148,23 @@ export const ChatBubble = ({
           </div>
         )}
       </div>
-      {role === "assistant" && !isNotification && (
+      {role === "assistant" && (
         <div className="message-actions">
           <button onClick={onCopy} title="Copy">
             <FaCopy />
           </button>
+          {isTool ? (
+            <button
+              onClick={() => onDeleteTool?.(tool_call_id!)}
+              title="Delete Tool Interaction"
+            >
+              <FaTrash />
+            </button>
+          ) : (
+            <button onClick={onDelete} title="Delete">
+              <FaTrash />
+            </button>
+          )}
         </div>
       )}
     </div>

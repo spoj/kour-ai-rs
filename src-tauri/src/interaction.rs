@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{collections::HashSet, sync::atomic::{AtomicUsize, Ordering}};
 
 use serde::{Deserialize, Serialize};
 
@@ -99,6 +99,85 @@ impl History {
     }
     pub fn clear(&mut self) {
         self.inner.clear();
+    }
+    pub fn clean_unfinished_tool_calls(&mut self) {
+        let tool_response_ids: HashSet<_> = self
+            .inner
+            .iter()
+            .flat_map(|i| {
+                if let Interaction::ToolResult { tool_call_id, .. } = i {
+                    Some(tool_call_id)
+                } else {
+                    None
+                }
+            })
+            .cloned()
+            .collect();
+        if let Some(Interaction::LlmResponse { tool_calls, .. }) = self
+            .inner
+            .iter_mut()
+            .rev()
+            .find(|x| matches!(x, Interaction::LlmResponse { .. }))
+            && let Some(tool_calls) = tool_calls
+        {
+            tool_calls.retain(|t| tool_response_ids.contains(&t.id));
+        }
+    }
+
+    pub fn delete_by_tool_id(&mut self, tool_call_id_to_delete: &str) {
+        // Remove the ToolResult with the given tool_call_id
+        self.inner.retain(|interaction| {
+            if let Interaction::ToolResult { tool_call_id, .. } = interaction {
+                tool_call_id != tool_call_id_to_delete
+            } else {
+                true
+            }
+        });
+
+        // Find any LlmResponse and remove the matching tool_call from it
+        for interaction in self.inner.iter_mut() {
+            if let Interaction::LlmResponse { tool_calls, .. } = interaction
+                && let Some(calls) = tool_calls
+            {
+                calls.retain(|call| call.id != tool_call_id_to_delete);
+            }
+        }
+
+        // Finally prune LLM messages that became empty
+        self.inner.retain(|interaction| {
+            if let Interaction::LlmResponse {
+                content,
+                tool_calls,
+                ..
+            } = interaction
+            {
+                !content.is_empty() || tool_calls.as_ref().is_some_and(|calls| !calls.is_empty())
+            } else {
+                true
+            }
+        });
+    }
+
+    pub fn delete_by_id(&mut self, id: usize) {
+        let interaction_to_delete = self.inner.iter().find(|i| i.id() == id).cloned();
+
+        if let Some(interaction) = interaction_to_delete {
+            match interaction {
+                Interaction::LlmResponse {
+                    tool_calls: Some(calls),
+                    ..
+                } => {
+                    for call in calls {
+                        self.delete_by_tool_id(&call.id);
+                    }
+                }
+                Interaction::ToolResult { tool_call_id, .. } => {
+                    self.delete_by_tool_id(&tool_call_id);
+                }
+                _ => {}
+            }
+        }
+        self.inner.retain(|i| i.id() != id);
     }
 }
 
