@@ -85,7 +85,8 @@ function App() {
           break;
         case "ToolCall":
           setMessages((prev) => {
-            if (prev.some((m) => m.id === update.id)) return prev;
+            if (prev.some((m) => m.tool_call_id === update.tool_call_id))
+              return prev;
             return [
               ...prev,
               {
@@ -301,7 +302,7 @@ function App() {
           .sort((a, b) => a.id - b.id)
           .map((m) => (
             <ChatBubble
-              key={m.id}
+              key={m.tool_call_id || m.id}
               {...m}
               onCopy={() => handleCopy(m.content)}
               onDelete={() => handleDelete(m.id)}
