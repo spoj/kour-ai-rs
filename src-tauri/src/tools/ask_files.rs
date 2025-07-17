@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use tokio::task;
 use crate::error::Error;
 use crate::openrouter::{IncomingContent, Openrouter};
+use crate::tools::find::find_internal;
 use crate::utils::jailed::Jailed;
 use futures::stream::{self, StreamExt};
 use std::path::Path;
@@ -20,17 +21,24 @@ pub struct AskFilesArgs {
     pub filenames: Vec<String>,
 }
 
+#[derive(Deserialize)]
+pub struct AskFilesGlobArgs {
+    pub query: String,
+    pub glob: String,
+    pub max_results: usize
+}
+
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct AskFileResults {
     answer: String,
     extracts: Vec<String>, 
 }
-pub fn get_tool() -> Tool {
+pub fn ask_files_tool() -> Tool {
     Tool {
         r#type: "function".to_string(),
         function: Function {
             name: "ask_files".to_string(),
-            description: "Answers a query about a list of files.".to_string(),
+            description: "Queries a specific, user-provided list of files in parallel, making it efficient for targeted analysis of known files. Expects to be given the query and a broader_context. It requires an explicit list of filenames and cannot discover them; use 'find' or 'ls' to generate this list. Works best for simple fact-finding queries.".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -93,4 +101,42 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
         .await;
     
     Ok(responses)
+}
+
+
+pub fn ask_files_glob_tool() -> Tool {
+    Tool {
+        r#type: "function".to_string(),
+        function: Function {
+            name: "ask_files_glob".to_string(),
+            description: "Same as ask_files, but accepts a glob pattern to match more than 1 file. Must specify max_results".to_string(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The query to run against each file."
+                    },
+                    "glob": {
+                        "type": "string",
+                        "description": "Glob pattern used to match files."
+                    },
+                    "max_results": {
+                        "type": "number",
+                        "description": "Maximum results. If glob matches more than this, the tool will return an error to avoid overwhelming the user. Start with 100 and adjust up if the task really requires understanding more files."
+                    }
+                },
+                "required": ["query", "glob","max_results"]
+            }),
+        },
+    }
+}
+
+pub async fn ask_files_glob(args: AskFilesGlobArgs) -> Result<Vec<Result<Value>>> {
+    let AskFilesGlobArgs { query, glob, max_results } = args;
+     let root_dir = task::spawn_blocking(crate::get_settings_fn)
+        .await?
+        .map(|s| s.root_dir)?;
+    let filenames = find_internal(&root_dir, &glob, max_results)?;
+    ask_files(AskFilesArgs { query, filenames }).await
 }

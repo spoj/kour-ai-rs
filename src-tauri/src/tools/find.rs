@@ -1,6 +1,6 @@
+use crate::Result;
 use crate::error::Error;
 use crate::utils::jailed::Jailed;
-use crate::{Result};
 
 use super::{Function, Tool};
 use glob::MatchOptions;
@@ -8,23 +8,25 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::task;
 
-const MAX_FIND_RESULTS: usize = 100;
-
 pub fn get_tool() -> Tool {
     Tool {
         r#type: "function".to_string(),
         function: Function {
             name: "find".to_string(),
-            description: "Find files and directories matching a glob pattern. The search is recursive unless the pattern contains a path separator.".to_string(),
+            description: "Locates files by glob, returning up to 'list_max_files' matches. If more files match, it returns an error and the total count, prompting you to refine the glob. Excellent for targeted searches when you expect a manageable number of results. Use 'ls' to confirm existence or explore a directory before crafting a glob.".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
                     "glob": {
                         "type": "string",
                         "description": "The glob pattern to match against"
+                    },
+                    "max_results": {
+                        "type": "number",
+                        "description": "Maximum results. If glob matches more than this, the tool will return an error to avoid overwhelming the user. Start with 200 and adjust approach if required."
                     }
                 },
-                "required": ["glob"]
+                "required": ["glob","max_results"]
             }),
         },
     }
@@ -33,9 +35,10 @@ pub fn get_tool() -> Tool {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct FindArgs {
     pub glob: String,
+    pub max_results: usize,
 }
 
-fn find_internal(root_dir: &str, glob_pattern: &str) -> Result<Vec<String>> {
+pub fn find_internal(root_dir: &str, glob_pattern: &str, limit: usize) -> Result<Vec<String>> {
     if root_dir.is_empty() {
         return Err(Error::Tool(
             "Error: Root directory is not set. Please set it in the settings.".to_string(),
@@ -63,9 +66,9 @@ fn find_internal(root_dir: &str, glob_pattern: &str) -> Result<Vec<String>> {
         .flatten()
         .collect();
 
-    if entries.len() > MAX_FIND_RESULTS {
+    if entries.len() > limit {
         return Err(Error::Tool(format!(
-            "Error: Find returned too many results ({}). Please provide a more specific glob pattern.",
+            "Error: Found more files ({}) than limit ({limit}). Consider up the limit or take different approach.",
             entries.len()
         )));
     }
@@ -89,6 +92,6 @@ pub async fn find(args: FindArgs) -> Result<Vec<String>> {
     let root_dir = task::spawn_blocking(crate::get_settings_fn)
         .await?
         .map(|s| s.root_dir)?;
-    let result = find_internal(&root_dir, &args.glob)?;
+    let result = find_internal(&root_dir, &args.glob, args.max_results)?;
     Ok(result)
 }

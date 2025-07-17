@@ -13,7 +13,7 @@ pub fn get_tool() -> Tool {
         r#type: "function".to_string(),
         function: Function {
             name: "ls".to_string(),
-            description: "List the content of a path relative to the root directory".to_string(),
+            description: "Lists contents of a specific directory level without sampling, good for iterative exploration".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {

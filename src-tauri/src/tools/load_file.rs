@@ -48,7 +48,7 @@ pub fn get_tool() -> Tool {
         function: Function {
             name: "load_file".to_string(),
             description:
-                "Loads a file directly into the conversation context. Supports various file types."
+                "Loads a file directly into the conversation context. Supports various file types. Use this instead of ask_files if you need in-depth understanding of a few files."
                     .to_string(),
             parameters: serde_json::json!({
                 "type": "object",
