@@ -18,6 +18,16 @@ pub enum Content {
     File { file: FileData },
 }
 
+impl Content {
+    fn is_empty(&self) -> bool {
+        match self {
+            Content::Text { text } => text.is_empty(),
+            Content::ImageUrl { .. } => false,
+            Content::File { .. } => false,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub struct FileData {
     pub filename: String,
@@ -82,11 +92,26 @@ impl Interaction {
             content,
         }
     }
-    pub fn id(&self) -> usize {
+    fn id(&self) -> usize {
         match self {
             Interaction::LlmResponse { interaction_id, .. } => *interaction_id,
             Interaction::ToolResult { interaction_id, .. } => *interaction_id,
             Interaction::UserMessage { interaction_id, .. } => *interaction_id,
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Interaction::LlmResponse {
+                content,
+                tool_calls,
+                ..
+            } => {
+                !content.iter().any(|c| !c.is_empty())
+                    || tool_calls.as_ref().is_some_and(|calls| !calls.is_empty())
+            }
+            Interaction::ToolResult { .. } => false,
+            Interaction::UserMessage { content, .. } => !content.iter().any(|c| !c.is_empty()),
         }
     }
 }
@@ -147,18 +172,7 @@ impl History {
         }
 
         // Finally prune LLM messages that became empty
-        self.inner.retain(|interaction| {
-            if let Interaction::LlmResponse {
-                content,
-                tool_calls,
-                ..
-            } = interaction
-            {
-                !content.is_empty() || tool_calls.as_ref().is_some_and(|calls| !calls.is_empty())
-            } else {
-                true
-            }
-        });
+        self.inner.retain(|interaction| !interaction.is_empty());
     }
 
     pub fn delete_by_id(&mut self, id: usize) {
