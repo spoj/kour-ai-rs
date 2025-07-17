@@ -1,6 +1,6 @@
+use crate::Result;
 use crate::error::Error;
 use crate::utils::jailed::Jailed;
-use crate::{Result};
 use std::path::Path;
 
 use super::{Function, Tool};
@@ -51,7 +51,15 @@ pub async fn ls(args: LsArgs) -> Result<Vec<String>> {
         Ok(entries) => {
             let result: Vec<String> = entries
                 .flatten()
-                .map(|entry| entry.file_name().to_string_lossy().to_string())
+                .map(|entry| {
+                    let mut name = entry.file_name().to_string_lossy().to_string();
+                    if let Ok(file_meta) = entry.metadata()
+                        && file_meta.is_dir()
+                    {
+                        name.push('/');
+                    }
+                    name
+                })
                 .collect();
             Ok(result)
         }

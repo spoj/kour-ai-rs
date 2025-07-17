@@ -76,12 +76,11 @@ pub fn find_internal(root_dir: &str, glob_pattern: &str, limit: usize) -> Result
     let result: Vec<String> = entries
         .iter()
         .map(|entry| {
-            entry
-                .to_str()
-                .unwrap_or_default()
-                .strip_prefix(root_dir)
-                .unwrap_or_default()
-                .to_string()
+            if let Ok(relative) = entry.strip_prefix(root_dir) {
+                relative.to_str().unwrap_or_default().to_string()
+            } else {
+                String::new()
+            }
         })
         .collect();
 
