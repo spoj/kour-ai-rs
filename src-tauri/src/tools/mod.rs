@@ -106,13 +106,12 @@ impl ToolPayload {
         self
     }
     pub fn finalize(self, tool_call_id: String) -> Interaction {
-        Interaction::ToolResult {
+        Interaction::tool_result(
             tool_call_id,
-            response: to_string(&self.response)
-                .unwrap_or("Error turning tool result to String".to_string()),
-            for_llm: self.for_llm,
-            for_user: self.for_user,
-        }
+            to_string(&self.response).unwrap_or("Error turning tool result to String".to_string()),
+            self.for_llm,
+            self.for_user,
+        )
     }
 }
 

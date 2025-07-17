@@ -25,6 +25,14 @@ export const ensureLibreoffice = async (): Promise<void> => {
 	await invoke("ensure_libreoffice");
 }
 
+export const delete_message = async (id: number): Promise<void> => {
+	await invoke("delete_message", { id });
+}
+
+export const delete_tool_interaction = async (tool_call_id: string): Promise<void> => {
+	await invoke("delete_tool_interaction", { toolCallId: tool_call_id });
+}
+
 export const onLibreofficeUpdate = async (
 	callback: (update: any) => void
 ) => {

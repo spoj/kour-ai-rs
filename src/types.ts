@@ -39,6 +39,7 @@ export interface IToolCall {
 }
 
 export interface IChatCompletionMessage {
+  id: number;
   tool_call_id?: string;
   role: "user" | "assistant" | "tool";
   content: MessageContent;
@@ -57,11 +58,17 @@ export interface IChatCompletionOptions {
 export type IChatCompletionUpdate =
   | { type: "Start" }
   | { type: "End" }
-  | { type: "Message"; role: string; content: MessageContent }
+  | { type: "Message"; id: number; role: string; content: MessageContent }
   | {
       type: "ToolCall";
+      id: number;
       tool_name: string;
       tool_call_id: string;
       tool_args: string;
     }
-  | { type: "ToolDone"; tool_call_id: string; tool_result: string };
+  | {
+      type: "ToolDone";
+      id: number;
+      tool_call_id: string;
+      tool_result: string;
+    };

@@ -10,6 +10,8 @@ import {
   clearHistory,
   onChatCompletionUpdate,
   cancelOutstandingRequest,
+  delete_message,
+  delete_tool_interaction,
 } from "./commands";
 import { fileToAttachment } from "./helpers";
 import { IChatCompletionMessage, ISettings, MessageContent } from "./types";
@@ -31,7 +33,6 @@ function App() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const rootDirInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
-  const hasReplayed = useRef(false);
   const [openSettingsModal, setOpenSettingsModal] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [settings, setSettings] = useState<ISettings>({
@@ -70,70 +71,63 @@ function App() {
           setIsTyping(false);
           break;
         case "Message":
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: update.role as "user" | "assistant",
-              content: update.content,
-            },
-          ]);
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === update.id)) return prev;
+            return [
+              ...prev,
+              {
+                id: update.id,
+                role: update.role as "user" | "assistant",
+                content: update.content,
+              },
+            ];
+          });
           break;
         case "ToolCall":
-          const toolCallMessage: IChatCompletionMessage = {
-            tool_call_id: update.tool_call_id,
-            role: "assistant",
-            content: [],
-            isNotification: true,
-            toolName: update.tool_name,
-            toolArgs: update.tool_args,
-          };
-          setMessages((prev) => [...prev, toolCallMessage]);
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === update.id)) return prev;
+            return [
+              ...prev,
+              {
+                id: update.id,
+                tool_call_id: update.tool_call_id,
+                role: "assistant",
+                content: [],
+                isNotification: true,
+                toolName: update.tool_name,
+                toolArgs: update.tool_args,
+              },
+            ];
+          });
           break;
         case "ToolDone":
           setMessages((prev) => {
-            // Find the most recent tool call with matching ID that doesn't have a result yet
+            const newMessages = [...prev];
             let foundIndex = -1;
-            for (let i = prev.length - 1; i >= 0; i--) {
-              if (
-                prev[i].tool_call_id === update.tool_call_id &&
-                !prev[i].toolResult
-              ) {
+            for (let i = newMessages.length - 1; i >= 0; i--) {
+              const m = newMessages[i];
+              if (m.tool_call_id === update.tool_call_id && !m.toolResult) {
                 foundIndex = i;
                 break;
               }
             }
 
             if (foundIndex !== -1) {
-              return prev.map((m, index) =>
-                index === foundIndex
-                  ? {
-                      ...m,
-                      toolResult: update.tool_result,
-                    }
-                  : m
-              );
+              const updatedMessage = {
+                ...newMessages[foundIndex],
+                toolResult: update.tool_result,
+              };
+              newMessages[foundIndex] = updatedMessage;
             }
-
-            // Fallback to original behavior if no match found
-            return prev.map((m) =>
-              m.tool_call_id === update.tool_call_id
-                ? {
-                    ...m,
-                    toolResult: update.tool_result,
-                  }
-                : m
-            );
+            return newMessages;
           });
           break;
       }
     });
 
-    if (!hasReplayed.current) {
-      // Clear messages before replaying history to prevent duplication
-      setMessages([]);
-      replayHistory();
-      hasReplayed.current = true;
-    }
+    // Clear messages before replaying history to prevent duplication
+    setMessages([]);
+    replayHistory();
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
@@ -164,7 +158,7 @@ function App() {
   };
 
   const handleSend = async () => {
-    if ((input.trim() === "" && attachments.length === 0) || isTyping) return;
+    if (isTyping) return;
 
     const messageContent: MessageContent = [];
 
@@ -192,9 +186,7 @@ function App() {
     setInput("");
     setAttachments([]);
 
-    if (messageContent.length > 0) {
-      chat(messageContent);
-    }
+    chat(messageContent);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -228,6 +220,20 @@ function App() {
       .map((item: any) => item.text)
       .join("\n");
     navigator.clipboard.writeText(textToCopy);
+  };
+
+  const handleDelete = (id: number) => {
+    delete_message(id).then(() => {
+      setMessages([]);
+      replayHistory();
+    });
+  };
+
+  const handleDeleteTool = (tool_call_id: string) => {
+    delete_tool_interaction(tool_call_id).then(() => {
+      setMessages([]);
+      replayHistory();
+    });
   };
 
   const handleCancel = () => {
@@ -276,20 +282,20 @@ function App() {
         </div>
       </header>
       <div id="chat-container" ref={chatContainerRef}>
-        {messages.map((m, i) => (
-          <ChatBubble
-            key={i}
-            role={m.role}
-            content={m.content}
-            isNotification={m.isNotification}
-            onCopy={() => handleCopy(m.content)}
-            toolName={m.toolName}
-            toolArgs={m.toolArgs}
-            toolResult={m.toolResult}
-          />
-        ))}
+        {messages
+          .sort((a, b) => a.id - b.id)
+          .map((m) => (
+            <ChatBubble
+              key={m.id}
+              {...m}
+              onCopy={() => handleCopy(m.content)}
+              onDelete={() => handleDelete(m.id)}
+              onDeleteTool={handleDeleteTool}
+            />
+          ))}
         {isTyping && (
           <ChatBubble
+            id={0}
             role="assistant"
             content={[{ type: "text", text: "Thinking..." }]}
             isNotification
