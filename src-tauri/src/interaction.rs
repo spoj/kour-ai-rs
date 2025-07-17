@@ -107,11 +107,11 @@ impl Interaction {
                 tool_calls,
                 ..
             } => {
-                !content.iter().any(|c| !c.is_empty())
-                    || tool_calls.as_ref().is_some_and(|calls| !calls.is_empty())
+                content.iter().all(|c| c.is_empty())
+                    && tool_calls.as_ref().is_none_or(|c| c.is_empty())
             }
             Interaction::ToolResult { .. } => false,
-            Interaction::UserMessage { content, .. } => !content.iter().any(|c| !c.is_empty()),
+            Interaction::UserMessage { content, .. } => content.iter().all(|c| c.is_empty()),
         }
     }
 }
