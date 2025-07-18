@@ -24,6 +24,8 @@ pub enum Error {
     Conflict(String),
     #[error("Anyhow Error: {0}")]
     Anyhow(#[from] anyhow::Error),
+    #[error("Unkonwn Error")]
+    Other,
 }
 
 impl From<tauri::Error> for Error {

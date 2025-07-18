@@ -11,6 +11,7 @@ mod utils;
 
 use crate::chat::ChatProcessor;
 use crate::error::Error;
+use crate::filter_files::Searching;
 use crate::interaction::{Content, History, Source};
 use crate::openrouter::ChatOptions;
 use crate::settings::get_settings;
@@ -153,6 +154,7 @@ pub fn run() {
             let cancel = Mutex::new(None);
             let inner_state = AppStateInner { cancel, history };
             app.manage(inner_state);
+            app.manage(Searching::default());
             Ok(())
         })
         .run(tauri::generate_context!())
