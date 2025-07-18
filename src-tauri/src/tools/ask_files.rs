@@ -1,19 +1,19 @@
-use schemars::{schema_for, JsonSchema};
-use serde::{Deserialize, Serialize};
-use tokio::task;
 use crate::error::Error;
 use crate::openrouter::{IncomingContent, Openrouter};
 use crate::tools::find::find_internal;
+use crate::tools::{Function, Tool};
 use crate::utils::jailed::Jailed;
 use futures::stream::{self, StreamExt};
+use schemars::{JsonSchema, schema_for};
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, from_str, json, to_value};
 use std::path::Path;
-use serde_json::{from_str, json, to_value, Value};
-use crate::tools::{Function, Tool};
+use tokio::task;
 
 use crate::Result;
 
 const MAX_CONCURRENCY: usize = 50;
-const MAP_MODEL:&str = "google/gemini-2.5-flash";
+const MAP_MODEL: &str = "google/gemini-2.5-flash";
 
 #[derive(Deserialize)]
 pub struct AskFilesArgs {
@@ -25,13 +25,13 @@ pub struct AskFilesArgs {
 pub struct AskFilesGlobArgs {
     pub query: String,
     pub glob: String,
-    pub max_results: usize
+    pub max_results: usize,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct AskFileResults {
     answer: String,
-    extracts: Vec<String>, 
+    extracts: Vec<String>,
 }
 pub fn ask_files_tool() -> Tool {
     Tool {
@@ -62,8 +62,7 @@ pub fn ask_files_tool() -> Tool {
 
 pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
     let AskFilesArgs { query, filenames } = args;
-    let settings = task::spawn_blocking(crate::get_settings_fn)
-        .await??;
+    let settings = task::spawn_blocking(crate::get_settings_fn).await??;
 
     let responses: Vec<_> = stream::iter(filenames)
         .map(|filename| {
@@ -99,10 +98,9 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
         .buffer_unordered(MAX_CONCURRENCY)
         .collect()
         .await;
-    
+
     Ok(responses)
 }
-
 
 pub fn ask_files_glob_tool() -> Tool {
     Tool {
@@ -133,8 +131,12 @@ pub fn ask_files_glob_tool() -> Tool {
 }
 
 pub async fn ask_files_glob(args: AskFilesGlobArgs) -> Result<Vec<Result<Value>>> {
-    let AskFilesGlobArgs { query, glob, max_results } = args;
-     let root_dir = task::spawn_blocking(crate::get_settings_fn)
+    let AskFilesGlobArgs {
+        query,
+        glob,
+        max_results,
+    } = args;
+    let root_dir = task::spawn_blocking(crate::get_settings_fn)
         .await?
         .map(|s| s.root_dir)?;
     let filenames = find_internal(&root_dir, &glob, max_results)?;
