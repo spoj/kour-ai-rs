@@ -21,7 +21,8 @@ import {
   cancelOutstandingRequest,
   delete_message,
   delete_tool_interaction,
-  listFiles, // Import the new command
+  listFiles,
+  search_files_by_name,
 } from "./commands";
 import { fileToAttachment } from "./helpers";
 import { IChatCompletionMessage, ISettings, MessageContent } from "./types";
@@ -46,6 +47,7 @@ function App() {
   const [openSettingsModal, setOpenSettingsModal] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [fileList, setFileList] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [leftPaneWidth, setLeftPaneWidth] = useState(250);
   const [settings, setSettings] = useState<ISettings>({
     apiKey: "",
@@ -160,9 +162,13 @@ function App() {
 
   useEffect(() => {
     if (settings.rootDir) {
-      listFiles().then(setFileList).catch(console.error);
+      if (searchTerm) {
+        search_files_by_name(searchTerm).then(setFileList).catch(console.error);
+      } else {
+        listFiles().then(setFileList).catch(console.error);
+      }
     }
-  }, [settings.rootDir]);
+  }, [settings.rootDir, searchTerm]);
 
   const prevMessagesLength = useRef(messages.length);
   useEffect(() => {
@@ -272,7 +278,7 @@ function App() {
     );
     delete_message(id);
   };
-   const handleDeleteTool = (llm_interaction_id: number, tool_call_id: string) => {
+  const handleDeleteTool = (llm_interaction_id: number, tool_call_id: string) => {
     setMessages((prev) =>
       prev.filter(
         (m) =>
@@ -354,11 +360,28 @@ function App() {
           maxWidth={800}
           enable={{ right: true }}
         >
-          <h2>Files</h2>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <h2>Files</h2>
+          </div>
+          <input
+            type="text"
+            placeholder="Search files..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ width: "100%", marginBottom: "10px" }}
+          />
           <ul>
-            {fileList.map((file) => (
-              <li key={file}>{file}</li>
-            ))}
+            {fileList.length > 0 ? (
+              fileList.map((file) => <li key={file}>{file}</li>)
+            ) : (
+              <h2>Please start by selecting a folder</h2>
+            )}
           </ul>
         </Resizable>
         <div id="right-pane">
@@ -382,7 +405,7 @@ function App() {
                 role="assistant"
                 content={[{ type: "text", text: "Thinking..." }]}
                 isNotification
-                onCopy={() => {}}
+                onCopy={() => { }}
               />
             )}
           </div>

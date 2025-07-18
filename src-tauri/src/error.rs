@@ -11,6 +11,10 @@ pub enum Error {
     #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
     #[error(transparent)]
+    Glob(#[from] glob::PatternError),
+    #[error(transparent)]
+    GlobSet(#[from] globset::Error),
+    #[error(transparent)]
     Join(#[from] tokio::task::JoinError),
     #[error("Failed to send chat update: {0}")]
     Tauri(String),
@@ -20,8 +24,6 @@ pub enum Error {
     Conflict(String),
     #[error("Anyhow Error: {0}")]
     Anyhow(#[from] anyhow::Error),
-    #[error("Walkdir Error: {0}")]
-    Walkdir(#[from] walkdir::Error),
 }
 
 impl From<tauri::Error> for Error {
