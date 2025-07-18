@@ -1,6 +1,14 @@
 import { useState, useEffect, useRef } from "react";
-import { FaCog, FaPaperPlane, FaTrash, FaSquare, FaFile } from "react-icons/fa";
+import {
+  FaCog,
+  FaPaperPlane,
+  FaTrash,
+  FaSquare,
+  FaFile,
+  FaFolderOpen,
+} from "react-icons/fa";
 import { Bounce, ToastContainer } from "react-toastify";
+import { open } from "@tauri-apps/plugin-dialog";
 import "./App.css";
 import {
   chat,
@@ -283,6 +291,22 @@ function App() {
             onChange={(e) => handleSettingsChange({ rootDir: e.target.value })}
             onFocus={(e) => e.target.select()}
           />
+          <button
+            id="header-button"
+            title="Select folder"
+            onClick={async () => {
+              const result = await open({
+                directory: true,
+                multiple: false,
+              });
+
+              if (typeof result === "string") {
+                handleSettingsChange({ rootDir: result });
+              }
+            }}
+          >
+            <FaFolderOpen />
+          </button>
         </div>
         <div style={{ paddingLeft: "10px" }}>
           <button
@@ -325,7 +349,7 @@ function App() {
             role="assistant"
             content={[{ type: "text", text: "Thinking..." }]}
             isNotification
-            onCopy={() => {}}
+            onCopy={() => { }}
           />
         )}
       </div>

@@ -35,15 +35,22 @@ h1 {
 #path-container {
   flex-grow: 1;
   margin: 0 20px;
-}
-#path-input {
-  width: 100%;
+  display: flex;
+  align-items: center;
   background-color: rgba(255, 255, 255, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 5px;
+  padding: 0 5px;
+}
+
+#path-input {
+  flex-grow: 1;
+  background-color: transparent;
+  border: none;
   color: white;
-  padding: 5px 10px;
+  padding: 5px 5px;
   font-size: 14px;
+  outline: none;
 }
 #path-input::placeholder {
   color: rgba(255, 255, 255, 0.7);
@@ -59,6 +66,9 @@ h1 {
   align-items: center;
   justify-content: center;
   padding: 8px;
+}
+#path-container #header-button {
+  flex-shrink: 0;
 }
 #chat-container {
   flex-grow: 1;
