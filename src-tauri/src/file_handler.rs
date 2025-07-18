@@ -80,7 +80,7 @@ pub fn convert_to_pdf(path: &Path) -> Result<Vec<u8>> {
         return Ok(cached_pdf);
     }
 
-    let soffice = crate::settings::get_settings_fn()?.soffice_path;
+    let soffice = crate::settings::get_settings()?.soffice_path;
     let temp_dir = Builder::new()
         .prefix("file_conversion")
         .tempdir()

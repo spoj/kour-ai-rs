@@ -1,7 +1,7 @@
 mod chat;
 mod error;
-mod fd;
 mod file_handler;
+mod filter_files;
 mod interaction;
 mod openrouter;
 mod settings;
@@ -13,9 +13,8 @@ use crate::chat::ChatProcessor;
 use crate::error::Error;
 use crate::interaction::{Content, History, Source};
 use crate::openrouter::ChatOptions;
-use crate::settings::{Settings, get_settings_fn};
+use crate::settings::get_settings;
 use crate::ui_events::UIEvents;
-use serde_json::to_value;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 use tauri::Manager;
@@ -45,23 +44,8 @@ pub fn get_cache_dir() -> Result<std::path::PathBuf> {
 }
 
 #[tauri::command]
-fn get_settings() -> Result<Settings> {
-    get_settings_fn()
-}
-
-#[tauri::command]
-fn set_settings(settings: Settings) -> Result<()> {
-    let store = STORE
-        .get()
-        .ok_or(Error::Io(std::io::ErrorKind::NotFound.into()))?;
-    store.set("settings", to_value(settings)?);
-    store.save()?;
-    Ok(())
-}
-
-#[tauri::command]
 async fn chat(window: tauri::Window, content: Vec<Content>, state: AppState<'_>) -> Result<()> {
-    let settings = get_settings_fn()?;
+    let settings = get_settings()?;
     let options = ChatOptions {
         model_name: settings.model_name,
     };
@@ -138,11 +122,6 @@ fn delete_tool_interaction(
     Ok(())
 }
 
-#[tauri::command]
-fn list_files() -> Result<Vec<String>> {
-    crate::fd::list_files()
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -150,15 +129,16 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            get_settings,
-            set_settings,
+            settings::get_settings,
+            settings::set_settings,
             chat,
             replay_history,
             clear_history,
             cancel_outstanding_request,
             delete_message,
             delete_tool_interaction,
-            list_files
+            filter_files::list_files,
+            filter_files::search_files_by_name
         ])
         .setup(|app| {
             STORE.get_or_init(|| {

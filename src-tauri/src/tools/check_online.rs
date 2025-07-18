@@ -23,7 +23,7 @@ pub struct CheckOnlineResult {
 }
 
 pub async fn check_online(args: CheckOnlineArgs) -> Result<CheckOnlineResult> {
-    let settings = crate::get_settings_fn()?;
+    let settings = crate::settings::get_settings()?;
 
     if settings.api_key.is_empty() {
         return Err(Error::Tool(

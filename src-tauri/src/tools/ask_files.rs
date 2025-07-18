@@ -63,7 +63,7 @@ pub fn ask_files_tool() -> Tool {
 
 pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
     let AskFilesArgs { query, filenames } = args;
-    let settings = crate::get_settings_fn()?;
+    let settings = crate::settings::get_settings()?;
 
     let responses: Vec<_> = stream::iter(filenames)
         .map(|filename| {
