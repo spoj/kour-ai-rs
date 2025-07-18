@@ -1,5 +1,6 @@
 mod chat;
 mod error;
+mod fd;
 mod file_handler;
 mod interaction;
 mod openrouter;
@@ -137,6 +138,11 @@ fn delete_tool_interaction(
     Ok(())
 }
 
+#[tauri::command]
+fn list_files() -> Result<Vec<String>> {
+    crate::fd::list_files()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -152,6 +158,7 @@ pub fn run() {
             cancel_outstanding_request,
             delete_message,
             delete_tool_interaction,
+            list_files
         ])
         .setup(|app| {
             STORE.get_or_init(|| {
