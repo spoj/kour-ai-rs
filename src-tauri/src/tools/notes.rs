@@ -1,11 +1,11 @@
 use crate::error::Error;
+use crate::settings::get_root;
 use chrono::Local;
 use serde::Deserialize;
 use serde_json::Value;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
-use tokio::task;
 
 use crate::tools::Function;
 use crate::tools::Tool;
@@ -45,9 +45,7 @@ pub async fn append_notes(args: AppendNotesArgs) -> crate::Result<String> {
 }
 
 async fn get_notes_path() -> crate::Result<PathBuf> {
-    let root_dir = task::spawn_blocking(crate::get_settings_fn)
-        .await?
-        .map(|s| s.root_dir)?;
+    let root_dir = get_root()?;
 
     if root_dir.is_empty() {
         return Err(Error::Tool(

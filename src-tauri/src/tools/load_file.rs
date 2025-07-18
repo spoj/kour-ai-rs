@@ -1,3 +1,4 @@
+use crate::settings::get_root;
 use crate::Result;
 use crate::error::Error;
 use crate::file_handler;
@@ -14,9 +15,7 @@ pub struct LoadFileArgs {
 }
 
 pub async fn load_file(args: LoadFileArgs) -> Result<ToolPayload> {
-    let root_dir = task::spawn_blocking(crate::get_settings_fn)
-        .await?
-        .map(|s| s.root_dir)?;
+    let root_dir = get_root()?;
 
     if root_dir.is_empty() {
         return Err(Error::Tool(

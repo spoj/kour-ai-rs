@@ -1,5 +1,6 @@
 use crate::error::Error;
 use crate::openrouter::{IncomingContent, Openrouter};
+use crate::settings::get_root;
 use crate::tools::find::find_internal;
 use crate::tools::{Function, Tool};
 use crate::utils::jailed::Jailed;
@@ -62,7 +63,7 @@ pub fn ask_files_tool() -> Tool {
 
 pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
     let AskFilesArgs { query, filenames } = args;
-    let settings = task::spawn_blocking(crate::get_settings_fn).await??;
+    let settings = crate::get_settings_fn()?;
 
     let responses: Vec<_> = stream::iter(filenames)
         .map(|filename| {
@@ -136,9 +137,7 @@ pub async fn ask_files_glob(args: AskFilesGlobArgs) -> Result<Vec<Result<Value>>
         glob,
         max_results,
     } = args;
-    let root_dir = task::spawn_blocking(crate::get_settings_fn)
-        .await?
-        .map(|s| s.root_dir)?;
+    let root_dir = get_root()?;
     let filenames = find_internal(&root_dir, &glob, max_results)?;
     ask_files(AskFilesArgs { query, filenames }).await
 }

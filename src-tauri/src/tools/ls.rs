@@ -1,4 +1,4 @@
-use crate::Result;
+use crate::{settings::get_root, Result};
 use crate::error::Error;
 use crate::utils::jailed::Jailed;
 use std::path::Path;
@@ -6,7 +6,6 @@ use std::path::Path;
 use super::{Function, Tool};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use tokio::task;
 
 pub fn get_tool() -> Tool {
     Tool {
@@ -34,9 +33,7 @@ pub struct LsArgs {
 }
 
 pub async fn ls(args: LsArgs) -> Result<Vec<String>> {
-    let root_dir = task::spawn_blocking(crate::get_settings_fn)
-        .await?
-        .map(|s| s.root_dir)?;
+    let root_dir = get_root()?;
 
     if root_dir.is_empty() {
         return Err(Error::Tool(

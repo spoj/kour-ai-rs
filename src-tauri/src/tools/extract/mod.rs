@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use tokio::{fs, task};
+use tokio::fs;
 
 use crate::Result;
 use crate::error::Error;
+use crate::settings::get_root;
 use crate::tools::{Function, Tool};
 
 pub mod extract_eml;
@@ -24,9 +25,7 @@ pub struct ExtractResult {
 }
 
 pub async fn extract(args: ExtractArgs) -> Result<ExtractResult> {
-    let root_dir = task::spawn_blocking(crate::get_settings_fn)
-        .await?
-        .map(|s| s.root_dir)?;
+    let root_dir = get_root()?;
     let root_dir = PathBuf::from(root_dir);
 
     let file_path = root_dir.join(&args.filename);

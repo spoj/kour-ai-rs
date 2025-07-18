@@ -1,4 +1,4 @@
-use crate::Result;
+use crate::{settings::get_root, Result};
 use crate::error::Error;
 use crate::utils::jailed::Jailed;
 
@@ -6,7 +6,6 @@ use super::{Function, Tool};
 use glob::MatchOptions;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use tokio::task;
 
 pub fn get_tool() -> Tool {
     Tool {
@@ -88,9 +87,7 @@ pub fn find_internal(root_dir: &str, glob_pattern: &str, limit: usize) -> Result
 }
 
 pub async fn find(args: FindArgs) -> Result<Vec<String>> {
-    let root_dir = task::spawn_blocking(crate::get_settings_fn)
-        .await?
-        .map(|s| s.root_dir)?;
+    let root_dir = get_root()?;
     let result = find_internal(&root_dir, &args.glob, args.max_results)?;
     Ok(result)
 }
