@@ -35,6 +35,9 @@ export const chat = async (
 	await invoke("chat", { content: content });
 };
 
+export const listFiles = async (): Promise<string[]> => {
+	return await invoke("list_files");
+};
 export const onChatCompletionUpdate = async (
 	callback: (update: IChatCompletionUpdate) => void
 ) => {

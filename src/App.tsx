@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Resizable } from "re-resizable";
 import {
   FaCog,
   FaPaperPlane,
@@ -20,6 +21,7 @@ import {
   cancelOutstandingRequest,
   delete_message,
   delete_tool_interaction,
+  listFiles, // Import the new command
 } from "./commands";
 import { fileToAttachment } from "./helpers";
 import { IChatCompletionMessage, ISettings, MessageContent } from "./types";
@@ -43,6 +45,8 @@ function App() {
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const [openSettingsModal, setOpenSettingsModal] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [fileList, setFileList] = useState<string[]>([]);
+  const [leftPaneWidth, setLeftPaneWidth] = useState(250);
   const [settings, setSettings] = useState<ISettings>({
     apiKey: "",
     modelName: "",
@@ -53,7 +57,12 @@ function App() {
 
   useEffect(() => {
     getVersion().then(setAppVersion);
-    getSettings().then(setSettings);
+    getSettings().then((s) => {
+      setSettings(s);
+      if (s.rootDir) {
+        listFiles().then(setFileList).catch(console.error);
+      }
+    });
     messageInputRef.current?.focus();
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -148,6 +157,12 @@ function App() {
       unlisten.then((f) => f());
     };
   }, []);
+
+  useEffect(() => {
+    if (settings.rootDir) {
+      listFiles().then(setFileList).catch(console.error);
+    }
+  }, [settings.rootDir]);
 
   const prevMessagesLength = useRef(messages.length);
   useEffect(() => {
@@ -257,8 +272,7 @@ function App() {
     );
     delete_message(id);
   };
-
-  const handleDeleteTool = (llm_interaction_id: number, tool_call_id: string) => {
+   const handleDeleteTool = (llm_interaction_id: number, tool_call_id: string) => {
     setMessages((prev) =>
       prev.filter(
         (m) =>
@@ -329,83 +343,107 @@ function App() {
           </button>
         </div>
       </header>
-      <div id="chat-container" ref={chatContainerRef}>
-        {messages
-          .sort((a, b) => a.id - b.id)
-          .map((m) => (
-            <ChatBubble
-              key={m.tool_call_id || m.id}
-              {...m}
-              onCopy={() => handleCopy(m.content)}
-              onDelete={() => handleDelete(m.id)}
-              onDeleteTool={(llm_interaction_id, tool_call_id) =>
-                handleDeleteTool(llm_interaction_id, tool_call_id)
-              }
-            />
-          ))}
-        {isTyping && (
-          <ChatBubble
-            id={0}
-            role="assistant"
-            content={[{ type: "text", text: "Thinking..." }]}
-            isNotification
-            onCopy={() => { }}
-          />
-        )}
-      </div>
-      <div id="input-container">
-        <div id="attachment-container">
-          {attachments.map((a, i) =>
-            a.type.startsWith("image/") ? (
-              <img
-                key={i}
-                src={a.content}
-                alt={a.filename}
-                title={a.filename}
-                className="attachment-thumbnail"
-                onClick={() =>
-                  setAttachments((prev) => prev.filter((_, j) => i !== j))
-                }
+      <main id="main-content">
+        <Resizable
+          className="left-pane"
+          size={{ width: leftPaneWidth, height: "100%" }}
+          onResizeStop={(_e, _direction, _ref, d) => {
+            setLeftPaneWidth(leftPaneWidth + d.width);
+          }}
+          minWidth={200}
+          maxWidth={800}
+          enable={{ right: true }}
+        >
+          <h2>Files</h2>
+          <ul>
+            {fileList.map((file) => (
+              <li key={file}>{file}</li>
+            ))}
+          </ul>
+        </Resizable>
+        <div id="right-pane">
+          <div id="chat-container" ref={chatContainerRef}>
+            {messages
+              .sort((a, b) => a.id - b.id)
+              .map((m) => (
+                <ChatBubble
+                  key={m.tool_call_id || m.id}
+                  {...m}
+                  onCopy={() => handleCopy(m.content)}
+                  onDelete={() => handleDelete(m.id)}
+                  onDeleteTool={(llm_interaction_id, tool_call_id) =>
+                    handleDeleteTool(llm_interaction_id, tool_call_id)
+                  }
+                />
+              ))}
+            {isTyping && (
+              <ChatBubble
+                id={0}
+                role="assistant"
+                content={[{ type: "text", text: "Thinking..." }]}
+                isNotification
+                onCopy={() => {}}
               />
-            ) : (
-              <div
-                key={i}
-                title={a.filename}
-                onClick={() =>
-                  setAttachments((prev) => prev.filter((_, j) => i !== j))
-                }
-              >
-                <FaFile className="attachment-thumbnail" id="file-attachment" />
-              </div>
-            )
-          )}
+            )}
+          </div>
+          <div id="input-container">
+            <div id="attachment-container">
+              {attachments.map((a, i) =>
+                a.type.startsWith("image/") ? (
+                  <img
+                    key={i}
+                    src={a.content}
+                    alt={a.filename}
+                    title={a.filename}
+                    className="attachment-thumbnail"
+                    onClick={() =>
+                      setAttachments((prev) => prev.filter((_, j) => i !== j))
+                    }
+                  />
+                ) : (
+                  <div
+                    key={i}
+                    title={a.filename}
+                    onClick={() =>
+                      setAttachments((prev) => prev.filter((_, j) => i !== j))
+                    }
+                  >
+                    <FaFile
+                      className="attachment-thumbnail"
+                      id="file-attachment"
+                    />
+                  </div>
+                )
+              )}
+            </div>
+            <div style={{ width: "100%", display: "flex" }}>
+              <textarea
+                ref={messageInputRef}
+                id="message-input"
+                placeholder="Type a message..."
+                rows={1}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+              ></textarea>
+              {isTyping ? (
+                <button
+                  className="send-button"
+                  id="stop-button"
+                  onClick={handleCancel}
+                >
+                  <FaSquare />
+                </button>
+              ) : (
+                <button className="send-button" onClick={handleSend}>
+                  <FaPaperPlane />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
-        <div style={{ width: "100%", display: "flex" }}>
-          <textarea
-            ref={messageInputRef}
-            id="message-input"
-            placeholder="Type a message..."
-            rows={1}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-          ></textarea>
-          {isTyping ? (
-            <button
-              className="send-button"
-              id="stop-button"
-              onClick={handleCancel}
-            >
-              <FaSquare />
-            </button>
-          ) : (
-            <button className="send-button" onClick={handleSend}>
-              <FaPaperPlane />
-            </button>
-          )}
-        </div>
-      </div>
+      </main>
       {openSettingsModal && (
         <SettingsModal
           settings={settings}
