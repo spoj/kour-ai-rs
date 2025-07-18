@@ -26,6 +26,10 @@ pub fn get_settings_fn() -> Result<Settings> {
         .unwrap_or_default();
     Ok(settings)
 }
+pub fn get_root() -> Result<String> {
+    let settings = get_settings_fn()?;
+    Ok(settings.root_dir)
+}
 impl Default for Settings {
     fn default() -> Self {
         Self {
