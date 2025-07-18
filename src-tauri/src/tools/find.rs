@@ -1,6 +1,6 @@
-use crate::{settings::get_root, Result};
 use crate::error::Error;
 use crate::utils::jailed::Jailed;
+use crate::{Result, settings::get_root};
 
 use super::{Function, Tool};
 use glob::MatchOptions;
@@ -37,13 +37,12 @@ pub struct FindArgs {
     pub max_results: usize,
 }
 
-pub fn find_internal(root_dir: &str, glob_pattern: &str, limit: usize) -> Result<Vec<String>> {
-    if root_dir.is_empty() {
-        return Err(Error::Tool(
-            "Error: Root directory is not set. Please set it in the settings.".to_string(),
-        ));
-    }
-    let jail = Path::new(root_dir);
+pub fn find_internal<P: AsRef<Path>>(
+    root_dir: P,
+    glob_pattern: &str,
+    limit: usize,
+) -> Result<Vec<String>> {
+    let jail = root_dir.as_ref();
     let options = MatchOptions {
         case_sensitive: false,
         require_literal_separator: true,
@@ -75,7 +74,7 @@ pub fn find_internal(root_dir: &str, glob_pattern: &str, limit: usize) -> Result
     let result: Vec<String> = entries
         .iter()
         .map(|entry| {
-            if let Ok(relative) = entry.strip_prefix(root_dir) {
+            if let Ok(relative) = entry.strip_prefix(&root_dir) {
                 relative.to_str().unwrap_or_default().to_string()
             } else {
                 String::new()

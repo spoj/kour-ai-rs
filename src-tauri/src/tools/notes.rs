@@ -47,13 +47,7 @@ pub async fn append_notes(args: AppendNotesArgs) -> crate::Result<String> {
 async fn get_notes_path() -> crate::Result<PathBuf> {
     let root_dir = get_root()?;
 
-    if root_dir.is_empty() {
-        return Err(Error::Tool(
-            "Error: Root directory is not set. Please set it in the settings.".to_string(),
-        ));
-    }
-
-    Ok(PathBuf::from(root_dir).join("_NOTES.txt"))
+    Ok(root_dir.join("_NOTES.txt"))
 }
 
 pub fn read_notes_tool() -> Tool {

@@ -1,6 +1,5 @@
 use crate::settings::get_root;
 use crate::Result;
-use crate::error::Error;
 use crate::file_handler;
 use crate::interaction::Content;
 use crate::tools::{Function, Tool, ToolPayload};
@@ -17,14 +16,7 @@ pub struct LoadFileArgs {
 pub async fn load_file(args: LoadFileArgs) -> Result<ToolPayload> {
     let root_dir = get_root()?;
 
-    if root_dir.is_empty() {
-        return Err(Error::Tool(
-            "Error: Root directory is not set. Please set it in the settings.".to_string(),
-        ));
-    }
-
-    let jail = Path::new(&root_dir);
-    let safe_path = jail.jailed_join(Path::new(&args.filename))?;
+    let safe_path = root_dir.jailed_join(Path::new(&args.filename))?;
 
     let mut file_content =
         task::spawn_blocking(move || file_handler::process_file_for_llm(&safe_path)).await??;

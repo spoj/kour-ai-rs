@@ -35,14 +35,7 @@ pub struct LsArgs {
 pub async fn ls(args: LsArgs) -> Result<Vec<String>> {
     let root_dir = get_root()?;
 
-    if root_dir.is_empty() {
-        return Err(Error::Tool(
-            "Error: Root directory is not set. Please set it in the settings.".to_string(),
-        ));
-    }
-
-    let jail = Path::new(&root_dir);
-    let safe_path = jail.jailed_join(Path::new(&args.relative_path))?;
+    let safe_path = root_dir.jailed_join(Path::new(&args.relative_path))?;
 
     match fs::read_dir(&safe_path) {
         Ok(entries) => {

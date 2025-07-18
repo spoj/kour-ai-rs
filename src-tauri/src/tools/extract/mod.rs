@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use tokio::fs;
 
 use crate::Result;
@@ -26,7 +25,6 @@ pub struct ExtractResult {
 
 pub async fn extract(args: ExtractArgs) -> Result<ExtractResult> {
     let root_dir = get_root()?;
-    let root_dir = PathBuf::from(root_dir);
 
     let file_path = root_dir.join(&args.filename);
 
