@@ -7,7 +7,7 @@ use globset::{GlobBuilder, GlobSetBuilder};
 use ignore::Walk;
 use rayon::prelude::*;
 use shlex::Shlex;
-use tauri::State;
+use std::sync::LazyLock;
 
 use crate::settings::get_root;
 
