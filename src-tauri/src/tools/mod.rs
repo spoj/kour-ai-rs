@@ -114,8 +114,7 @@ impl ToolPayload {
         )
     }
 }
-
-pub static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
+pub fn get_tools() -> Vec<Tool> {
     vec![
         roll_dice::get_tool(),
         ls::get_tool(),
@@ -129,7 +128,7 @@ pub static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
         make_file::get_tool(),
         check_online::get_tool(),
     ]
-});
+}
 
 pub async fn tool_dispatcher(name: &str, arguments: &str) -> ToolPayload {
     match name {

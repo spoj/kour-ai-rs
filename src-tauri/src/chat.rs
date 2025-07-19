@@ -35,7 +35,7 @@ impl ChatProcessor {
                 &to_llm,
                 &self.options.model_name,
                 SYSTEM_PROMPT,
-                &tools::TOOLS,
+                &tools::get_tools(),
                 None,
             )
             .await?;
