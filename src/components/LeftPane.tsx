@@ -1,6 +1,16 @@
 import { Resizable } from "re-resizable";
 import "./LeftPane.css";
 
+const formatFolderPath = (parts: string[]) => {
+  if (parts.length <= 2) {
+    return parts.join("/");
+  }
+  const condensedParts = parts
+    .slice(0, -2)
+    .map((part) => part.charAt(0));
+  return [...condensedParts, ...parts.slice(-2)].join("/");
+};
+
 type LeftPaneProps = {
   leftPaneWidth: number;
   setLeftPaneWidth: (width: number) => void;
@@ -80,7 +90,7 @@ export const LeftPane = ({
           fileList.map((file) => {
             const parts = file.split(/[\\/]/);
             const fileName = parts.pop() || file;
-            const folderPath = parts.join("/");
+            const folderPath = formatFolderPath(parts);
 
             return (
               <li key={file} title={file} className="file-list-item">
