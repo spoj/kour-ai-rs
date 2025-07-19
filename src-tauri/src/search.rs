@@ -12,17 +12,19 @@ use tauri::State;
 use crate::settings::get_root;
 
 #[derive(Default)]
-pub struct Searching {
+pub struct SearchState {
     root: Mutex<Option<PathBuf>>,
-    files: RwLock<Vec<String>>,
+    full_list: RwLock<Vec<String>>,
+    pub last_search_result: RwLock<Vec<String>>,
+    pub last_search: RwLock<String>,
 }
+
+pub static SEARCH_STATE: LazyLock<SearchState> = LazyLock::new(SearchState::default);
+
 #[tauri::command]
-pub fn search_files_by_name(
-    globs: &str,
-    state: State<'_, Searching>,
-) -> Result<Vec<String>, crate::Error> {
+pub fn search_files_by_name(globs: &str) -> Result<Vec<String>, crate::Error> {
     let root = get_root()?;
-    if Some(&root) != (*state.root.lock().unwrap()).as_ref() {
+    if Some(&root) != (*SEARCH_STATE.root.lock().unwrap()).as_ref() {
         let files: Vec<_> = Walk::new(&root)
             .flatten()
             .flat_map(|e| {
@@ -38,13 +40,19 @@ pub fn search_files_by_name(
                 }
             })
             .collect();
-        *state.files.write().unwrap() = files;
-        *state.root.lock().unwrap() = Some(root);
+        *SEARCH_STATE.full_list.write().unwrap() = files;
+        *SEARCH_STATE.root.lock().unwrap() = Some(root);
     }
 
     let globs = globs.to_string();
-    let files = state.files.read().unwrap();
-    search_files_by_name_internal(&files, &globs)
+    let files = SEARCH_STATE.full_list.read().unwrap();
+    let mut res = search_files_by_name_internal(&files, &globs);
+    if let Ok(ref mut v) = res {
+        *SEARCH_STATE.last_search.write().unwrap() = globs.to_string();
+        *SEARCH_STATE.last_search_result.write().unwrap() = v.clone();
+        v.truncate(500);
+    }
+    res
 }
 
 fn search_files_by_name_internal(
@@ -66,7 +74,7 @@ fn search_files_by_name_internal(
     }
     let set = set.build()?;
 
-    let mut out: Vec<_> = paths
+    let out: Vec<_> = paths
         .par_iter()
         .flat_map(|path| {
             if set.matches(path).len() == set.len() {
@@ -76,6 +84,5 @@ fn search_files_by_name_internal(
             }
         })
         .collect();
-    out.truncate(500);
     Ok(out)
 }

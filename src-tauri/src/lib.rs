@@ -153,7 +153,6 @@ pub fn run() {
             let cancel = Mutex::new(None);
             let inner_state = AppStateInner { cancel, history };
             app.manage(inner_state);
-            app.manage(Searching::default());
             Ok(())
         })
         .run(tauri::generate_context!())
