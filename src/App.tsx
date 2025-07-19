@@ -1,14 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { Resizable } from "re-resizable";
-import {
-  FaCog,
-  FaPaperPlane,
-  FaTrash,
-  FaSquare,
-  FaFile,
-  FaFolderOpen,
-} from "react-icons/fa";
-import { Bounce, ToastContainer } from "react-toastify";
 import { open } from "@tauri-apps/plugin-dialog";
 import "./App.css";
 import {
@@ -25,9 +15,13 @@ import {
 } from "./commands";
 import { fileToAttachment } from "./helpers";
 import { IChatCompletionMessage, ISettings, MessageContent } from "./types";
-import { ChatBubble } from "./components/ChatBubble";
 import { SettingsModal } from "./components/SettingsModal";
 import { getVersion } from "@tauri-apps/api/app";
+import { Bounce, ToastContainer } from "react-toastify";
+import { TopBar } from "./components/TopBar";
+import { LeftPane } from "./components/LeftPane";
+import { RightPane } from "./components/RightPane";
+
 
 type Attachment = {
   type: string; // Mime type e.g. "image/png"
@@ -301,176 +295,46 @@ function App() {
 
   return (
     <div className="container">
-      <header>
-        <a href="/" style={{ color: "white", textDecoration: "none" }}>
-          <h1 title={`version: ${appVersion}`}>Kour-AI</h1>
-        </a>
-        <div id="path-container">
-          <input
-            ref={rootDirInputRef}
-            type="text"
-            id="path-input"
-            placeholder="Enter root directory..."
-            value={settings.rootDir}
-            onChange={(e) => handleSettingsChange({ rootDir: e.target.value })}
-            onFocus={(e) => e.target.select()}
-          />
-          <button
-            id="header-button"
-            title="Select folder"
-            onClick={async () => {
-              const result = await open({
-                directory: true,
-                multiple: false,
-              });
-
-              if (typeof result === "string") {
-                handleSettingsChange({ rootDir: result });
-              }
-            }}
-          >
-            <FaFolderOpen />
-          </button>
-        </div>
-        <div style={{ paddingLeft: "10px" }}>
-          <button
-            id="header-button"
-            title="Clear History"
-            onClick={() => {
-              clearHistory().then(() => {
-                setMessages([]);
-              });
-            }}
-          >
-            <FaTrash />
-          </button>
-          <button
-            id="header-button"
-            title="Settings"
-            onClick={() => setOpenSettingsModal(true)}
-          >
-            <FaCog />
-          </button>
-        </div>
-      </header>
+      <TopBar
+        appVersion={appVersion}
+        settings={settings}
+        handleSettingsChange={handleSettingsChange}
+        onClearHistory={() => clearHistory().then(() => setMessages([]))}
+        onOpenSettings={() => setOpenSettingsModal(true)}
+        onSelectFolder={async () => {
+          const result = await open({ directory: true, multiple: false });
+          if (typeof result === "string") {
+            handleSettingsChange({ rootDir: result });
+          }
+        }}
+        rootDirInputRef={rootDirInputRef}
+      />
       <main id="main-content">
-        <Resizable
-          className="left-pane"
-          size={{ width: leftPaneWidth, height: "100%" }}
-          onResizeStop={(_e, _direction, _ref, d) => {
-            setLeftPaneWidth(leftPaneWidth + d.width);
-          }}
-          minWidth={200}
-          maxWidth={800}
-          enable={{ right: true }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <h2>Files</h2>
-          </div>
-          <input
-            ref={searchInputRef}
-            type="text"
-            placeholder="Search files..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ width: "100%", marginBottom: "10px" }}
-          />
-          <ul>
-            {fileList.length > 0 ? (
-              fileList.map((file) => <li key={file}>{file}</li>)
-            ) : (
-              <h2>Please start by selecting a folder</h2>
-            )}
-          </ul>
-        </Resizable>
-        <div id="right-pane">
-          <div id="chat-container" ref={chatContainerRef}>
-            {messages
-              .sort((a, b) => a.id - b.id)
-              .map((m) => (
-                <ChatBubble
-                  key={m.tool_call_id || m.id}
-                  {...m}
-                  onCopy={() => handleCopy(m.content)}
-                  onDelete={() => handleDelete(m.id)}
-                  onDeleteTool={(llm_interaction_id, tool_call_id) =>
-                    handleDeleteTool(llm_interaction_id, tool_call_id)
-                  }
-                />
-              ))}
-            {isTyping && (
-              <ChatBubble
-                id={0}
-                role="assistant"
-                content={[{ type: "text", text: "Thinking..." }]}
-                isNotification
-                onCopy={() => { }}
-              />
-            )}
-          </div>
-          <div id="input-container">
-            <div id="attachment-container">
-              {attachments.map((a, i) =>
-                a.type.startsWith("image/") ? (
-                  <img
-                    key={i}
-                    src={a.content}
-                    alt={a.filename}
-                    title={a.filename}
-                    className="attachment-thumbnail"
-                    onClick={() =>
-                      setAttachments((prev) => prev.filter((_, j) => i !== j))
-                    }
-                  />
-                ) : (
-                  <div
-                    key={i}
-                    title={a.filename}
-                    onClick={() =>
-                      setAttachments((prev) => prev.filter((_, j) => i !== j))
-                    }
-                  >
-                    <FaFile
-                      className="attachment-thumbnail"
-                      id="file-attachment"
-                    />
-                  </div>
-                )
-              )}
-            </div>
-            <div style={{ width: "100%", display: "flex" }}>
-              <textarea
-                ref={messageInputRef}
-                id="message-input"
-                placeholder="Type a message..."
-                rows={1}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
-              ></textarea>
-              {isTyping ? (
-                <button
-                  className="send-button"
-                  id="stop-button"
-                  onClick={handleCancel}
-                >
-                  <FaSquare />
-                </button>
-              ) : (
-                <button className="send-button" onClick={handleSend}>
-                  <FaPaperPlane />
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <LeftPane
+          leftPaneWidth={leftPaneWidth}
+          setLeftPaneWidth={setLeftPaneWidth}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          fileList={fileList}
+          searchInputRef={searchInputRef}
+        />
+        <RightPane
+          messages={messages}
+          isTyping={isTyping}
+          onCopy={handleCopy}
+          onDelete={handleDelete}
+          onDeleteTool={handleDeleteTool}
+          chatContainerRef={chatContainerRef}
+          attachments={attachments}
+          setAttachments={setAttachments}
+          input={input}
+          setInput={setInput}
+          handleKeyDown={handleKeyDown}
+          handlePaste={handlePaste}
+          handleSend={handleSend}
+          handleCancel={handleCancel}
+          messageInputRef={messageInputRef}
+        />
       </main>
       {openSettingsModal && (
         <SettingsModal
