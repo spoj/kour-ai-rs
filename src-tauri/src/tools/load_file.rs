@@ -1,7 +1,7 @@
-use crate::settings::get_root;
 use crate::Result;
 use crate::file_handler;
 use crate::interaction::Content;
+use crate::settings::get_root;
 use crate::tools::{Function, Tool, ToolPayload};
 use crate::utils::jailed::Jailed;
 use serde::Deserialize;

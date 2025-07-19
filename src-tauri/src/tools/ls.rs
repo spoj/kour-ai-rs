@@ -1,6 +1,6 @@
-use crate::{settings::get_root, Result};
 use crate::error::Error;
 use crate::utils::jailed::Jailed;
+use crate::{Result, settings::get_root};
 use std::path::Path;
 
 use super::{Function, Tool};

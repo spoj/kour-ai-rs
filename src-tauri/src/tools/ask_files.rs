@@ -82,7 +82,7 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
                 let file_content =
                     task::spawn_blocking(move || crate::file_handler::process_file_for_llm(&file_path))
                         .await??;
-                
+
                 let mut messages = vec![
                     json!({"role":"user","content":format!("File: {filename}\n\nQuery: {query}")})
                 ];
@@ -92,12 +92,12 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
 
                 let response =
                     Openrouter::call(&messages, model_name, "You are a helpful assistant that answers questions about files. Your answer must be grounded.", &vec![], Some(schema)).await?;
-                if let IncomingContent::Text(text) =  &response.choices[0].message.content 
+                if let IncomingContent::Text(text) =  &response.choices[0].message.content
                 && let Ok(output) = from_str::<AskFileResults>(text)
                 {
                     return Ok(json!({filename:output}));
                 }
-                
+
                 Err(Error::Tool("MapError".to_string()))
             }
         })

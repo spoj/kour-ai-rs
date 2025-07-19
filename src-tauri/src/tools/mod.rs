@@ -10,7 +10,6 @@ mod roll_dice;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, from_str, to_string, to_value};
-use std::sync::LazyLock;
 
 use crate::{
     Result,

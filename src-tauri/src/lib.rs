@@ -1,9 +1,9 @@
 mod chat;
 mod error;
 mod file_handler;
-mod search;
 mod interaction;
 mod openrouter;
+mod search;
 mod settings;
 mod tools;
 mod ui_events;
@@ -11,7 +11,6 @@ mod utils;
 
 use crate::chat::ChatProcessor;
 use crate::error::Error;
-use crate::search::Searching;
 use crate::interaction::{Content, History, Source};
 use crate::openrouter::ChatOptions;
 use crate::settings::get_settings;
