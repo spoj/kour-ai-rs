@@ -39,10 +39,6 @@ export const chat = async (content: MessageContent): Promise<void> => {
   await invoke("chat", { content: content });
 };
 
-export const listFiles = async (): Promise<string[]> => {
-  return await invoke("list_files");
-};
-
 export const search_files_by_name = async (globs: string): Promise<string[]> => {
   return await invoke("search_files_by_name", { globs: globs });
 };

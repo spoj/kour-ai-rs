@@ -57,6 +57,7 @@ tauri-plugin-dialog = "2"
 globset = "0.4.16"
 shlex = "1.3.0"
 ignore = "0.4.22"
+rayon = "1.10.0"
 
 [target.'cfg(windows)'.dependencies]
 msi-extract = {version = "0.2.0", git = "https://github.com/spoj/msi-extract-rs", branch = "dev-cab"}

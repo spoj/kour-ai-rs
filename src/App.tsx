@@ -21,7 +21,6 @@ import {
   cancelOutstandingRequest,
   delete_message,
   delete_tool_interaction,
-  listFiles,
   search_files_by_name,
 } from "./commands";
 import { fileToAttachment } from "./helpers";
@@ -44,6 +43,7 @@ function App() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const rootDirInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [openSettingsModal, setOpenSettingsModal] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [fileList, setFileList] = useState<string[]>([]);
@@ -61,21 +61,29 @@ function App() {
     getVersion().then(setAppVersion);
     getSettings().then((s) => {
       setSettings(s);
-      if (s.rootDir) {
-        listFiles().then(setFileList).catch(console.error);
-      }
     });
     messageInputRef.current?.focus();
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "l" && e.ctrlKey) {
-        e.preventDefault();
-        rootDirInputRef.current?.focus();
-      } else if (e.key === "k" && e.ctrlKey) {
-        e.preventDefault();
-        clearHistory().then(() => {
-          setMessages([]);
-        });
+      if (e.ctrlKey) {
+        switch (e.key) {
+          case "l":
+            e.preventDefault();
+            rootDirInputRef.current?.select();
+            break;
+          case "k":
+            e.preventDefault();
+            clearHistory().then(() => setMessages([]));
+            break;
+          case "f":
+            e.preventDefault();
+            searchInputRef.current?.select();
+            break;
+          case "r":
+            e.preventDefault();
+            messageInputRef.current?.select();
+            break;
+        }
       }
     };
 
@@ -162,11 +170,7 @@ function App() {
 
   useEffect(() => {
     if (settings.rootDir) {
-      if (searchTerm) {
-        search_files_by_name(searchTerm).then(setFileList).catch(console.error);
-      } else {
-        listFiles().then(setFileList).catch(console.error);
-      }
+      search_files_by_name(searchTerm).then(setFileList).catch(console.error);
     }
   }, [settings.rootDir, searchTerm]);
 
@@ -370,6 +374,7 @@ function App() {
             <h2>Files</h2>
           </div>
           <input
+            ref={searchInputRef}
             type="text"
             placeholder="Search files..."
             value={searchTerm}

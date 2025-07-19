@@ -1,7 +1,7 @@
 mod chat;
 mod error;
 mod file_handler;
-mod filter_files;
+mod search;
 mod interaction;
 mod openrouter;
 mod settings;
@@ -11,7 +11,7 @@ mod utils;
 
 use crate::chat::ChatProcessor;
 use crate::error::Error;
-use crate::filter_files::Searching;
+use crate::search::Searching;
 use crate::interaction::{Content, History, Source};
 use crate::openrouter::ChatOptions;
 use crate::settings::get_settings;
@@ -138,8 +138,7 @@ pub fn run() {
             cancel_outstanding_request,
             delete_message,
             delete_tool_interaction,
-            filter_files::list_files,
-            filter_files::search_files_by_name
+            search::search_files_by_name
         ])
         .setup(|app| {
             STORE.get_or_init(|| {
