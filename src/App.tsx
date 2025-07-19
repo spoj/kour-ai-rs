@@ -77,6 +77,10 @@ function App() {
             e.preventDefault();
             messageInputRef.current?.select();
             break;
+          case "o":
+            e.preventDefault();
+            handleSelectFolder();
+            break;
         }
       }
     };
@@ -293,6 +297,13 @@ function App() {
     });
   };
 
+  const handleSelectFolder = async () => {
+    const result = await open({ directory: true, multiple: false });
+    if (typeof result === "string") {
+      handleSettingsChange({ rootDir: result });
+    }
+  };
+
   return (
     <div className="container">
       <TopBar
@@ -301,12 +312,7 @@ function App() {
         handleSettingsChange={handleSettingsChange}
         onClearHistory={() => clearHistory().then(() => setMessages([]))}
         onOpenSettings={() => setOpenSettingsModal(true)}
-        onSelectFolder={async () => {
-          const result = await open({ directory: true, multiple: false });
-          if (typeof result === "string") {
-            handleSettingsChange({ rootDir: result });
-          }
-        }}
+        onSelectFolder={handleSelectFolder}
         rootDirInputRef={rootDirInputRef}
       />
       <main id="main-content">
