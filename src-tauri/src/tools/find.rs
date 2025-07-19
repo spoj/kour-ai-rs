@@ -1,11 +1,9 @@
+use crate::Result;
 use crate::error::Error;
-use crate::utils::jailed::Jailed;
-use crate::{Result, settings::get_root};
+use crate::search::search_files_by_name;
 
 use super::{Function, Tool};
-use glob::MatchOptions;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 
 pub fn get_tool() -> Tool {
     Tool {
@@ -37,56 +35,15 @@ pub struct FindArgs {
     pub max_results: usize,
 }
 
-pub fn find_internal<P: AsRef<Path>>(
-    root_dir: P,
-    glob_pattern: &str,
-    limit: usize,
-) -> Result<Vec<String>> {
-    let jail = root_dir.as_ref();
-    let options = MatchOptions {
-        case_sensitive: false,
-        require_literal_separator: true,
-        require_literal_leading_dot: false,
-    };
+pub async fn find(args: FindArgs) -> Result<Vec<String>> {
+    let result = search_files_by_name(&args.glob)?;
 
-    // Use the Jailed trait to prevent traversal attacks.
-    // We only join the non-glob part of the pattern to validate the base directory.
-    let glob_path = Path::new(glob_pattern);
-    let safe_base = jail.jailed_join(Path::new(glob_path.parent().unwrap_or(glob_path)))?;
-
-    let full_pattern = safe_base.join(glob_path.file_name().unwrap_or_default());
-    let full_pattern_str = full_pattern
-        .to_str()
-        .ok_or_else(|| Error::Tool("Invalid pattern path".to_string()))?;
-
-    let entries: Vec<_> = glob::glob_with(full_pattern_str, options)
-        .map_err(|e| Error::Tool(format!("Invalid glob pattern: {e}")))?
-        .flatten()
-        .collect();
-
-    if entries.len() > limit {
+    if result.len() > args.max_results {
         return Err(Error::Tool(format!(
-            "Error: Found more files ({}) than limit ({limit}). Consider up the limit or take different approach.",
-            entries.len()
+            "Error: Found more files ({}) than limit ({}). Consider up the limit or take different approach.",
+            args.max_results,
+            result.len()
         )));
     }
-
-    let result: Vec<String> = entries
-        .iter()
-        .map(|entry| {
-            if let Ok(relative) = entry.strip_prefix(&root_dir) {
-                relative.to_str().unwrap_or_default().to_string()
-            } else {
-                String::new()
-            }
-        })
-        .collect();
-
-    Ok(result)
-}
-
-pub async fn find(args: FindArgs) -> Result<Vec<String>> {
-    let root_dir = get_root()?;
-    let result = find_internal(&root_dir, &args.glob, args.max_results)?;
     Ok(result)
 }
