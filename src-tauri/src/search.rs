@@ -26,9 +26,16 @@ pub fn search_files_by_name(
         let files: Vec<_> = Walk::new(&root)
             .flatten()
             .flat_map(|e| {
-                e.path()
-                    .strip_prefix(&root)
-                    .map(|r| r.to_string_lossy().to_string())
+                if let Ok(meta) = e.metadata()
+                    && meta.is_file()
+                {
+                    e.path()
+                        .strip_prefix(&root)
+                        .map(|r| r.to_string_lossy().to_string())
+                        .ok()
+                } else {
+                    None
+                }
             })
             .collect();
         *state.files.write().unwrap() = files;
