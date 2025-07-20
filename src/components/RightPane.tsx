@@ -1,14 +1,11 @@
-import {
-  FaPaperPlane,
-  FaSquare,
-  FaFile,
-} from "react-icons/fa";
+import { Resizable } from "re-resizable";
+import { FaPaperPlane, FaSquare, FaFile } from "react-icons/fa";
 import { IChatCompletionMessage } from "../types";
 import { ChatBubble } from "./ChatBubble";
 
 type Attachment = {
-  type: string;
-  content: string;
+  type: string; // Mime type e.g. "image/png"
+  content: string; // data URL of the content
   filename: string;
 };
 
@@ -28,6 +25,8 @@ type RightPaneProps = {
   handleSend: () => void;
   handleCancel: () => void;
   messageInputRef: React.RefObject<HTMLTextAreaElement>;
+  rightPaneWidth: number;
+  setRightPaneWidth: (width: number) => void;
 };
 
 export const RightPane = ({
@@ -46,8 +45,19 @@ export const RightPane = ({
   handleSend,
   handleCancel,
   messageInputRef,
+  rightPaneWidth,
+  setRightPaneWidth,
 }: RightPaneProps) => (
-  <div id="right-pane">
+  <Resizable
+    className="right-pane"
+    size={{ width: rightPaneWidth, height: "100%" }}
+    onResizeStop={(_e, _direction, _ref, d) => {
+      setRightPaneWidth(rightPaneWidth + d.width);
+    }}
+    minWidth={300}
+    maxWidth={600}
+    enable={{ left: true }}
+  >
     <div id="chat-container" ref={chatContainerRef}>
       {messages
         .sort((a, b) => a.id - b.id)
@@ -128,5 +138,5 @@ export const RightPane = ({
         )}
       </div>
     </div>
-  </div>
+  </Resizable>
 );

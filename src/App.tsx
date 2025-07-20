@@ -43,7 +43,7 @@ function App() {
   const [isTyping, setIsTyping] = useState(false);
   const [fileList, setFileList] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [leftPaneWidth, setLeftPaneWidth] = useState(250);
+  const [rightPaneWidth, setRightPaneWidth] = useState(500);
   const [settings, setSettings] = useState<ISettings>({
     apiKey: "",
     modelName: "",
@@ -342,8 +342,6 @@ function App() {
       />
       <main id="main-content">
         <LeftPane
-          leftPaneWidth={leftPaneWidth}
-          setLeftPaneWidth={setLeftPaneWidth}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
           fileList={fileList}
@@ -370,6 +368,8 @@ function App() {
           handleSend={handleSend}
           handleCancel={handleCancel}
           messageInputRef={messageInputRef}
+          rightPaneWidth={rightPaneWidth}
+          setRightPaneWidth={setRightPaneWidth}
         />
       </main>
       {openSettingsModal && (

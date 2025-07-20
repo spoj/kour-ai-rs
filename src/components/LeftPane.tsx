@@ -1,4 +1,3 @@
-import { Resizable } from "re-resizable";
 import { useState, useRef } from "react";
 import "./LeftPane.css";
 
@@ -13,8 +12,6 @@ const formatFolderPath = (parts: string[]) => {
 };
 
 type LeftPaneProps = {
-  leftPaneWidth: number;
-  setLeftPaneWidth: (width: number) => void;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   fileList: string[];
@@ -27,8 +24,6 @@ type LeftPaneProps = {
 };
 
 export const LeftPane = ({
-  leftPaneWidth,
-  setLeftPaneWidth,
   searchTerm,
   setSearchTerm,
   fileList,
@@ -78,16 +73,7 @@ export const LeftPane = ({
   };
 
   return (
-    <Resizable
-      className="left-pane"
-      size={{ width: leftPaneWidth, height: "100%" }}
-      onResizeStop={(_e, _direction, _ref, d) => {
-        setLeftPaneWidth(leftPaneWidth + d.width);
-      }}
-      minWidth={200}
-      maxWidth={800}
-      enable={{ right: true }}
-    >
+    <div className="left-pane">
       <div className="left-pane-container">
         <div className="search-container">
           <svg
@@ -186,6 +172,6 @@ export const LeftPane = ({
           )}
         </ul>
       </div>
-    </Resizable>
+    </div>
   );
 };

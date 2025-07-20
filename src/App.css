@@ -38,17 +38,20 @@ header {
 }
 
 .left-pane {
-  border-right: 1px solid #ddd;
+  flex-grow: 1;
   padding: 10px;
   overflow-y: auto;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
-#right-pane {
-  flex-grow: 1;
+.right-pane {
+  flex-shrink: 0; /* Prevent the right pane from shrinking */
   display: flex;
   flex-direction: column;
   overflow: hidden; /* Let chat-container handle its own scrolling */
+  border-left: 1px solid #ddd;
 }
 
 h1 {
