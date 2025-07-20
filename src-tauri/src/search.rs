@@ -1,4 +1,7 @@
-use std::sync::{Mutex, RwLock};
+use std::{
+    collections::HashSet,
+    sync::{Mutex, RwLock},
+};
 
 use camino::Utf8PathBuf;
 use globset::{GlobBuilder, GlobSetBuilder};
@@ -15,6 +18,7 @@ pub struct SearchState {
     full_list: RwLock<Vec<String>>,
     pub last_search_result: RwLock<Vec<String>>,
     pub last_search: RwLock<String>,
+    pub selection: RwLock<HashSet<String>>,
 }
 
 impl SearchState {
@@ -46,14 +50,21 @@ impl SearchState {
         if let Ok(ref mut v) = res {
             *self.last_search.write().unwrap() = globs.to_string();
             *self.last_search_result.write().unwrap() = v.clone();
+            self.selection.write().unwrap().clear();
             v.truncate(500);
         }
         res
     }
-    fn find_by_globs(
-        paths: &[String],
-        globs: &str,
-    ) -> Result<Vec<String>, crate::Error> {
+    pub fn selection_add(&self, sel: String) -> bool {
+        self.selection.write().unwrap().insert(sel)
+    }
+    pub fn selection_remove(&self, sel: &str) -> bool {
+        self.selection.write().unwrap().remove(sel)
+    }
+    pub fn selection_clear(&self) {
+        self.selection.write().unwrap().clear();
+    }
+    fn find_by_globs(paths: &[String], globs: &str) -> Result<Vec<String>, crate::Error> {
         let lex = Shlex::new(globs);
         let mut set = GlobSetBuilder::new();
         for mut pat in lex {
@@ -88,4 +99,22 @@ pub static SEARCH_STATE: LazyLock<SearchState> = LazyLock::new(SearchState::defa
 #[tauri::command]
 pub fn search_files_by_name(globs: &str) -> Result<Vec<String>, crate::Error> {
     SEARCH_STATE.search_files_by_name(globs)
+}
+
+#[tauri::command]
+pub fn selection_add(sel: String) -> bool {
+    let res = SEARCH_STATE.selection_add(sel);
+    println!("{:?}", *SEARCH_STATE.selection.read().unwrap());
+    res
+}
+#[tauri::command]
+pub fn selection_remove(sel: &str) -> bool {
+    let res = SEARCH_STATE.selection_remove(sel);
+    println!("{:?}", *SEARCH_STATE.selection.read().unwrap());
+    res
+}
+#[tauri::command]
+pub fn selection_clear() {
+    SEARCH_STATE.selection_clear();
+    println!("{:?}", SEARCH_STATE.selection.read().unwrap());
 }

@@ -12,6 +12,9 @@ import {
   delete_message,
   delete_tool_interaction,
   search_files_by_name,
+  selection_add,
+  selection_remove,
+  selection_clear,
 } from "./commands";
 import { fileToAttachment } from "./helpers";
 import { IChatCompletionMessage, ISettings, MessageContent } from "./types";
@@ -192,6 +195,23 @@ function App() {
       messageInputRef.current.style.height = `${messageInputRef.current.scrollHeight}px`;
     }
   }, [input]);
+
+  const prevSelectedFiles = useRef<string[]>([]);
+  useEffect(() => {
+    const prev = prevSelectedFiles.current;
+    const next = selectedFiles;
+
+    if (next.length === 0 && prev.length > 0) {
+      selection_clear();
+    } else {
+      const addedFiles = next.filter((f) => !prev.includes(f));
+      const removedFiles = prev.filter((f) => !next.includes(f));
+      addedFiles.forEach((file) => selection_add(file));
+      removedFiles.forEach((file) => selection_remove(file));
+    }
+
+    prevSelectedFiles.current = next;
+  }, [selectedFiles]);
 
   const handleSettingsChange = (newSettings: Partial<ISettings>) => {
     const updatedSettings = { ...settings, ...newSettings };

@@ -50,3 +50,15 @@ export const onChatCompletionUpdate = async (
     callback(event.payload as IChatCompletionUpdate);
   });
 };
+
+export const selection_add = async (sel: string): Promise<void> => {
+  await invoke("selection_add", { sel });
+};
+
+export const selection_remove = async (sel: string): Promise<void> => {
+  await invoke("selection_remove", { sel });
+};
+
+export const selection_clear = async (): Promise<void> => {
+  await invoke("selection_clear");
+};

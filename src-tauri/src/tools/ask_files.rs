@@ -161,9 +161,10 @@ pub fn ask_files_searched_tool() -> Tool {
         function: Function {
             name: "ask_files_searched".to_string(),
             description: format!(
-                "Same as ask_files, but applies directly to a set of user specified files in the App interface. Right now user has searched for term {:?} which returned {} results",
+                "Same as ask_files, but applies directly to a set of user specified files in the App interface. Right now user has searched for term {:?} which returned {} results. User has selected {} items.",
                 SEARCH_STATE.last_search.read().unwrap(),
-                SEARCH_STATE.last_search_result.read().unwrap().len()
+                SEARCH_STATE.last_search_result.read().unwrap().len(),
+                SEARCH_STATE.selection.read().unwrap().len(),
             ),
             parameters: serde_json::json!({
                 "type": "object",
@@ -185,8 +186,17 @@ pub fn ask_files_searched_tool() -> Tool {
 
 pub async fn ask_files_searched(args: AskFilesSearchedArgs) -> Result<Vec<Result<Value>>> {
     let AskFilesSearchedArgs { query, max_results } = args;
+    let filenames;
+    {
+        let selection = SEARCH_STATE.selection.read().unwrap();
+        let result = SEARCH_STATE.last_search_result.read().unwrap();
+        filenames = if !selection.is_empty() {
+            selection.iter().cloned().collect()
+        } else {
+            result.to_vec()
+        };
+    }
 
-    let filenames = SEARCH_STATE.last_search_result.read().unwrap().clone();
     if filenames.len() > max_results {
         return Err(Error::Tool(format!(
             "Error: Found more files ({}) than limit ({}). Consider up the limit or take different approach.",
