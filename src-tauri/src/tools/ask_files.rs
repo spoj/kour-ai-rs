@@ -24,7 +24,7 @@ pub struct AskFilesArgs {
 #[derive(Deserialize)]
 pub struct AskFilesGlobArgs {
     pub query: String,
-    pub glob: String,
+    pub pattern: String,
     pub max_results: usize,
 }
 
@@ -121,16 +121,16 @@ pub fn ask_files_glob_tool() -> Tool {
                         "type": "string",
                         "description": "The query to run against each file."
                     },
-                    "glob": {
+                    "pattern": {
                         "type": "string",
-                        "description": "Glob pattern used to match files."
+                        "description": "Pattern used to match files. Same logic as the `find` tool pattern"
                     },
                     "max_results": {
                         "type": "number",
                         "description": "Maximum results. If glob matches more than this, the tool will return an error to avoid overwhelming the user. Start with 100 and adjust up if the task really requires understanding more files."
                     }
                 },
-                "required": ["query", "glob","max_results"]
+                "required": ["query", "pattern","max_results"]
             }),
         },
     }
@@ -139,10 +139,10 @@ pub fn ask_files_glob_tool() -> Tool {
 pub async fn ask_files_glob(args: AskFilesGlobArgs) -> Result<Vec<Result<Value>>> {
     let AskFilesGlobArgs {
         query,
-        glob,
+        pattern,
         max_results,
     } = args;
-    let filenames = search_files_by_name(&glob)?;
+    let filenames = search_files_by_name(&pattern)?;
 
     if filenames.len() > max_results {
         return Err(Error::Tool(format!(

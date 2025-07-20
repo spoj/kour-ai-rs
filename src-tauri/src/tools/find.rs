@@ -14,16 +14,16 @@ pub fn get_tool() -> Tool {
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "glob": {
+                    "pattern": {
                         "type": "string",
-                        "description": "The glob pattern to match against"
+                        "description": "The pattern to match against. This is similar style to many desktop apps. the pattern is first shell-lexed into individual terms. each term is treated like a glob pattern. and terms are considered to be related by AND."
                     },
                     "max_results": {
                         "type": "number",
                         "description": "Maximum results. If glob matches more than this, the tool will return an error to avoid overwhelming the user. Start with 200 and adjust approach if required."
                     }
                 },
-                "required": ["glob","max_results"]
+                "required": ["pattern","max_results"]
             }),
         },
     }
@@ -31,12 +31,12 @@ pub fn get_tool() -> Tool {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct FindArgs {
-    pub glob: String,
+    pub pattern: String,
     pub max_results: usize,
 }
 
 pub async fn find(args: FindArgs) -> Result<Vec<String>> {
-    let result = search_files_by_name(&args.glob)?;
+    let result = search_files_by_name(&args.pattern)?;
 
     if result.len() > args.max_results {
         return Err(Error::Tool(format!(
