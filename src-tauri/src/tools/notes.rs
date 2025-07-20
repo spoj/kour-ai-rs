@@ -1,11 +1,11 @@
 use crate::error::Error;
 use crate::settings::get_root;
+use camino::Utf8PathBuf;
 use chrono::Local;
 use serde::Deserialize;
 use serde_json::Value;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
-use std::path::PathBuf;
 
 use crate::tools::Function;
 use crate::tools::Tool;
@@ -44,7 +44,7 @@ pub async fn append_notes(args: AppendNotesArgs) -> crate::Result<String> {
     Ok("Note appended successfully.".to_string())
 }
 
-async fn get_notes_path() -> crate::Result<PathBuf> {
+async fn get_notes_path() -> crate::Result<Utf8PathBuf> {
     let root_dir = get_root()?;
 
     Ok(root_dir.join("_NOTES.txt"))

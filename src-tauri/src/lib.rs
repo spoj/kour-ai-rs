@@ -15,7 +15,7 @@ use crate::interaction::{Content, History, Source};
 use crate::openrouter::ChatOptions;
 use crate::settings::get_settings;
 use crate::ui_events::UIEvents;
-use std::path::PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 use tauri::Manager;
 use tauri::{State, Wry};
@@ -26,7 +26,7 @@ use tokio_util::sync::CancellationToken;
 type Result<T> = std::result::Result<T, Error>;
 
 pub static STORE: OnceLock<Arc<Store<Wry>>> = OnceLock::new();
-pub static CACHE_DIR: OnceLock<PathBuf> = OnceLock::new();
+pub static CACHE_DIR: OnceLock<Utf8PathBuf> = OnceLock::new();
 
 struct AppStateInner {
     cancel: Mutex<Option<CancellationToken>>,
@@ -34,7 +34,7 @@ struct AppStateInner {
 }
 type AppState<'a> = State<'a, AppStateInner>;
 
-pub fn get_cache_dir() -> Result<std::path::PathBuf> {
+pub fn get_cache_dir() -> Result<Utf8PathBuf> {
     let cache_dir = crate::CACHE_DIR
         .get()
         .ok_or(Error::Io(std::io::ErrorKind::NotFound.into()))?
@@ -146,7 +146,7 @@ pub fn run() {
                     .unwrap() // unwrap: crash if cannot initialize store
             });
             CACHE_DIR.get_or_init(
-                || app.path().app_cache_dir().unwrap(), // unwrap: crash if cannot find cache dir
+                || Utf8Path::new(&app.path().app_cache_dir().unwrap().to_string_lossy()).to_owned(), // unwrap: crash if cannot find cache dir
             );
             let history = Arc::new(Mutex::new(Default::default()));
             let cancel = Mutex::new(None);

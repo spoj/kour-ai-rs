@@ -25,7 +25,10 @@ pub trait Jailed {
     fn jailed_contains(&self, other: &Path) -> io::Result<bool>;
 }
 
-impl Jailed for Path {
+impl<P> Jailed for P
+where
+    P: AsRef<Path>,
+{
     fn jailed_join(&self, user_path: &Path) -> io::Result<PathBuf> {
         let path_to_join: PathBuf = if user_path.has_root() {
             user_path
@@ -37,7 +40,7 @@ impl Jailed for Path {
             user_path.to_owned()
         };
 
-        let new_path = self.join(path_to_join);
+        let new_path = self.as_ref().join(path_to_join);
 
         // We must check for traversal attacks AFTER joining.
         if self.jailed_contains(&new_path)? {
@@ -51,7 +54,7 @@ impl Jailed for Path {
     }
 
     fn jailed_contains(&self, other: &Path) -> io::Result<bool> {
-        let canonical_jail = self.canonicalize()?;
+        let canonical_jail = self.as_ref().canonicalize()?;
         if !other.exists() {
             let parent = other.parent().unwrap_or(other);
             return self.jailed_contains(parent);

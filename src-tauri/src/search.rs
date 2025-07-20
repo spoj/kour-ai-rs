@@ -1,8 +1,6 @@
-use std::{
-    path::PathBuf,
-    sync::{Mutex, RwLock},
-};
+use std::sync::{Mutex, RwLock};
 
+use camino::Utf8PathBuf;
 use globset::{GlobBuilder, GlobSetBuilder};
 use ignore::Walk;
 use rayon::prelude::*;
@@ -13,7 +11,7 @@ use crate::settings::get_root;
 
 #[derive(Default)]
 pub struct SearchState {
-    root: Mutex<Option<PathBuf>>,
+    root: Mutex<Option<Utf8PathBuf>>,
     full_list: RwLock<Vec<String>>,
     pub last_search_result: RwLock<Vec<String>>,
     pub last_search: RwLock<String>,

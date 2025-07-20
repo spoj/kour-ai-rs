@@ -1,6 +1,5 @@
-use std::path::{Path, PathBuf};
-
 use anyhow::anyhow;
+use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, to_value};
 
@@ -41,13 +40,13 @@ pub fn get_settings() -> Result<Settings> {
         .unwrap_or_default();
     Ok(settings)
 }
-pub fn get_root() -> Result<PathBuf> {
+pub fn get_root() -> Result<Utf8PathBuf> {
     let settings = get_settings()?;
     let root_dir = settings.root_dir;
     if root_dir.is_empty() {
         return Err(crate::Error::Anyhow(anyhow!("root directory not set")));
     }
-    Ok(Path::new(&root_dir).to_owned())
+    Ok(Utf8Path::new(&root_dir).to_owned())
 }
 impl Default for Settings {
     fn default() -> Self {

@@ -2289,6 +2289,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "calamine",
+ "camino",
  "chrono",
  "csv",
  "futures",

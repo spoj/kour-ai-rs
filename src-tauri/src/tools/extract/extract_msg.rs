@@ -22,11 +22,11 @@ fn format_addresses(addresses: &[(String, String)]) -> String {
         .join(", ")
 }
 
-fn process_email(email: &Email, output_dir: &Path) -> Result<Vec<PathBuf>> {
-    fs::create_dir_all(output_dir)?;
+fn process_email<P: AsRef<Path>>(email: &Email, output_dir: P) -> Result<Vec<PathBuf>> {
+    fs::create_dir_all(&output_dir)?;
     let mut extracted_files = Vec::new();
 
-    let md_path = output_dir.join("EMAIL.md");
+    let md_path = output_dir.as_ref().join("EMAIL.md");
     let mut file = fs::File::create(&md_path).expect("Failed to create file");
     extracted_files.push(md_path);
 
@@ -63,7 +63,7 @@ fn process_email(email: &Email, output_dir: &Path) -> Result<Vec<PathBuf>> {
     }
 
     for attachment in &email.attachments {
-        let file_path = output_dir.join(sanitize(&attachment.name));
+        let file_path = output_dir.as_ref().join(sanitize(&attachment.name));
         fs::write(&file_path, &attachment.data).expect("Failed to write attachment");
         extracted_files.push(file_path);
     }
@@ -74,7 +74,7 @@ fn process_email(email: &Email, output_dir: &Path) -> Result<Vec<PathBuf>> {
             .as_deref()
             .unwrap_or("embedded_email");
         let dir_name = sanitize(subject);
-        let new_dir = output_dir.join(dir_name);
+        let new_dir = output_dir.as_ref().join(dir_name);
         let mut embedded_files = process_email(embedded_message, &new_dir)?;
         extracted_files.append(&mut embedded_files);
     }
@@ -82,7 +82,7 @@ fn process_email(email: &Email, output_dir: &Path) -> Result<Vec<PathBuf>> {
     Ok(extracted_files)
 }
 
-pub fn extract_msg(file_path: &Path, output_dir: &Path) -> Result<Vec<PathBuf>> {
+pub fn extract_msg<P: AsRef<Path>>(file_path: P, output_dir: P) -> Result<Vec<PathBuf>> {
     let email = Email::from_path(file_path);
     process_email(&email, output_dir)
 }

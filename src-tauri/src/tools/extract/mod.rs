@@ -34,24 +34,14 @@ pub async fn extract(args: ExtractArgs) -> Result<ExtractResult> {
 
     let extraction_folder = file_path.with_extension(format!(
         "{}.extracted",
-        file_path
-            .extension()
-            .ok_or(Error::Tool(
-                "Extraction error, corrupted filename".to_string()
-            ))?
-            .to_str()
-            .ok_or(Error::Tool(
-                "Extraction error, corrupted filename".to_string()
-            ))?
+        file_path.extension().ok_or(Error::Tool(
+            "Extraction error, corrupted filename".to_string()
+        ))?
     ));
 
     fs::create_dir_all(&extraction_folder).await?;
 
-    let file_extension = file_path
-        .extension()
-        .and_then(|s| s.to_str())
-        .unwrap_or("")
-        .to_lowercase();
+    let file_extension = file_path.extension().unwrap_or("").to_lowercase();
 
     let extracted_files = match file_extension.as_str() {
         "zip" => {
@@ -94,7 +84,7 @@ pub async fn extract(args: ExtractArgs) -> Result<ExtractResult> {
 
     let result: ExtractResult = ExtractResult {
         status: "success".to_string(),
-        extraction_folder: extraction_folder.to_string_lossy().to_string(),
+        extraction_folder: extraction_folder.to_string(),
         total_files: extracted_files.len(),
         extracted_files,
     };
