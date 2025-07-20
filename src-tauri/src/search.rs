@@ -42,7 +42,7 @@ impl SearchState {
 
         let globs = globs.to_string();
         let files = self.full_list.read().unwrap();
-        let mut res = Self::search_files_by_name_internal(&files, &globs);
+        let mut res = Self::find_by_globs(&files, &globs);
         if let Ok(ref mut v) = res {
             *self.last_search.write().unwrap() = globs.to_string();
             *self.last_search_result.write().unwrap() = v.clone();
@@ -50,7 +50,7 @@ impl SearchState {
         }
         res
     }
-    fn search_files_by_name_internal(
+    fn find_by_globs(
         paths: &[String],
         globs: &str,
     ) -> Result<Vec<String>, crate::Error> {
