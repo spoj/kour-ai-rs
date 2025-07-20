@@ -50,7 +50,6 @@ impl SearchState {
         if let Ok(ref mut v) = res {
             *self.last_search.write().unwrap() = globs.to_string();
             *self.last_search_result.write().unwrap() = v.clone();
-            self.selection.write().unwrap().clear();
             v.truncate(500);
         }
         res
