@@ -1,19 +1,19 @@
-use schemars::{schema_for, JsonSchema};
-use serde::{Deserialize, Serialize};
-use tokio::task;
 use crate::error::Error;
 use crate::openrouter::{IncomingContent, Openrouter};
-use crate::tools::find::find_internal;
+use crate::search::{SEARCH_STATE, search_files_by_name};
+use crate::tools::{Function, Tool};
 use crate::utils::jailed::Jailed;
 use futures::stream::{self, StreamExt};
+use schemars::{JsonSchema, schema_for};
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, from_str, json, to_value};
 use std::path::Path;
-use serde_json::{from_str, json, to_value, Value};
-use crate::tools::{Function, Tool};
+use tokio::task;
 
 use crate::Result;
 
 const MAX_CONCURRENCY: usize = 50;
-const MAP_MODEL:&str = "google/gemini-2.5-flash";
+const MAP_MODEL: &str = "google/gemini-2.5-flash";
 
 #[derive(Deserialize)]
 pub struct AskFilesArgs {
@@ -24,14 +24,20 @@ pub struct AskFilesArgs {
 #[derive(Deserialize)]
 pub struct AskFilesGlobArgs {
     pub query: String,
-    pub glob: String,
-    pub max_results: usize
+    pub pattern: String,
+    pub max_results: usize,
+}
+
+#[derive(Deserialize)]
+pub struct AskFilesSearchedArgs {
+    pub query: String,
+    pub max_results: usize,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct AskFileResults {
     answer: String,
-    extracts: Vec<String>, 
+    extracts: Vec<String>,
 }
 pub fn ask_files_tool() -> Tool {
     Tool {
@@ -62,8 +68,7 @@ pub fn ask_files_tool() -> Tool {
 
 pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
     let AskFilesArgs { query, filenames } = args;
-    let settings = task::spawn_blocking(crate::get_settings_fn)
-        .await??;
+    let settings = crate::settings::get_settings()?;
 
     let responses: Vec<_> = stream::iter(filenames)
         .map(|filename| {
@@ -77,7 +82,7 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
                 let file_content =
                     task::spawn_blocking(move || crate::file_handler::process_file_for_llm(&file_path))
                         .await??;
-                
+
                 let mut messages = vec![
                     json!({"role":"user","content":format!("File: {filename}\n\nQuery: {query}")})
                 ];
@@ -87,22 +92,21 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
 
                 let response =
                     Openrouter::call(&messages, model_name, "You are a helpful assistant that answers questions about files. Your answer must be grounded.", &vec![], Some(schema)).await?;
-                if let IncomingContent::Text(text) =  &response.choices[0].message.content 
+                if let IncomingContent::Text(text) =  &response.choices[0].message.content
                 && let Ok(output) = from_str::<AskFileResults>(text)
                 {
                     return Ok(json!({filename:output}));
                 }
-                
+
                 Err(Error::Tool("MapError".to_string()))
             }
         })
         .buffer_unordered(MAX_CONCURRENCY)
         .collect()
         .await;
-    
+
     Ok(responses)
 }
-
 
 pub fn ask_files_glob_tool() -> Tool {
     Tool {
@@ -117,26 +121,89 @@ pub fn ask_files_glob_tool() -> Tool {
                         "type": "string",
                         "description": "The query to run against each file."
                     },
-                    "glob": {
+                    "pattern": {
                         "type": "string",
-                        "description": "Glob pattern used to match files."
+                        "description": "Pattern used to match files. Same logic as the `find` tool pattern"
                     },
                     "max_results": {
                         "type": "number",
                         "description": "Maximum results. If glob matches more than this, the tool will return an error to avoid overwhelming the user. Start with 100 and adjust up if the task really requires understanding more files."
                     }
                 },
-                "required": ["query", "glob","max_results"]
+                "required": ["query", "pattern","max_results"]
             }),
         },
     }
 }
 
 pub async fn ask_files_glob(args: AskFilesGlobArgs) -> Result<Vec<Result<Value>>> {
-    let AskFilesGlobArgs { query, glob, max_results } = args;
-     let root_dir = task::spawn_blocking(crate::get_settings_fn)
-        .await?
-        .map(|s| s.root_dir)?;
-    let filenames = find_internal(&root_dir, &glob, max_results)?;
+    let AskFilesGlobArgs {
+        query,
+        pattern,
+        max_results,
+    } = args;
+    let filenames = search_files_by_name(&pattern)?;
+
+    if filenames.len() > max_results {
+        return Err(Error::Tool(format!(
+            "Error: Found more files ({}) than limit ({}). Consider up the limit or take different approach.",
+            max_results,
+            filenames.len()
+        )));
+    }
+
+    ask_files(AskFilesArgs { query, filenames }).await
+}
+
+pub fn ask_files_searched_tool() -> Tool {
+    Tool {
+        r#type: "function".to_string(),
+        function: Function {
+            name: "ask_files_searched".to_string(),
+            description: format!(
+                "Same as ask_files, but applies directly to a set of user specified files in the App interface. Right now user has searched for term {:?} which returned {} results. User has selected {} items.",
+                SEARCH_STATE.last_search.read().unwrap(),
+                SEARCH_STATE.last_search_result.read().unwrap().len(),
+                SEARCH_STATE.selection.read().unwrap().len(),
+            ),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The query to run against each file."
+                    },
+                    "max_results": {
+                        "type": "number",
+                        "description": "Maximum results. If user selected more than this, the tool will return an error to avoid overwhelming the user. Start with 100 and adjust up if the task really requires understanding more files."
+                    }
+                },
+                "required": ["query", "max_results"]
+            }),
+        },
+    }
+}
+
+pub async fn ask_files_searched(args: AskFilesSearchedArgs) -> Result<Vec<Result<Value>>> {
+    let AskFilesSearchedArgs { query, max_results } = args;
+    let filenames;
+    {
+        let selection = SEARCH_STATE.selection.read().unwrap();
+        let result = SEARCH_STATE.last_search_result.read().unwrap();
+        filenames = if !selection.is_empty() {
+            selection.iter().cloned().collect()
+        } else {
+            result.to_vec()
+        };
+    }
+
+    if filenames.len() > max_results {
+        return Err(Error::Tool(format!(
+            "Error: Found more files ({}) than limit ({}). Consider up the limit or take different approach.",
+            max_results,
+            filenames.len()
+        )));
+    }
+
     ask_files(AskFilesArgs { query, filenames }).await
 }

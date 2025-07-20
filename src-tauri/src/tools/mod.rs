@@ -10,7 +10,6 @@ mod roll_dice;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, from_str, to_string, to_value};
-use std::sync::LazyLock;
 
 use crate::{
     Result,
@@ -114,8 +113,7 @@ impl ToolPayload {
         )
     }
 }
-
-pub static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
+pub fn get_tools() -> Vec<Tool> {
     vec![
         roll_dice::get_tool(),
         ls::get_tool(),
@@ -124,12 +122,13 @@ pub static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
         notes::append_notes_tool(),
         ask_files::ask_files_tool(),
         ask_files::ask_files_glob_tool(),
+        ask_files::ask_files_searched_tool(),
         extract::get_tool(),
         load_file::get_tool(),
         make_file::get_tool(),
         check_online::get_tool(),
     ]
-});
+}
 
 pub async fn tool_dispatcher(name: &str, arguments: &str) -> ToolPayload {
     match name {
@@ -140,6 +139,7 @@ pub async fn tool_dispatcher(name: &str, arguments: &str) -> ToolPayload {
         "append_notes" => tool_execute(notes::append_notes, arguments).await,
         "ask_files" => tool_execute(ask_files::ask_files, arguments).await,
         "ask_files_glob" => tool_execute(ask_files::ask_files_glob, arguments).await,
+        "ask_files_searched" => tool_execute(ask_files::ask_files_searched, arguments).await,
         "extract" => tool_execute(extract::extract, arguments).await,
         "load_file" => tool_execute(load_file::load_file, arguments).await,
         "make_file" => tool_execute(make_file::make_file, arguments).await,

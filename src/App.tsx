@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { FaCog, FaPaperPlane, FaTrash, FaSquare, FaFile } from "react-icons/fa";
-import { Bounce, ToastContainer } from "react-toastify";
+import { open } from "@tauri-apps/plugin-dialog";
 import "./App.css";
 import {
   chat,
@@ -12,12 +11,20 @@ import {
   cancelOutstandingRequest,
   delete_message,
   delete_tool_interaction,
+  search_files_by_name,
+  selection_add,
+  selection_remove,
+  selection_clear,
 } from "./commands";
 import { fileToAttachment } from "./helpers";
 import { IChatCompletionMessage, ISettings, MessageContent } from "./types";
-import { ChatBubble } from "./components/ChatBubble";
 import { SettingsModal } from "./components/SettingsModal";
 import { getVersion } from "@tauri-apps/api/app";
+import { Bounce, ToastContainer } from "react-toastify";
+import { TopBar } from "./components/TopBar";
+import { LeftPane } from "./components/LeftPane";
+import { RightPane } from "./components/RightPane";
+
 
 type Attachment = {
   type: string; // Mime type e.g. "image/png"
@@ -30,11 +37,16 @@ function App() {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [appVersion, setAppVersion] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const rootDirInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [openSettingsModal, setOpenSettingsModal] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [fileList, setFileList] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [rightPaneWidth, setRightPaneWidth] = useState(500);
   const [settings, setSettings] = useState<ISettings>({
     apiKey: "",
     modelName: "",
@@ -45,18 +57,35 @@ function App() {
 
   useEffect(() => {
     getVersion().then(setAppVersion);
-    getSettings().then(setSettings);
+    getSettings().then((s) => {
+      setSettings(s);
+    });
     messageInputRef.current?.focus();
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "l" && e.ctrlKey) {
-        e.preventDefault();
-        rootDirInputRef.current?.focus();
-      } else if (e.key === "k" && e.ctrlKey) {
-        e.preventDefault();
-        clearHistory().then(() => {
-          setMessages([]);
-        });
+      if (e.ctrlKey) {
+        switch (e.key) {
+          case "l":
+            e.preventDefault();
+            rootDirInputRef.current?.select();
+            break;
+          case "k":
+            e.preventDefault();
+            clearHistory().then(() => setMessages([]));
+            break;
+          case "f":
+            e.preventDefault();
+            searchInputRef.current?.select();
+            break;
+          case "r":
+            e.preventDefault();
+            messageInputRef.current?.select();
+            break;
+          case "o":
+            e.preventDefault();
+            handleSelectFolder();
+            break;
+        }
       }
     };
 
@@ -141,6 +170,12 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (settings.rootDir) {
+      search_files_by_name(searchTerm).then(setFileList).catch(console.error);
+    }
+  }, [settings.rootDir, searchTerm]);
+
   const prevMessagesLength = useRef(messages.length);
   useEffect(() => {
     if (messages.length > prevMessagesLength.current) {
@@ -160,6 +195,23 @@ function App() {
       messageInputRef.current.style.height = `${messageInputRef.current.scrollHeight}px`;
     }
   }, [input]);
+
+  const prevSelectedFiles = useRef<string[]>([]);
+  useEffect(() => {
+    const prev = prevSelectedFiles.current;
+    const next = selectedFiles;
+
+    if (next.length === 0 && prev.length > 0) {
+      selection_clear();
+    } else {
+      const addedFiles = next.filter((f) => !prev.includes(f));
+      const removedFiles = prev.filter((f) => !next.includes(f));
+      addedFiles.forEach((file) => selection_add(file));
+      removedFiles.forEach((file) => selection_remove(file));
+    }
+
+    prevSelectedFiles.current = next;
+  }, [selectedFiles]);
 
   const handleSettingsChange = (newSettings: Partial<ISettings>) => {
     const updatedSettings = { ...settings, ...newSettings };
@@ -249,7 +301,6 @@ function App() {
     );
     delete_message(id);
   };
-
   const handleDeleteTool = (llm_interaction_id: number, tool_call_id: string) => {
     setMessages((prev) =>
       prev.filter(
@@ -267,121 +318,80 @@ function App() {
     });
   };
 
+  const handleSelectFolder = async () => {
+    const result = await open({ directory: true, multiple: false });
+    if (typeof result === "string") {
+      handleSettingsChange({ rootDir: result });
+    }
+  };
+
+  const handleFileSelect = (file: string) => {
+    setSelectedFiles((prev) =>
+      prev.includes(file) ? prev.filter((f) => f !== file) : [...prev, file]
+    );
+  };
+
+  const handleSelectAll = () => {
+    setSelectedFiles(fileList);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedFiles([]);
+  };
+
+  const setSelectionRange = (files: string[], mode: "add" | "remove") => {
+    setSelectedFiles((prev) => {
+      if (mode === "add") {
+        return [...new Set([...prev, ...files])];
+      } else {
+        return prev.filter((f) => !files.includes(f));
+      }
+    });
+  };
+
   return (
     <div className="container">
-      <header>
-        <a href="/" style={{ color: "white", textDecoration: "none" }}>
-          <h1 title={`version: ${appVersion}`}>Kour-AI</h1>
-        </a>
-        <div id="path-container">
-          <input
-            ref={rootDirInputRef}
-            type="text"
-            id="path-input"
-            placeholder="Enter root directory..."
-            value={settings.rootDir}
-            onChange={(e) => handleSettingsChange({ rootDir: e.target.value })}
-            onFocus={(e) => e.target.select()}
-          />
-        </div>
-        <div style={{ paddingLeft: "10px" }}>
-          <button
-            id="header-button"
-            title="Clear History"
-            onClick={() => {
-              clearHistory().then(() => {
-                setMessages([]);
-              });
-            }}
-          >
-            <FaTrash />
-          </button>
-          <button
-            id="header-button"
-            title="Settings"
-            onClick={() => setOpenSettingsModal(true)}
-          >
-            <FaCog />
-          </button>
-        </div>
-      </header>
-      <div id="chat-container" ref={chatContainerRef}>
-        {messages
-          .sort((a, b) => a.id - b.id)
-          .map((m) => (
-            <ChatBubble
-              key={m.tool_call_id || m.id}
-              {...m}
-              onCopy={() => handleCopy(m.content)}
-              onDelete={() => handleDelete(m.id)}
-              onDeleteTool={(llm_interaction_id, tool_call_id) =>
-                handleDeleteTool(llm_interaction_id, tool_call_id)
-              }
-            />
-          ))}
-        {isTyping && (
-          <ChatBubble
-            id={0}
-            role="assistant"
-            content={[{ type: "text", text: "Thinking..." }]}
-            isNotification
-            onCopy={() => {}}
-          />
-        )}
-      </div>
-      <div id="input-container">
-        <div id="attachment-container">
-          {attachments.map((a, i) =>
-            a.type.startsWith("image/") ? (
-              <img
-                key={i}
-                src={a.content}
-                alt={a.filename}
-                title={a.filename}
-                className="attachment-thumbnail"
-                onClick={() =>
-                  setAttachments((prev) => prev.filter((_, j) => i !== j))
-                }
-              />
-            ) : (
-              <div
-                key={i}
-                title={a.filename}
-                onClick={() =>
-                  setAttachments((prev) => prev.filter((_, j) => i !== j))
-                }
-              >
-                <FaFile className="attachment-thumbnail" id="file-attachment" />
-              </div>
-            )
-          )}
-        </div>
-        <div style={{ width: "100%", display: "flex" }}>
-          <textarea
-            ref={messageInputRef}
-            id="message-input"
-            placeholder="Type a message..."
-            rows={1}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-          ></textarea>
-          {isTyping ? (
-            <button
-              className="send-button"
-              id="stop-button"
-              onClick={handleCancel}
-            >
-              <FaSquare />
-            </button>
-          ) : (
-            <button className="send-button" onClick={handleSend}>
-              <FaPaperPlane />
-            </button>
-          )}
-        </div>
-      </div>
+      <TopBar
+        appVersion={appVersion}
+        settings={settings}
+        handleSettingsChange={handleSettingsChange}
+        onClearHistory={() => clearHistory().then(() => setMessages([]))}
+        onOpenSettings={() => setOpenSettingsModal(true)}
+        onSelectFolder={handleSelectFolder}
+        rootDirInputRef={rootDirInputRef}
+      />
+      <main id="main-content">
+        <LeftPane
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          fileList={fileList}
+          searchInputRef={searchInputRef}
+          selectedFiles={selectedFiles}
+          onFileSelect={handleFileSelect}
+          onSelectAll={handleSelectAll}
+          onClearSelection={handleClearSelection}
+          setSelectionRange={setSelectionRange}
+        />
+        <RightPane
+          messages={messages}
+          isTyping={isTyping}
+          onCopy={handleCopy}
+          onDelete={handleDelete}
+          onDeleteTool={handleDeleteTool}
+          chatContainerRef={chatContainerRef}
+          attachments={attachments}
+          setAttachments={setAttachments}
+          input={input}
+          setInput={setInput}
+          handleKeyDown={handleKeyDown}
+          handlePaste={handlePaste}
+          handleSend={handleSend}
+          handleCancel={handleCancel}
+          messageInputRef={messageInputRef}
+          rightPaneWidth={rightPaneWidth}
+          setRightPaneWidth={setRightPaneWidth}
+        />
+      </main>
       {openSettingsModal && (
         <SettingsModal
           settings={settings}

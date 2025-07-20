@@ -24,11 +24,11 @@ fn format_addresses(address: &Address) -> String {
         .join(", ")
 }
 
-pub fn extract_eml(message: &Message, output_dir: &Path) -> Result<Vec<PathBuf>> {
-    fs::create_dir_all(output_dir)?;
+pub fn extract_eml<P: AsRef<Path>>(message: &Message, output_dir: P) -> Result<Vec<PathBuf>> {
+    fs::create_dir_all(output_dir.as_ref())?;
     let mut extracted_files = Vec::new();
 
-    let md_path = output_dir.join("EMAIL.md");
+    let md_path = output_dir.as_ref().join("EMAIL.md");
     let mut file = fs::File::create(&md_path).expect("Failed to create file");
     extracted_files.push(md_path);
 
@@ -65,12 +65,12 @@ pub fn extract_eml(message: &Message, output_dir: &Path) -> Result<Vec<PathBuf>>
             if let Some(embedded_message) = parser.parse(attachment.contents()) {
                 let subject = embedded_message.subject().unwrap_or("embedded_email");
                 let dir_name = sanitize(subject);
-                let new_dir = output_dir.join(dir_name);
+                let new_dir = output_dir.as_ref().join(dir_name);
                 let mut embedded_files = extract_eml(&embedded_message, &new_dir)?;
                 extracted_files.append(&mut embedded_files);
             }
         } else if let Some(filename) = attachment.attachment_name() {
-            let file_path = output_dir.join(filename);
+            let file_path = output_dir.as_ref().join(filename);
             fs::write(&file_path, attachment.contents()).expect("Failed to write attachment");
             extracted_files.push(file_path);
         }

@@ -1,0 +1,120 @@
+use std::{
+    collections::HashSet,
+    sync::{Mutex, RwLock},
+};
+
+use camino::Utf8PathBuf;
+use globset::{GlobBuilder, GlobSetBuilder};
+use ignore::Walk;
+use rayon::prelude::*;
+use shlex::Shlex;
+use std::sync::LazyLock;
+
+use crate::settings::get_root;
+
+#[derive(Default)]
+pub struct SearchState {
+    root: Mutex<Option<Utf8PathBuf>>,
+    full_list: RwLock<Vec<String>>,
+    pub last_search_result: RwLock<Vec<String>>,
+    pub last_search: RwLock<String>,
+    pub selection: RwLock<HashSet<String>>,
+}
+
+impl SearchState {
+    pub fn search_files_by_name(&self, globs: &str) -> Result<Vec<String>, crate::Error> {
+        let root = get_root()?;
+        if Some(&root) != (self.root.lock().unwrap()).as_ref() {
+            let files: Vec<_> = Walk::new(&root)
+                .flatten()
+                .flat_map(|e| {
+                    if let Ok(meta) = e.metadata()
+                        && meta.is_file()
+                    {
+                        e.path()
+                            .strip_prefix(&root)
+                            .map(|r| r.to_string_lossy().to_string())
+                            .ok()
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            *self.full_list.write().unwrap() = files;
+            *self.root.lock().unwrap() = Some(root);
+        }
+
+        let globs = globs.to_string();
+        let files = self.full_list.read().unwrap();
+        let mut res = Self::find_by_globs(&files, &globs);
+        if let Ok(ref mut v) = res {
+            *self.last_search.write().unwrap() = globs.to_string();
+            *self.last_search_result.write().unwrap() = v.clone();
+            self.selection.write().unwrap().clear();
+            v.truncate(500);
+        }
+        res
+    }
+    pub fn selection_add(&self, sel: String) -> bool {
+        self.selection.write().unwrap().insert(sel)
+    }
+    pub fn selection_remove(&self, sel: &str) -> bool {
+        self.selection.write().unwrap().remove(sel)
+    }
+    pub fn selection_clear(&self) {
+        self.selection.write().unwrap().clear();
+    }
+    fn find_by_globs(paths: &[String], globs: &str) -> Result<Vec<String>, crate::Error> {
+        let lex = Shlex::new(globs);
+        let mut set = GlobSetBuilder::new();
+        for mut pat in lex {
+            if !pat.contains('*') {
+                pat = format!("*{pat}*");
+            }
+            let glob = GlobBuilder::new(&pat)
+                .case_insensitive(true)
+                .backslash_escape(false)
+                .literal_separator(false)
+                .build()?;
+            set.add(glob);
+        }
+        let set = set.build()?;
+
+        let out: Vec<_> = paths
+            .par_iter()
+            .flat_map(|path| {
+                if set.matches(path).len() == set.len() {
+                    Some(path.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        Ok(out)
+    }
+}
+
+pub static SEARCH_STATE: LazyLock<SearchState> = LazyLock::new(SearchState::default);
+
+#[tauri::command]
+pub fn search_files_by_name(globs: &str) -> Result<Vec<String>, crate::Error> {
+    SEARCH_STATE.search_files_by_name(globs)
+}
+
+#[tauri::command]
+pub fn selection_add(sel: String) -> bool {
+    let res = SEARCH_STATE.selection_add(sel);
+    println!("{:?}", *SEARCH_STATE.selection.read().unwrap());
+    res
+}
+#[tauri::command]
+pub fn selection_remove(sel: &str) -> bool {
+    let res = SEARCH_STATE.selection_remove(sel);
+    println!("{:?}", *SEARCH_STATE.selection.read().unwrap());
+    res
+}
+#[tauri::command]
+pub fn selection_clear() {
+    SEARCH_STATE.selection_clear();
+    println!("{:?}", SEARCH_STATE.selection.read().unwrap());
+}

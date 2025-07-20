@@ -3,14 +3,15 @@ use crate::error::Error;
 use crate::interaction::{Content, FileData, ImageUrl};
 use base64::{Engine as _, engine::general_purpose};
 use calamine::{Reader, open_workbook_auto_from_rs};
+use camino::Utf8PathBuf;
 use csv::Writer;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::Cursor;
 use std::iter::once;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-fn get_cache_path(file_buffer: &[u8], target_extension: &str) -> Result<PathBuf> {
+fn get_cache_path(file_buffer: &[u8], target_extension: &str) -> Result<Utf8PathBuf> {
     let mut hasher = Sha256::new();
     hasher.update(file_buffer);
     let result = hasher.finalize();
@@ -80,7 +81,7 @@ pub fn convert_to_pdf(path: &Path) -> Result<Vec<u8>> {
         return Ok(cached_pdf);
     }
 
-    let soffice = crate::settings::get_settings_fn()?.soffice_path;
+    let soffice = crate::settings::get_settings()?.soffice_path;
     let temp_dir = Builder::new()
         .prefix("file_conversion")
         .tempdir()

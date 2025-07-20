@@ -4,11 +4,11 @@ use serde_json::Value;
 use serde_json::json;
 use serde_json::to_string_pretty;
 
-use crate::get_settings_fn;
 use crate::interaction::Content;
 use crate::interaction::Interaction;
 use crate::interaction::Source;
 use crate::interaction::Target;
+use crate::settings::get_settings;
 use crate::tools;
 
 pub struct Openrouter;
@@ -161,7 +161,7 @@ impl Openrouter {
                 .collect::<Vec<_>>()
                 .join("\n\n")
         );
-        let settings = get_settings_fn()?;
+        let settings = get_settings()?;
         let client = reqwest::Client::new();
         let mut final_messages = messages.to_vec();
         if !system_prompt.is_empty() {

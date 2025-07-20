@@ -1,5 +1,6 @@
+use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
-use serde_json::from_value;
+use serde_json::{from_value, to_value};
 
 use crate::{Result, STORE, error::Error};
 
@@ -16,7 +17,19 @@ pub struct Settings {
     #[serde(rename = "providerOrder")]
     pub provider_order: String,
 }
-pub fn get_settings_fn() -> Result<Settings> {
+
+#[tauri::command]
+pub fn set_settings(settings: Settings) -> Result<()> {
+    let store = STORE
+        .get()
+        .ok_or(Error::Io(std::io::ErrorKind::NotFound.into()))?;
+    store.set("settings", to_value(settings)?);
+    store.save()?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_settings() -> Result<Settings> {
     let store = STORE
         .get()
         .ok_or(Error::Io(std::io::ErrorKind::NotFound.into()))?;
@@ -25,6 +38,14 @@ pub fn get_settings_fn() -> Result<Settings> {
         .and_then(|v| from_value(v).ok())
         .unwrap_or_default();
     Ok(settings)
+}
+pub fn get_root() -> Result<Utf8PathBuf> {
+    let settings = get_settings()?;
+    let root_dir = settings.root_dir;
+    if root_dir.is_empty() {
+        return Err(crate::Error::Other);
+    }
+    Ok(Utf8Path::new(&root_dir).to_owned())
 }
 impl Default for Settings {
     fn default() -> Self {

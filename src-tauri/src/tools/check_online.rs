@@ -6,7 +6,6 @@ use crate::tools::{Function, Tool};
 use schemars::{JsonSchema, schema_for};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, json, to_value};
-use tokio::task;
 
 const SEARCH_MODEL: &str = "perplexity/sonar";
 
@@ -24,7 +23,7 @@ pub struct CheckOnlineResult {
 }
 
 pub async fn check_online(args: CheckOnlineArgs) -> Result<CheckOnlineResult> {
-    let settings = task::spawn_blocking(crate::get_settings_fn).await??;
+    let settings = crate::settings::get_settings()?;
 
     if settings.api_key.is_empty() {
         return Err(Error::Tool(
