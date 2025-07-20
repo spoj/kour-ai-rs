@@ -97,3 +97,9 @@
   white-space: nowrap;
   min-width: 0;
 }
+.no-results {
+  text-align: center;
+  color: #888;
+  font-size: 0.9rem;
+  margin-top: 20px;
+}

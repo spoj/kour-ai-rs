@@ -115,7 +115,7 @@ export const LeftPane = ({
             );
           })
         ) : (
-          <h2>Please start by selecting a folder</h2>
+          <p className="no-results">no results</p>
         )}
       </ul>
     </div>
