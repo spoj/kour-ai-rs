@@ -2,7 +2,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, to_value};
 
-use crate::{Result, STORE, error::Error};
+use crate::{error::Error, search::selection_clear, Result, STORE};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Settings {
@@ -25,6 +25,7 @@ pub fn set_settings(settings: Settings) -> Result<()> {
         .ok_or(Error::Io(std::io::ErrorKind::NotFound.into()))?;
     store.set("settings", to_value(settings)?);
     store.save()?;
+    selection_clear();
     Ok(())
 }
 
