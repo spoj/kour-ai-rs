@@ -2,7 +2,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, to_value};
 
-use crate::{error::Error, search::selection_clear, Result, STORE};
+use crate::{Result, STORE, error::Error, search::selection_clear};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Settings {

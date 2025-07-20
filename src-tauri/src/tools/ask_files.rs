@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::openrouter::{IncomingContent, Openrouter};
-use crate::search::{SEARCH_STATE, search_files_by_name};
+use crate::search::{SEARCH_STATE, SELECTION_STATE, search_files_by_name};
 use crate::tools::{Function, Tool};
 use crate::utils::jailed::Jailed;
 use futures::stream::{self, StreamExt};
@@ -164,7 +164,7 @@ pub fn ask_files_searched_tool() -> Tool {
                 "Same as ask_files, but applies directly to a set of user specified files in the App interface. Right now user has searched for term {:?} which returned {} results. User has selected {} items.",
                 SEARCH_STATE.last_search.read().unwrap(),
                 SEARCH_STATE.last_search_result.read().unwrap().len(),
-                SEARCH_STATE.selection.read().unwrap().len(),
+                SELECTION_STATE.selection.read().unwrap().len(),
             ),
             parameters: serde_json::json!({
                 "type": "object",
@@ -188,7 +188,7 @@ pub async fn ask_files_searched(args: AskFilesSearchedArgs) -> Result<Vec<Result
     let AskFilesSearchedArgs { query, max_results } = args;
     let filenames;
     {
-        let selection = SEARCH_STATE.selection.read().unwrap();
+        let selection = SELECTION_STATE.selection.read().unwrap();
         let result = SEARCH_STATE.last_search_result.read().unwrap();
         filenames = if !selection.is_empty() {
             selection.iter().cloned().collect()

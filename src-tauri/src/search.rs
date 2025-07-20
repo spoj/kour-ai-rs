@@ -18,9 +18,12 @@ pub struct SearchState {
     full_list: RwLock<Vec<String>>,
     pub last_search_result: RwLock<Vec<String>>,
     pub last_search: RwLock<String>,
-    pub selection: RwLock<HashSet<String>>,
 }
 
+#[derive(Default)]
+pub struct SelectionState {
+    pub selection: RwLock<HashSet<String>>,
+}
 impl SearchState {
     pub fn search_files_by_name(&self, globs: &str) -> Result<Vec<String>, crate::Error> {
         let root = get_root()?;
@@ -54,15 +57,7 @@ impl SearchState {
         }
         res
     }
-    pub fn selection_add(&self, sel: String) -> bool {
-        self.selection.write().unwrap().insert(sel)
-    }
-    pub fn selection_remove(&self, sel: &str) -> bool {
-        self.selection.write().unwrap().remove(sel)
-    }
-    pub fn selection_clear(&self) {
-        self.selection.write().unwrap().clear();
-    }
+
     fn find_by_globs(paths: &[String], globs: &str) -> Result<Vec<String>, crate::Error> {
         let lex = Shlex::new(globs);
         let mut set = GlobSetBuilder::new();
@@ -93,7 +88,8 @@ impl SearchState {
     }
 }
 
-pub static SEARCH_STATE: LazyLock<SearchState> = LazyLock::new(SearchState::default);
+pub static SEARCH_STATE: LazyLock<SearchState> = LazyLock::new(Default::default);
+pub static SELECTION_STATE: LazyLock<SelectionState> = LazyLock::new(Default::default);
 
 #[tauri::command]
 pub fn search_files_by_name(globs: &str) -> Result<Vec<String>, crate::Error> {
@@ -102,18 +98,13 @@ pub fn search_files_by_name(globs: &str) -> Result<Vec<String>, crate::Error> {
 
 #[tauri::command]
 pub fn selection_add(sel: String) -> bool {
-    let res = SEARCH_STATE.selection_add(sel);
-    println!("{:?}", *SEARCH_STATE.selection.read().unwrap());
-    res
+    SELECTION_STATE.selection.write().unwrap().insert(sel)
 }
 #[tauri::command]
 pub fn selection_remove(sel: &str) -> bool {
-    let res = SEARCH_STATE.selection_remove(sel);
-    println!("{:?}", *SEARCH_STATE.selection.read().unwrap());
-    res
+    SELECTION_STATE.selection.write().unwrap().remove(sel)
 }
 #[tauri::command]
 pub fn selection_clear() {
-    SEARCH_STATE.selection_clear();
-    println!("{:?}", SEARCH_STATE.selection.read().unwrap());
+    SELECTION_STATE.selection.write().unwrap().clear();
 }
