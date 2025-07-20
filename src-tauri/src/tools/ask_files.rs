@@ -155,16 +155,15 @@ pub async fn ask_files_glob(args: AskFilesGlobArgs) -> Result<Vec<Result<Value>>
     ask_files(AskFilesArgs { query, filenames }).await
 }
 
-pub fn ask_files_searched_tool() -> Tool {
+pub fn ask_files_selected_tool() -> Tool {
     Tool {
         r#type: "function".to_string(),
         function: Function {
-            name: "ask_files_searched".to_string(),
+            name: "ask_files_selected".to_string(),
             description: format!(
-                "Same as ask_files, but applies directly to a set of user specified files in the App interface. Right now user has searched for term {:?} which returned {} results. User has selected {} items.",
-                SEARCH_STATE.last_search.read().unwrap(),
-                SEARCH_STATE.last_search_result.read().unwrap().len(),
+                "Same as ask_files, but applies directly to a set of user specified files in the App interface. User has selected {} items. If user has not selected anything actively, this tool will query all files returned by an active user search, which currently has {} items",
                 SELECTION_STATE.selection.read().unwrap().len(),
+                SEARCH_STATE.last_search_result.read().unwrap().len(),
             ),
             parameters: serde_json::json!({
                 "type": "object",
@@ -184,7 +183,7 @@ pub fn ask_files_searched_tool() -> Tool {
     }
 }
 
-pub async fn ask_files_searched(args: AskFilesSearchedArgs) -> Result<Vec<Result<Value>>> {
+pub async fn ask_files_selected(args: AskFilesSearchedArgs) -> Result<Vec<Result<Value>>> {
     let AskFilesSearchedArgs { query, max_results } = args;
     let filenames;
     {
