@@ -103,3 +103,20 @@
   font-size: 0.9rem;
   margin-top: 20px;
 }
+.selection-buttons {
+  margin-bottom: 10px;
+  display: flex;
+  gap: 10px;
+}
+
+.file-list {
+  user-select: none;
+}
+.file-list-item.selected {
+  background-color: #e0e0e0;
+}
+
+.file-list-item:hover {
+  background-color: #f0f0f0;
+  cursor: pointer;
+}

@@ -34,6 +34,7 @@ function App() {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [appVersion, setAppVersion] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const rootDirInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
@@ -304,6 +305,30 @@ function App() {
     }
   };
 
+  const handleFileSelect = (file: string) => {
+    setSelectedFiles((prev) =>
+      prev.includes(file) ? prev.filter((f) => f !== file) : [...prev, file]
+    );
+  };
+
+  const handleSelectAll = () => {
+    setSelectedFiles(fileList);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedFiles([]);
+  };
+
+  const setSelectionRange = (files: string[], mode: "add" | "remove") => {
+    setSelectedFiles((prev) => {
+      if (mode === "add") {
+        return [...new Set([...prev, ...files])];
+      } else {
+        return prev.filter((f) => !files.includes(f));
+      }
+    });
+  };
+
   return (
     <div className="container">
       <TopBar
@@ -323,6 +348,11 @@ function App() {
           setSearchTerm={setSearchTerm}
           fileList={fileList}
           searchInputRef={searchInputRef}
+          selectedFiles={selectedFiles}
+          onFileSelect={handleFileSelect}
+          onSelectAll={handleSelectAll}
+          onClearSelection={handleClearSelection}
+          setSelectionRange={setSelectionRange}
         />
         <RightPane
           messages={messages}
