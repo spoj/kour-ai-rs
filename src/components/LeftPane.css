@@ -56,62 +56,42 @@
   margin-bottom: 10px;
 }
 
-.file-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.file-table-container {
   overflow-y: auto;
   flex-grow: 1;
+  border: 1px solid #ddd;
+  border-radius: 6px;
 }
 
-.file-list-item {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: default;
-  font-size: 0.875rem;
-  padding: 4px 0;
-  display: flex;
-  align-items: center;
-}
-
-.file-icon {
-  margin-right: 8px;
-  min-width: 14px;
-  width: 14px;
-  height: 14px;
-  color: #666;
-}
-
-.file-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.folder-path {
-  color: gray;
-  margin-left: 16px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-.no-results {
-  text-align: center;
-  color: #888;
-  font-size: 0.9rem;
-  margin-top: 20px;
-}
-.selection-buttons {
-  margin-bottom: 10px;
-  display: flex;
-  gap: 10px;
-}
-
-.file-list {
+.file-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
   user-select: none;
 }
+
+.file-table th {
+  background-color: #f0f0f0;
+  padding: 8px;
+  text-align: left;
+  cursor: pointer;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.file-table td {
+  padding: 6px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.8rem;
+}
+
+.path-cell {
+  color: #888;
+}
+
 .file-list-item.selected {
   background-color: #e0e0e0;
 }
@@ -119,4 +99,17 @@
 .file-list-item:hover {
   background-color: #f0f0f0;
   cursor: pointer;
+}
+
+.no-results {
+  text-align: center;
+  color: #888;
+  font-size: 0.9rem;
+  padding: 20px;
+}
+
+.selection-buttons {
+  margin-bottom: 10px;
+  display: flex;
+  gap: 10px;
 }

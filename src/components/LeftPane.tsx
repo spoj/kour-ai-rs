@@ -1,14 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import "./LeftPane.css";
 
-const formatFolderPath = (parts: string[]) => {
-  if (parts.length <= 2) {
-    return parts.join("/");
-  }
-  const condensedParts = parts
-    .slice(0, -2)
-    .map((part) => part.charAt(0));
-  return [...condensedParts, ...parts.slice(-2)].join("/");
+type SortConfig = {
+  key: "name" | "path";
+  direction: "ascending" | "descending";
 };
 
 type LeftPaneProps = {
@@ -34,10 +29,45 @@ export const LeftPane = ({
   onClearSelection,
   setSelectionRange,
 }: LeftPaneProps) => {
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartFile, setDragStartFile] = useState<string | null>(null);
   const [initialSelection, setInitialSelection] = useState<string[]>([]);
-  const fileListRef = useRef<HTMLUListElement>(null);
+  const fileListRef = useRef<HTMLTableElement>(null);
+
+  const sortedFiles = useMemo(() => {
+    const sortableItems = fileList.map((file) => {
+      const parts = file.split(/[\\/]/);
+      const name = parts.pop() || file;
+      const path = parts.join("/");
+      return { name, path, original: file };
+    });
+
+    if (sortConfig !== null) {
+      sortableItems.sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+          return sortConfig.direction === "ascending" ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+          return sortConfig.direction === "ascending" ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [fileList, sortConfig]);
+
+  const requestSort = (key: "name" | "path") => {
+    let direction: "ascending" | "descending" = "ascending";
+    if (
+      sortConfig &&
+      sortConfig.key === key &&
+      sortConfig.direction === "ascending"
+    ) {
+      direction = "descending";
+    }
+    setSortConfig({ key, direction });
+  };
 
   const handleMouseDown = (file: string) => {
     setIsDragging(true);
@@ -54,13 +84,14 @@ export const LeftPane = ({
 
   const handleMouseEnter = (file: string) => {
     if (isDragging && dragStartFile) {
-      const startIndex = fileList.indexOf(dragStartFile);
-      const endIndex = fileList.indexOf(file);
+      const flatFileList = sortedFiles.map((f) => f.original);
+      const startIndex = flatFileList.indexOf(dragStartFile);
+      const endIndex = flatFileList.indexOf(file);
       const [start, end] = [
         Math.min(startIndex, endIndex),
         Math.max(startIndex, endIndex),
       ];
-      const filesToToggle = fileList.slice(start, end + 1);
+      const filesToToggle = flatFileList.slice(start, end + 1);
       const filesToAdd = filesToToggle.filter(
         (f) => !initialSelection.includes(f)
       );
@@ -70,6 +101,13 @@ export const LeftPane = ({
       setSelectionRange(filesToAdd, "add");
       setSelectionRange(filesToRemove, "remove");
     }
+  };
+
+  const getSortIndicator = (key: "name" | "path") => {
+    if (!sortConfig || sortConfig.key !== key) {
+      return null;
+    }
+    return sortConfig.direction === "ascending" ? " ▲" : " ▼";
   };
 
   return (
@@ -125,52 +163,44 @@ export const LeftPane = ({
           <button onClick={onSelectAll}>Select All</button>
           <button onClick={onClearSelection}>Clear Selection</button>
         </div>
-
-        <ul
-          className="file-list"
-          ref={fileListRef}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-        >
-          {fileList.length > 0 ? (
-            fileList.map((file) => {
-              const parts = file.split(/[\\/]/);
-              const fileName = parts.pop() || file;
-              const folderPath = formatFolderPath(parts);
-
-              return (
-                <li
-                  key={file}
-                  title={file}
-                  className={`file-list-item ${selectedFiles.includes(file) ? "selected" : ""
+        <div className="file-table-container">
+          <table className="file-table" ref={fileListRef}>
+            <thead>
+              <tr>
+                <th onClick={() => requestSort("name")}>
+                  Name{getSortIndicator("name")}
+                </th>
+                <th onClick={() => requestSort("path")}>
+                  Path{getSortIndicator("path")}
+                </th>
+              </tr>
+            </thead>
+            <tbody onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+              {sortedFiles.length > 0 ? (
+                sortedFiles.map(({ name, path, original }) => (
+                  <tr
+                    key={original}
+                    title={original}
+                    className={`file-list-item ${
+                      selectedFiles.includes(original) ? "selected" : ""
                     }`}
-                  onMouseDown={() => handleMouseDown(file)}
-                  onMouseEnter={() => handleMouseEnter(file)}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="file-icon"
+                    onMouseDown={() => handleMouseDown(original)}
+                    onMouseEnter={() => handleMouseEnter(original)}
                   >
-                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
-                  <span className="file-name">{fileName}</span>
-                  {folderPath && (
-                    <span className="folder-path">{folderPath}</span>
-                  )}
-                </li>
-              );
-            })
-          ) : (
-            <p className="no-results">no results</p>
-          )}
-        </ul>
+                    <td>{name}</td>
+                    <td className="path-cell">{path}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={2} className="no-results">
+                    no results
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
