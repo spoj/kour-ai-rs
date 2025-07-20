@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, to_value};
@@ -44,7 +43,7 @@ pub fn get_root() -> Result<Utf8PathBuf> {
     let settings = get_settings()?;
     let root_dir = settings.root_dir;
     if root_dir.is_empty() {
-        return Err(crate::Error::Anyhow(anyhow!("root directory not set")));
+        return Err(crate::Error::Other);
     }
     Ok(Utf8Path::new(&root_dir).to_owned())
 }
