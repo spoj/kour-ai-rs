@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo } from "react";
+import SelectedFiles from "./SelectedFiles";
 import "./LeftPane.css";
 
 type SortConfig = {
@@ -202,6 +203,10 @@ export const LeftPane = ({
           </table>
         </div>
       </div>
+      <SelectedFiles
+        selectedFiles={selectedFiles}
+        onFileSelect={onFileSelect}
+      />
     </div>
   );
 };
