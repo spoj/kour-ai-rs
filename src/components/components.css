@@ -219,3 +219,43 @@
 .file-attachment-link button:hover {
   background-color: #10419c;
 }
+
+.selected-files-container {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background-color: #f1f0f0;
+  border-top: 1px solid #ccc;
+}
+
+.selected-files-header {
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 0.9em;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.selected-files-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.selected-files-list li {
+  padding: 4px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+  font-size: 0.85em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.selected-files-list li:hover {
+  background-color: #e0e0e0;
+}
