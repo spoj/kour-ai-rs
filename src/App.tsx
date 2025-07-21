@@ -38,7 +38,7 @@ function App() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [appVersion, setAppVersion] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
-	const [isFlapOpen, setIsFlapOpen] = useState(false);
+  const [isFlapOpen, setIsFlapOpen] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const rootDirInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
@@ -73,10 +73,6 @@ function App() {
             e.preventDefault();
             clearHistory().then(() => setMessages([]));
             break;
-          case "f":
-            e.preventDefault();
-            searchInputRef.current?.select();
-            break;
           case "r":
             e.preventDefault();
             messageInputRef.current?.select();
@@ -86,9 +82,15 @@ function App() {
             handleSelectFolder();
             break;
         }
-    if (e.key === "b") {
+        if (e.key === "b") {
           e.preventDefault();
-          setIsFlapOpen(prev => !prev);
+          setIsFlapOpen(prev => {
+            const nextState = !prev;
+            if (nextState) {
+              setTimeout(() => searchInputRef.current?.select(), 0);
+            }
+            return nextState;
+          });
         }
       }
     };
@@ -359,7 +361,11 @@ function App() {
         appVersion={appVersion}
         settings={settings}
         handleSettingsChange={handleSettingsChange}
-        onClearHistory={() => clearHistory().then(() => setMessages([]))}
+        onClearHistory={() => {
+          clearHistory().then(() => setMessages([]));
+          setSearchTerm("");
+          setSelectedFiles([]);
+        }}
         onOpenSettings={() => setOpenSettingsModal(true)}
         onSelectFolder={handleSelectFolder}
         rootDirInputRef={rootDirInputRef}
@@ -381,6 +387,7 @@ function App() {
             />
           </div>
         )}
+        {isFlapOpen && <div className="backdrop" onClick={() => setIsFlapOpen(false)} />}
         <RightPane
           messages={messages}
           isTyping={isTyping}

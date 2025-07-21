@@ -135,8 +135,8 @@ export const LeftPane = ({
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
           />
-          {searchTerm && (
-            <button onClick={() => setSearchTerm("")} className="clear-button">
+          {(
+            <button onClick={() => { setSearchTerm(""); onClearSelection(); }} className="clear-button">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="16"
@@ -181,9 +181,8 @@ export const LeftPane = ({
                   <tr
                     key={original}
                     title={original}
-                    className={`file-list-item ${
-                      selectedFiles.includes(original) ? "selected" : ""
-                    }`}
+                    className={`file-list-item ${selectedFiles.includes(original) ? "selected" : ""
+                      }`}
                     onMouseDown={() => handleMouseDown(original)}
                     onMouseEnter={() => handleMouseEnter(original)}
                   >
