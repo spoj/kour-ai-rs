@@ -26,6 +26,12 @@ pub enum Error {
     Anyhow(#[from] anyhow::Error),
     #[error("Unkonwn Error")]
     Other,
+    #[error("Limit exceeded. Requested {requested} of {item}. Limited to {limit}")]
+    Limit {
+        item: String,
+        requested: usize,
+        limit: usize,
+    },
 }
 
 impl From<tauri::Error> for Error {

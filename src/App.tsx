@@ -47,6 +47,7 @@ function App() {
   const [isTyping, setIsTyping] = useState(false);
   const [fileList, setFileList] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
   const [settings, setSettings] = useState<ISettings>({
     apiKey: "",
     modelName: "",
@@ -177,10 +178,20 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm]);
+
+  useEffect(() => {
     if (settings.rootDir) {
-      search_files_by_name(searchTerm).then(setFileList).catch(console.error);
+      search_files_by_name(debouncedSearchTerm).then(setFileList).catch((_) => setFileList([]));
     }
-  }, [settings.rootDir, searchTerm]);
+  }, [settings.rootDir, debouncedSearchTerm]);
 
   const prevMessagesLength = useRef(messages.length);
   useEffect(() => {

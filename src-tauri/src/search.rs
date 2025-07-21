@@ -54,7 +54,13 @@ impl SearchState {
         if let Ok(ref mut v) = res {
             *self.last_search.write().unwrap() = globs.to_string();
             *self.last_search_result.write().unwrap() = v.clone();
-            v.truncate(500);
+            if v.len() > 500 {
+                return Err(crate::Error::Limit {
+                    item: "files".to_string(),
+                    requested: v.len(),
+                    limit: 500,
+                });
+            }
         }
         res
     }
