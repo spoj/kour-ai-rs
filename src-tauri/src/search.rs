@@ -1,17 +1,17 @@
-use std::{
-    collections::HashSet,
-    sync::{Mutex, RwLock},
-};
-
+use crate::settings::get_root;
 use camino::Utf8PathBuf;
 use globset::{GlobBuilder, GlobSetBuilder};
 use ignore::Walk;
 use rayon::prelude::*;
 use shlex::Shlex;
 use std::sync::LazyLock;
+use std::{
+    collections::HashSet,
+    sync::{Mutex, RwLock},
+};
 use tokio::task::spawn_blocking;
 
-use crate::settings::get_root;
+const SEARCH_RESULT_LIMIT: usize = 1000;
 
 #[derive(Default)]
 pub struct SearchState {
@@ -54,11 +54,11 @@ impl SearchState {
         if let Ok(ref mut v) = res {
             *self.last_search.write().unwrap() = globs.to_string();
             *self.last_search_result.write().unwrap() = v.clone();
-            if v.len() > 500 {
+            if v.len() > SEARCH_RESULT_LIMIT {
                 return Err(crate::Error::Limit {
                     item: "files".to_string(),
                     requested: v.len(),
-                    limit: 500,
+                    limit: SEARCH_RESULT_LIMIT,
                 });
             }
         }

@@ -1,11 +1,9 @@
+use crate::openrouter::ToolCall;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     sync::atomic::{AtomicUsize, Ordering},
 };
-
-use serde::{Deserialize, Serialize};
-
-use crate::openrouter::ToolCall;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 #[serde(tag = "type")]
