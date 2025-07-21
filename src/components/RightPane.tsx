@@ -1,4 +1,3 @@
-import { Resizable } from "re-resizable";
 import { FaPaperPlane, FaSquare, FaFile } from "react-icons/fa";
 import { IChatCompletionMessage } from "../types";
 import { ChatBubble } from "./ChatBubble";
@@ -25,8 +24,8 @@ type RightPaneProps = {
   handleSend: () => void;
   handleCancel: () => void;
   messageInputRef: React.RefObject<HTMLTextAreaElement>;
-  rightPaneWidth: number;
-  setRightPaneWidth: (width: number) => void;
+  selectedFiles: string[];
+  onToggleFlap: () => void;
 };
 
 export const RightPane = ({
@@ -45,19 +44,10 @@ export const RightPane = ({
   handleSend,
   handleCancel,
   messageInputRef,
-  rightPaneWidth,
-  setRightPaneWidth,
+  selectedFiles,
+  onToggleFlap,
 }: RightPaneProps) => (
-  <Resizable
-    className="right-pane"
-    size={{ width: rightPaneWidth, height: "100%" }}
-    onResizeStop={(_e, _direction, _ref, d) => {
-      setRightPaneWidth(rightPaneWidth + d.width);
-    }}
-    minWidth={300}
-    maxWidth={600}
-    enable={{ left: true }}
-  >
+  <div className="right-pane">
     <div id="chat-container" ref={chatContainerRef}>
       {messages
         .sort((a, b) => a.id - b.id)
@@ -83,6 +73,11 @@ export const RightPane = ({
       )}
     </div>
     <div id="input-container">
+      {selectedFiles.length > 0 && (
+        <div className="selected-files-indicator" onClick={onToggleFlap}>
+          {selectedFiles.length} file(s) selected
+        </div>
+      )}
       <div id="attachment-container">
         {attachments.map((a, i) =>
           a.type.startsWith("image/") ? (
@@ -138,5 +133,5 @@ export const RightPane = ({
         )}
       </div>
     </div>
-  </Resizable>
+  </div>
 );

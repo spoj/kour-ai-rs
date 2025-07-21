@@ -1,6 +1,5 @@
 import { useState, useRef, useMemo } from "react";
 import SelectedFiles from "./SelectedFiles";
-import "./LeftPane.css";
 
 type SortConfig = {
   key: "name" | "path";

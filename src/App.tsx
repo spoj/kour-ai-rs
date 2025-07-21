@@ -38,6 +38,7 @@ function App() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [appVersion, setAppVersion] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
+	const [isFlapOpen, setIsFlapOpen] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const rootDirInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
@@ -46,7 +47,6 @@ function App() {
   const [isTyping, setIsTyping] = useState(false);
   const [fileList, setFileList] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [rightPaneWidth, setRightPaneWidth] = useState(500);
   const [settings, setSettings] = useState<ISettings>({
     apiKey: "",
     modelName: "",
@@ -85,6 +85,10 @@ function App() {
             e.preventDefault();
             handleSelectFolder();
             break;
+        }
+    if (e.key === "b") {
+          e.preventDefault();
+          setIsFlapOpen(prev => !prev);
         }
       }
     };
@@ -359,19 +363,24 @@ function App() {
         onOpenSettings={() => setOpenSettingsModal(true)}
         onSelectFolder={handleSelectFolder}
         rootDirInputRef={rootDirInputRef}
+        onToggleFlap={() => setIsFlapOpen((prev) => !prev)}
       />
       <main id="main-content">
-        <LeftPane
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          fileList={fileList}
-          searchInputRef={searchInputRef}
-          selectedFiles={selectedFiles}
-          onFileSelect={handleFileSelect}
-          onSelectAll={handleSelectAll}
-          onClearSelection={handleClearSelection}
-          setSelectionRange={setSelectionRange}
-        />
+        {isFlapOpen && (
+          <div className="flap">
+            <LeftPane
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              fileList={fileList}
+              searchInputRef={searchInputRef}
+              selectedFiles={selectedFiles}
+              onFileSelect={handleFileSelect}
+              onSelectAll={handleSelectAll}
+              onClearSelection={handleClearSelection}
+              setSelectionRange={setSelectionRange}
+            />
+          </div>
+        )}
         <RightPane
           messages={messages}
           isTyping={isTyping}
@@ -388,8 +397,8 @@ function App() {
           handleSend={handleSend}
           handleCancel={handleCancel}
           messageInputRef={messageInputRef}
-          rightPaneWidth={rightPaneWidth}
-          setRightPaneWidth={setRightPaneWidth}
+          selectedFiles={selectedFiles}
+          onToggleFlap={() => setIsFlapOpen(true)}
         />
       </main>
       {openSettingsModal && (

@@ -1,4 +1,4 @@
-import { FaCog, FaTrash, FaFolderOpen } from "react-icons/fa";
+import { FaCog, FaTrash, FaFolderOpen, FaBars } from "react-icons/fa";
 import { ISettings } from "../types";
 
 type TopBarProps = {
@@ -7,6 +7,7 @@ type TopBarProps = {
   handleSettingsChange: (newSettings: Partial<ISettings>) => void;
   onClearHistory: () => void;
   onOpenSettings: () => void;
+  onToggleFlap: () => void;
   onSelectFolder: () => void;
   rootDirInputRef: React.RefObject<HTMLInputElement>;
 };
@@ -17,10 +18,14 @@ export const TopBar = ({
   handleSettingsChange,
   onClearHistory,
   onOpenSettings,
+  onToggleFlap,
   onSelectFolder,
   rootDirInputRef,
 }: TopBarProps) => (
   <header>
+    <button id="header-button" title="Toggle File Explorer" onClick={onToggleFlap}>
+      <FaBars />
+    </button>
     <a href="/" style={{ color: "white", textDecoration: "none" }}>
       <h1 title={`version: ${appVersion}`}>Kour-AI</h1>
     </a>

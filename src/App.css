@@ -92,6 +92,7 @@ h1 {
   align-items: center;
   justify-content: center;
   padding: 8px;
+  position: relative;
 }
 #path-container #header-button {
   flex-shrink: 0;
@@ -174,4 +175,23 @@ h1 {
 
 #stop-button {
   background-color: hsl(0, 85%, 43%);
+}
+
+.flap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 80%;
+  height: 100%;
+  background-color: white;
+  z-index: 100;
+  border-right: 1px solid #ccc;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+}
+
+#main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
 }
