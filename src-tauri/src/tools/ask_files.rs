@@ -33,6 +33,10 @@ pub struct AskFilesSearchedArgs {
     pub query: String,
     pub max_results: usize,
 }
+#[derive(Deserialize)]
+pub struct UserSelectedArgs {
+    pub max_results: usize,
+}
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct AskFileResults {
@@ -205,4 +209,52 @@ pub async fn ask_files_selected(args: AskFilesSearchedArgs) -> Result<Vec<Result
     }
 
     ask_files(AskFilesArgs { query, filenames }).await
+}
+
+pub fn list_user_selected_tool() -> Tool {
+    Tool {
+        r#type: "function".to_string(),
+        function: Function {
+            name: "list_user_selected".to_string(),
+            description: format!(
+                "List the {} files that that user has selected, or the {} files that the user has in the search results if nothing is selected actively.",
+                SELECTION_STATE.selection.read().unwrap().len(),
+                SEARCH_STATE.last_search_result.read().unwrap().len(),
+            ),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "max_results": {
+                        "type": "number",
+                        "description": "Maximum results. If user selected more than this, the tool will return an error to avoid overwhelming the user. Start with 100 and adjust up if the task really requires understanding more files."
+                    }
+                },
+                "required": ["max_results"]
+            }),
+        },
+    }
+}
+
+pub async fn list_user_selected(args: UserSelectedArgs) -> Result<Vec<String>> {
+    let UserSelectedArgs { max_results } = args;
+    let filenames;
+    {
+        let selection = SELECTION_STATE.selection.read().unwrap();
+        let result = SEARCH_STATE.last_search_result.read().unwrap();
+        filenames = if !selection.is_empty() {
+            selection.iter().cloned().collect()
+        } else {
+            result.to_vec()
+        };
+    }
+
+    if filenames.len() > max_results {
+        return Err(Error::Tool(format!(
+            "Error: Found more files ({}) than limit ({}). Consider up the limit or take different approach.",
+            max_results,
+            filenames.len()
+        )));
+    }
+
+    Ok(filenames)
 }
