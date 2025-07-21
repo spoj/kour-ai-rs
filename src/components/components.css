@@ -221,17 +221,13 @@
 }
 
 .selected-files-container {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
+  flex-shrink: 0;
   background-color: #f1f0f0;
   border-top: 1px solid #ccc;
 }
 
 .selected-files-header {
   padding: 8px 10px;
-  cursor: pointer;
   font-size: 0.9em;
   display: flex;
   justify-content: space-between;
@@ -242,7 +238,7 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 150px;
+  max-height: 200px;
   overflow-y: auto;
 }
 
@@ -258,4 +254,143 @@
 
 .selected-files-list li:hover {
   background-color: #e0e0e0;
+}
+
+.chat-stream {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.file-picker {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	padding: 10px;
+	box-sizing: border-box;
+	gap: 10px;
+}
+
+.file-picker-container {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.file-table-container {
+  flex-grow: 1;
+  overflow-y: auto;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+
+.selected-files-indicator {
+  background-color: #e0e0e0;
+  padding: 5px 10px;
+  border-radius: 5px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  text-align: center;
+  font-size: 12px;
+}
+
+.selected-files-indicator:hover {
+  background-color: #d0d0d0;
+}
+
+.search-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.search-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
+  stroke: #666;
+}
+
+.search-input {
+  border: none;
+  outline: none;
+  flex-grow: 1;
+  font-size: 14px;
+}
+
+.clear-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 5px;
+}
+
+.selection-buttons {
+  margin-bottom: 10px;
+}
+
+.selection-buttons button {
+  margin-right: 10px;
+  padding: 5px 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  background-color: #f0f0f0;
+  cursor: pointer;
+}
+
+.selection-buttons button:hover {
+  background-color: #e0e0e0;
+}
+
+.file-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.file-table th {
+  text-align: left;
+  padding: 10px;
+  background-color: #f8f8f8;
+  border-bottom: 2px solid #eee;
+  cursor: pointer;
+  user-select: none;
+}
+
+.file-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #eee;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+}
+
+.file-list-item {
+  user-select: none;
+}
+
+.file-list-item:hover {
+  background-color: #f5f5f5;
+}
+
+.file-list-item.selected {
+  background-color: #dbeafe;
+}
+
+.path-cell {
+  color: #999;
+}
+
+.no-results {
+  text-align: center;
+  padding: 20px;
+  color: #888;
 }

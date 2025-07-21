@@ -1,13 +1,12 @@
 import { useState, useRef, useMemo } from "react";
 import SelectedFiles from "./SelectedFiles";
-import "./LeftPane.css";
 
 type SortConfig = {
   key: "name" | "path";
   direction: "ascending" | "descending";
 };
 
-type LeftPaneProps = {
+type FilePickerProps = {
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   fileList: string[];
@@ -19,7 +18,7 @@ type LeftPaneProps = {
   setSelectionRange: (files: string[], mode: "add" | "remove") => void;
 };
 
-export const LeftPane = ({
+export const FilePicker = ({
   searchTerm,
   setSearchTerm,
   fileList,
@@ -29,7 +28,7 @@ export const LeftPane = ({
   onSelectAll,
   onClearSelection,
   setSelectionRange,
-}: LeftPaneProps) => {
+}: FilePickerProps) => {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartFile, setDragStartFile] = useState<string | null>(null);
@@ -112,7 +111,7 @@ export const LeftPane = ({
   };
 
   return (
-    <div className="left-pane">
+    <div className="file-picker">
       <div className="left-pane-container">
         <div className="search-container">
           <svg
@@ -136,8 +135,8 @@ export const LeftPane = ({
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
           />
-          {searchTerm && (
-            <button onClick={() => setSearchTerm("")} className="clear-button">
+          {(
+            <button onClick={() => { setSearchTerm(""); onClearSelection(); }} className="clear-button">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="16"
@@ -182,9 +181,8 @@ export const LeftPane = ({
                   <tr
                     key={original}
                     title={original}
-                    className={`file-list-item ${
-                      selectedFiles.includes(original) ? "selected" : ""
-                    }`}
+                    className={`file-list-item ${selectedFiles.includes(original) ? "selected" : ""
+                      }`}
                     onMouseDown={() => handleMouseDown(original)}
                     onMouseEnter={() => handleMouseEnter(original)}
                   >

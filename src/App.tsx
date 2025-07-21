@@ -22,8 +22,8 @@ import { SettingsModal } from "./components/SettingsModal";
 import { getVersion } from "@tauri-apps/api/app";
 import { Bounce, ToastContainer } from "react-toastify";
 import { TopBar } from "./components/TopBar";
-import { LeftPane } from "./components/LeftPane";
-import { RightPane } from "./components/RightPane";
+import { FilePicker } from "./components/FilePicker";
+import { ChatStream } from "./components/ChatStream";
 
 
 type Attachment = {
@@ -38,6 +38,7 @@ function App() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [appVersion, setAppVersion] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
+  const [isFlapOpen, setIsFlapOpen] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const rootDirInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
@@ -46,7 +47,7 @@ function App() {
   const [isTyping, setIsTyping] = useState(false);
   const [fileList, setFileList] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [rightPaneWidth, setRightPaneWidth] = useState(500);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
   const [settings, setSettings] = useState<ISettings>({
     apiKey: "",
     modelName: "",
@@ -73,10 +74,6 @@ function App() {
             e.preventDefault();
             clearHistory().then(() => setMessages([]));
             break;
-          case "f":
-            e.preventDefault();
-            searchInputRef.current?.select();
-            break;
           case "r":
             e.preventDefault();
             messageInputRef.current?.select();
@@ -85,6 +82,16 @@ function App() {
             e.preventDefault();
             handleSelectFolder();
             break;
+        }
+        if (e.key === "b") {
+          e.preventDefault();
+          setIsFlapOpen(prev => {
+            const nextState = !prev;
+            if (nextState) {
+              setTimeout(() => searchInputRef.current?.select(), 0);
+            }
+            return nextState;
+          });
         }
       }
     };
@@ -171,10 +178,20 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm]);
+
+  useEffect(() => {
     if (settings.rootDir) {
-      search_files_by_name(searchTerm).then(setFileList).catch(console.error);
+      search_files_by_name(debouncedSearchTerm).then(setFileList).catch((_) => setFileList([]));
     }
-  }, [settings.rootDir, searchTerm]);
+  }, [settings.rootDir, debouncedSearchTerm]);
 
   const prevMessagesLength = useRef(messages.length);
   useEffect(() => {
@@ -355,24 +372,34 @@ function App() {
         appVersion={appVersion}
         settings={settings}
         handleSettingsChange={handleSettingsChange}
-        onClearHistory={() => clearHistory().then(() => setMessages([]))}
+        onClearHistory={() => {
+          clearHistory().then(() => setMessages([]));
+          setSearchTerm("");
+          setSelectedFiles([]);
+        }}
         onOpenSettings={() => setOpenSettingsModal(true)}
         onSelectFolder={handleSelectFolder}
         rootDirInputRef={rootDirInputRef}
+        onToggleFlap={() => setIsFlapOpen((prev) => !prev)}
       />
       <main id="main-content">
-        <LeftPane
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          fileList={fileList}
-          searchInputRef={searchInputRef}
-          selectedFiles={selectedFiles}
-          onFileSelect={handleFileSelect}
-          onSelectAll={handleSelectAll}
-          onClearSelection={handleClearSelection}
-          setSelectionRange={setSelectionRange}
-        />
-        <RightPane
+        {isFlapOpen && (
+          <div className="flap">
+            <FilePicker
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              fileList={fileList}
+              searchInputRef={searchInputRef}
+              selectedFiles={selectedFiles}
+              onFileSelect={handleFileSelect}
+              onSelectAll={handleSelectAll}
+              onClearSelection={handleClearSelection}
+              setSelectionRange={setSelectionRange}
+            />
+          </div>
+        )}
+        {isFlapOpen && <div className="backdrop" onClick={() => setIsFlapOpen(false)} />}
+        <ChatStream
           messages={messages}
           isTyping={isTyping}
           onCopy={handleCopy}
@@ -388,8 +415,8 @@ function App() {
           handleSend={handleSend}
           handleCancel={handleCancel}
           messageInputRef={messageInputRef}
-          rightPaneWidth={rightPaneWidth}
-          setRightPaneWidth={setRightPaneWidth}
+          selectedFiles={selectedFiles}
+          onToggleFlap={() => setIsFlapOpen(true)}
         />
       </main>
       {openSettingsModal && (

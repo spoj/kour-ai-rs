@@ -8,7 +8,6 @@ mod settings;
 mod tools;
 mod ui_events;
 mod utils;
-
 use crate::chat::ChatProcessor;
 use crate::error::Error;
 use crate::interaction::{Content, History, Source};
