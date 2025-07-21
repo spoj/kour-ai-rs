@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::openrouter::{IncomingContent, Openrouter};
-use crate::search::{SEARCH_STATE, SELECTION_STATE, search_files_by_name};
+use crate::search::{SELECTION_STATE, search_files_by_name};
 use crate::tools::{Function, Tool};
 use crate::utils::jailed::Jailed;
 use futures::stream::{self, StreamExt};
@@ -146,7 +146,7 @@ pub async fn ask_files_glob(args: AskFilesGlobArgs) -> Result<Vec<Result<Value>>
         pattern,
         max_results,
     } = args;
-    let filenames = search_files_by_name(&pattern)?;
+    let filenames = search_files_by_name(&pattern).await?;
 
     if filenames.len() > max_results {
         return Err(Error::Tool(format!(
@@ -165,9 +165,8 @@ pub fn ask_files_selected_tool() -> Tool {
         function: Function {
             name: "ask_files_selected".to_string(),
             description: format!(
-                "Same as ask_files, but applies directly to a set of user specified files in the App interface. User has selected {} items. If user has not selected anything actively, this tool will query all files returned by an active user search, which currently has {} items",
+                "Same as ask_files, but applies directly to a set of user specified files in the App interface. User has selected {} items.",
                 SELECTION_STATE.selection.read().unwrap().len(),
-                SEARCH_STATE.last_search_result.read().unwrap().len(),
             ),
             parameters: serde_json::json!({
                 "type": "object",
@@ -189,15 +188,10 @@ pub fn ask_files_selected_tool() -> Tool {
 
 pub async fn ask_files_selected(args: AskFilesSearchedArgs) -> Result<Vec<Result<Value>>> {
     let AskFilesSearchedArgs { query, max_results } = args;
-    let filenames;
+    let filenames: Vec<String>;
     {
         let selection = SELECTION_STATE.selection.read().unwrap();
-        let result = SEARCH_STATE.last_search_result.read().unwrap();
-        filenames = if !selection.is_empty() {
-            selection.iter().cloned().collect()
-        } else {
-            result.to_vec()
-        };
+        filenames = selection.iter().cloned().collect();
     }
 
     if filenames.len() > max_results {
@@ -217,9 +211,8 @@ pub fn list_user_selected_tool() -> Tool {
         function: Function {
             name: "list_user_selected".to_string(),
             description: format!(
-                "List the {} files that that user has selected, or the {} files that the user has in the search results if nothing is selected actively.",
-                SELECTION_STATE.selection.read().unwrap().len(),
-                SEARCH_STATE.last_search_result.read().unwrap().len(),
+                "List the {} files that that user has selected",
+                SELECTION_STATE.selection.read().unwrap().len()
             ),
             parameters: serde_json::json!({
                 "type": "object",
@@ -237,15 +230,10 @@ pub fn list_user_selected_tool() -> Tool {
 
 pub async fn list_user_selected(args: UserSelectedArgs) -> Result<Vec<String>> {
     let UserSelectedArgs { max_results } = args;
-    let filenames;
+    let filenames: Vec<String>;
     {
         let selection = SELECTION_STATE.selection.read().unwrap();
-        let result = SEARCH_STATE.last_search_result.read().unwrap();
-        filenames = if !selection.is_empty() {
-            selection.iter().cloned().collect()
-        } else {
-            result.to_vec()
-        };
+        filenames = selection.iter().cloned().collect();
     }
 
     if filenames.len() > max_results {

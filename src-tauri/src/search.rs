@@ -9,6 +9,7 @@ use ignore::Walk;
 use rayon::prelude::*;
 use shlex::Shlex;
 use std::sync::LazyLock;
+use tokio::task::spawn_blocking;
 
 use crate::settings::get_root;
 
@@ -91,9 +92,17 @@ impl SearchState {
 pub static SEARCH_STATE: LazyLock<SearchState> = LazyLock::new(Default::default);
 pub static SELECTION_STATE: LazyLock<SelectionState> = LazyLock::new(Default::default);
 
+// #[tauri::command]
+// pub fn search_files_by_name_sync(globs: &str) -> Result<Vec<String>, crate::Error> {
+//     SEARCH_STATE.search_files_by_name(globs)
+// }
 #[tauri::command]
-pub fn search_files_by_name(globs: &str) -> Result<Vec<String>, crate::Error> {
-    SEARCH_STATE.search_files_by_name(globs)
+pub async fn search_files_by_name(globs: &str) -> Result<Vec<String>, crate::Error> {
+    spawn_blocking({
+        let globs = globs.to_string();
+        move || SEARCH_STATE.search_files_by_name(&globs)
+    })
+    .await?
 }
 
 #[tauri::command]

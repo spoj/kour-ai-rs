@@ -36,7 +36,7 @@ pub struct FindArgs {
 }
 
 pub async fn find(args: FindArgs) -> Result<Vec<String>> {
-    let result = search_files_by_name(&args.pattern)?;
+    let result = search_files_by_name(&args.pattern).await?;
 
     if result.len() > args.max_results {
         return Err(Error::Tool(format!(
