@@ -22,8 +22,8 @@ import { SettingsModal } from "./components/SettingsModal";
 import { getVersion } from "@tauri-apps/api/app";
 import { Bounce, ToastContainer } from "react-toastify";
 import { TopBar } from "./components/TopBar";
-import { LeftPane } from "./components/LeftPane";
-import { RightPane } from "./components/RightPane";
+import { FilePicker } from "./components/FilePicker";
+import { ChatStream } from "./components/ChatStream";
 
 
 type Attachment = {
@@ -374,7 +374,7 @@ function App() {
       <main id="main-content">
         {isFlapOpen && (
           <div className="flap">
-            <LeftPane
+            <FilePicker
               searchTerm={searchTerm}
               setSearchTerm={setSearchTerm}
               fileList={fileList}
@@ -388,7 +388,7 @@ function App() {
           </div>
         )}
         {isFlapOpen && <div className="backdrop" onClick={() => setIsFlapOpen(false)} />}
-        <RightPane
+        <ChatStream
           messages={messages}
           isTyping={isTyping}
           onCopy={handleCopy}

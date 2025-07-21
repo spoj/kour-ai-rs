@@ -6,7 +6,7 @@ type SortConfig = {
   direction: "ascending" | "descending";
 };
 
-type LeftPaneProps = {
+type FilePickerProps = {
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   fileList: string[];
@@ -18,7 +18,7 @@ type LeftPaneProps = {
   setSelectionRange: (files: string[], mode: "add" | "remove") => void;
 };
 
-export const LeftPane = ({
+export const FilePicker = ({
   searchTerm,
   setSearchTerm,
   fileList,
@@ -28,7 +28,7 @@ export const LeftPane = ({
   onSelectAll,
   onClearSelection,
   setSelectionRange,
-}: LeftPaneProps) => {
+}: FilePickerProps) => {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartFile, setDragStartFile] = useState<string | null>(null);
@@ -111,7 +111,7 @@ export const LeftPane = ({
   };
 
   return (
-    <div className="left-pane">
+    <div className="file-picker">
       <div className="left-pane-container">
         <div className="search-container">
           <svg

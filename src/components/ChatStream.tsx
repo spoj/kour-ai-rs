@@ -8,7 +8,7 @@ type Attachment = {
   filename: string;
 };
 
-type RightPaneProps = {
+type ChatStreamProps = {
   messages: IChatCompletionMessage[];
   isTyping: boolean;
   onCopy: (content: IChatCompletionMessage["content"]) => void;
@@ -28,7 +28,7 @@ type RightPaneProps = {
   onToggleFlap: () => void;
 };
 
-export const RightPane = ({
+export const ChatStream = ({
   messages,
   isTyping,
   onCopy,
@@ -46,8 +46,8 @@ export const RightPane = ({
   messageInputRef,
   selectedFiles,
   onToggleFlap,
-}: RightPaneProps) => (
-  <div className="right-pane">
+}: ChatStreamProps) => (
+  <div className="chat-stream">
     <div id="chat-container" ref={chatContainerRef}>
       {messages
         .sort((a, b) => a.id - b.id)
