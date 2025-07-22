@@ -175,8 +175,10 @@ function App() {
       if (e.ctrlKey) {
         switch (e.key) {
           case "k":
-            e.preventDefault();
-            handleClearAll();
+            if (e.shiftKey) {
+              e.preventDefault();
+              handleClearAll();
+            }
             break;
           case "o":
             e.preventDefault();
@@ -187,15 +189,10 @@ function App() {
             messageInputRef.current?.select();
             setIsFlapOpen(false);
             break;
-          case "f":
+          case "e":
             e.preventDefault();
-            setIsFlapOpen((prev) => {
-              const nextState = !prev;
-              if (nextState) {
-                setTimeout(() => searchInputRef.current?.select(), 0);
-              }
-              return nextState;
-            });
+            setIsFlapOpen(true);
+            setTimeout(() => searchInputRef.current?.select(), 0);
             break;
         }
       }
