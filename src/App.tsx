@@ -63,41 +63,6 @@ function App() {
     });
     messageInputRef.current?.focus();
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey) {
-        switch (e.key) {
-          case "l":
-            e.preventDefault();
-            rootDirInputRef.current?.select();
-            break;
-          case "k":
-            e.preventDefault();
-            clearHistory().then(() => setMessages([]));
-            break;
-          case "r":
-            e.preventDefault();
-            messageInputRef.current?.select();
-            break;
-          case "o":
-            e.preventDefault();
-            handleSelectFolder();
-            break;
-        }
-        if (e.key === "b") {
-          e.preventDefault();
-          setIsFlapOpen(prev => {
-            const nextState = !prev;
-            if (nextState) {
-              setTimeout(() => searchInputRef.current?.select(), 0);
-            }
-            return nextState;
-          });
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
     const unlisten = onChatCompletionUpdate((update) => {
       switch (update.type) {
         case "Start":
@@ -172,10 +137,62 @@ function App() {
     replayHistory();
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
       unlisten.then((f) => f());
     };
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey) {
+        if (isFlapOpen) {
+          switch (e.key) {
+            case "a":
+              e.preventDefault();
+              handleSelectAll();
+              break;
+            case "c":
+              e.preventDefault();
+              handleClearSelection();
+              break;
+          }
+        }
+      }
+      if (e.ctrlKey) {
+        switch (e.key) {
+          case "l":
+            e.preventDefault();
+            rootDirInputRef.current?.select();
+            break;
+          case "k":
+            e.preventDefault();
+            clearHistory().then(() => setMessages([]));
+            break;
+          case "r":
+            e.preventDefault();
+            messageInputRef.current?.select();
+            break;
+          case "o":
+            e.preventDefault();
+            handleSelectFolder();
+            break;
+          case "b":
+            e.preventDefault();
+            setIsFlapOpen((prev) => {
+              const nextState = !prev;
+              if (nextState) {
+                setTimeout(() => searchInputRef.current?.select(), 0);
+              }
+              return nextState;
+            });
+            break;
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isFlapOpen, fileList, settings]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
