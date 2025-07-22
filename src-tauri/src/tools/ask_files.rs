@@ -117,7 +117,7 @@ pub fn ask_files_glob_tool() -> Tool {
         r#type: "function".to_string(),
         function: Function {
             name: "ask_files_glob".to_string(),
-            description: "Same as ask_files, but accepts a glob pattern to match more than 1 file. Must specify max_results".to_string(),
+            description: "Same as ask_files, but accepts a glob pattern to match multiple files. Must specify max_results. Note that if user has active selection, you should prioritize `ask_files_selected` and `list_user_selected` unless specifically want to explore outside of user selection.".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -165,7 +165,7 @@ pub fn ask_files_selected_tool() -> Tool {
         function: Function {
             name: "ask_files_selected".to_string(),
             description: format!(
-                "Same as ask_files, but applies directly to a set of user specified files in the App interface. User has selected {} items.",
+                "Same as ask_files, but applies directly to a set of user specified files in the App interface. User has actively selected {} items.",
                 SELECTION_STATE.selection.read().unwrap().len(),
             ),
             parameters: serde_json::json!({
@@ -211,7 +211,7 @@ pub fn list_user_selected_tool() -> Tool {
         function: Function {
             name: "list_user_selected".to_string(),
             description: format!(
-                "List the {} files that that user has selected",
+                "List the {} files that that user has actively selected.",
                 SELECTION_STATE.selection.read().unwrap().len()
             ),
             parameters: serde_json::json!({
