@@ -13,7 +13,9 @@ type FilePickerProps = {
   searchInputRef: React.RefObject<HTMLInputElement>;
   selectedFiles: string[];
   onFileSelect: (file: string) => void;
-  onSelectAll: () => void;
+  onAddAll: () => void;
+  onSubtractAll: () => void;
+  onAsShown: () => void;
   onClearSelection: () => void;
   setSelectionRange: (files: string[], mode: "add" | "remove") => void;
 };
@@ -25,7 +27,9 @@ export const FilePicker = ({
   searchInputRef,
   selectedFiles,
   onFileSelect,
-  onSelectAll,
+  onAddAll,
+  onSubtractAll,
+  onAsShown,
   onClearSelection,
   setSelectionRange,
 }: FilePickerProps) => {
@@ -160,7 +164,13 @@ export const FilePicker = ({
         )}
 
         <div className="selection-buttons">
-          <button onClick={onSelectAll}>Select All</button>
+          {searchTerm && (
+            <>
+              <button onClick={onAddAll}>Add all</button>
+              <button onClick={onSubtractAll}>Subtract all</button>
+              <button onClick={onAsShown}>As shown</button>
+            </>
+          )}
           <button onClick={onClearSelection}>Clear Selection</button>
         </div>
         <div className="file-table-container">
