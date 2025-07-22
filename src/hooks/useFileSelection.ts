@@ -27,9 +27,18 @@ export const useFileSelection = (fileList: string[]) => {
         );
     };
 
-    const handleSelectAll = () => {
+    const handleAddAll = () => {
+        setSelectedFiles((prev) => [...new Set([...prev, ...fileList])]);
+    };
+
+    const handleSubtractAll = () => {
+        setSelectedFiles((prev) => prev.filter((f) => !fileList.includes(f)));
+    };
+
+    const handleAsShown = () => {
         setSelectedFiles(fileList);
     };
+
 
     const handleClearSelection = () => {
         setSelectedFiles([]);
@@ -48,7 +57,9 @@ export const useFileSelection = (fileList: string[]) => {
     return {
         selectedFiles,
         handleFileSelect,
-        handleSelectAll,
+        handleAddAll,
+        handleSubtractAll,
+        handleAsShown,
         handleClearSelection,
         setSelectionRange,
         setSelectedFiles,

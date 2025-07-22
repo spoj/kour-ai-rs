@@ -49,7 +49,9 @@ function App() {
   const {
     selectedFiles,
     handleFileSelect,
-    handleSelectAll,
+    handleAddAll,
+    handleSubtractAll,
+    handleAsShown,
     handleClearSelection,
     setSelectionRange,
     setSelectedFiles,
@@ -153,7 +155,15 @@ function App() {
           switch (e.key) {
             case "a":
               e.preventDefault();
-              handleSelectAll();
+              handleAddAll();
+              break;
+            case "s":
+              e.preventDefault();
+              handleSubtractAll();
+              break;
+            case "d":
+              e.preventDefault();
+              handleAsShown();
               break;
             case "c":
               e.preventDefault();
@@ -168,12 +178,16 @@ function App() {
             e.preventDefault();
             handleClearAll();
             break;
+          case "o":
+            e.preventDefault();
+            handleSelectFolder();
+            break;
           case "r":
             e.preventDefault();
             messageInputRef.current?.select();
             setIsFlapOpen(false);
             break;
-          case "b":
+          case "f":
             e.preventDefault();
             setIsFlapOpen((prev) => {
               const nextState = !prev;
@@ -190,7 +204,7 @@ function App() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isFlapOpen, fileList, handleSelectAll, handleClearSelection, handleClearAll]);
+  }, [isFlapOpen, fileList, handleAddAll, handleSubtractAll, handleAsShown, handleClearSelection, handleClearAll]);
 
   useEffect(() => {
     if (settings.rootDir) {
@@ -327,7 +341,9 @@ function App() {
               searchInputRef={searchInputRef}
               selectedFiles={selectedFiles}
               onFileSelect={handleFileSelect}
-              onSelectAll={handleSelectAll}
+              onAddAll={handleAddAll}
+              onSubtractAll={handleSubtractAll}
+              onAsShown={handleAsShown}
               onClearSelection={handleClearSelection}
               setSelectionRange={setSelectionRange}
             />
