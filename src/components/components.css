@@ -264,12 +264,20 @@
 }
 
 .file-picker {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
-	padding: 10px;
-	box-sizing: border-box;
-	gap: 10px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.left-pane-container {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  overflow: hidden;
 }
 
 .file-picker-container {
