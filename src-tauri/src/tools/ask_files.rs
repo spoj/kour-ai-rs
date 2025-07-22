@@ -102,7 +102,7 @@ pub async fn ask_files(args: AskFilesArgs) -> Result<Vec<Result<Value>>> {
                     return Ok(json!({filename:output}));
                 }
 
-                Err(Error::Tool("MapError".to_string()))
+                Err(Error::Tool(format!("Error querying {filename}")))
             }
         })
         .buffer_unordered(MAX_CONCURRENCY)
