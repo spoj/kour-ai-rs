@@ -175,10 +175,8 @@ function App() {
       if (e.ctrlKey) {
         switch (e.key) {
           case "k":
-            if (e.shiftKey) {
-              e.preventDefault();
-              handleClearAll();
-            }
+            e.preventDefault();
+            handleClearAll();
             break;
           case "o":
             e.preventDefault();
