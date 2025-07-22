@@ -2,9 +2,12 @@ use crate::settings::get_root;
 use camino::Utf8PathBuf;
 use globset::{GlobBuilder, GlobSetBuilder};
 use ignore::Walk;
+use notify::event::{CreateKind, ModifyKind, RenameMode};
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher, event, recommended_watcher};
 use rayon::prelude::*;
 use shlex::Shlex;
-use std::sync::LazyLock;
+use std::path::Path;
+use std::sync::{Arc, LazyLock};
 use std::{
     collections::HashSet,
     sync::{Mutex, RwLock},
@@ -16,7 +19,8 @@ const SEARCH_RESULT_LIMIT: usize = 1000;
 #[derive(Default)]
 pub struct SearchState {
     root: Mutex<Option<Utf8PathBuf>>,
-    full_list: RwLock<Vec<String>>,
+    full_list: Arc<RwLock<HashSet<String>>>,
+    watcher: Mutex<Option<RecommendedWatcher>>,
     pub last_search_result: RwLock<Vec<String>>,
     pub last_search: RwLock<String>,
 }
@@ -29,7 +33,7 @@ impl SearchState {
     pub fn search_files_by_name(&self, globs: &str) -> Result<Vec<String>, crate::Error> {
         let root = get_root()?;
         if Some(&root) != (self.root.lock().unwrap()).as_ref() {
-            let files: Vec<_> = Walk::new(&root)
+            let files: HashSet<_> = Walk::new(&root)
                 .flatten()
                 .flat_map(|e| {
                     if let Ok(meta) = e.metadata()
@@ -45,7 +49,86 @@ impl SearchState {
                 })
                 .collect();
             *self.full_list.write().unwrap() = files;
-            *self.root.lock().unwrap() = Some(root);
+            *self.root.lock().unwrap() = Some(root.clone());
+
+            let mut watcher = recommended_watcher({
+                let root = root.clone();
+                let full_list = Arc::clone(&self.full_list);
+                move |res: Result<event::Event, notify::Error>| match res {
+                    Ok(event) => match event.kind {
+                        EventKind::Create(CreateKind::File) => {
+                            println!("create {:?}", event.paths);
+                            for path in event.paths {
+                                if let Ok(path) = path.strip_prefix(&root) {
+                                    full_list
+                                        .write()
+                                        .unwrap()
+                                        .insert(path.to_string_lossy().to_string());
+                                }
+                            }
+                        }
+                        EventKind::Remove(_) => {
+                            println!("remove {:?}", event.paths);
+                            for path in event.paths {
+                                if let Ok(path) = path.strip_prefix(&root) {
+                                    full_list
+                                        .write()
+                                        .unwrap()
+                                        .remove(path.to_string_lossy().as_ref());
+                                }
+                            }
+                        }
+                        EventKind::Modify(ModifyKind::Name(RenameMode::To))
+                            if event.paths[0].is_file() =>
+                        {
+                            println!("rename to {:?}", event.paths);
+                            if let Ok(path) = event.paths[0].strip_prefix(&root) {
+                                full_list
+                                    .write()
+                                    .unwrap()
+                                    .insert(path.to_string_lossy().to_string());
+                            }
+                        }
+                        EventKind::Modify(ModifyKind::Name(RenameMode::From)) => {
+                            println!("rename from {:?}", event.paths);
+                            if let Ok(path) = event.paths[0].strip_prefix(&root) {
+                                full_list
+                                    .write()
+                                    .unwrap()
+                                    .remove(path.to_string_lossy().as_ref());
+                            }
+                        }
+                        EventKind::Modify(ModifyKind::Name(RenameMode::Both))
+                            if event.paths[1].is_file() =>
+                        {
+                            println!("rename both {:?}", event.paths);
+                            if let Ok(path) = event.paths[0].strip_prefix(&root) {
+                                full_list
+                                    .write()
+                                    .unwrap()
+                                    .remove(path.to_string_lossy().as_ref());
+                            }
+                            if let Ok(path) = event.paths[1].strip_prefix(&root) {
+                                full_list
+                                    .write()
+                                    .unwrap()
+                                    .insert(path.to_string_lossy().to_string());
+                            }
+                        }
+                        _ => {}
+                    },
+                    Err(e) => {
+                        println!("Error {e:?}")
+                    }
+                }
+            })
+            .unwrap();
+
+            watcher
+                .watch(Path::new(&root), RecursiveMode::Recursive)
+                .unwrap();
+
+            *self.watcher.lock().unwrap() = Some(watcher);
         }
 
         let globs = globs.to_string();
@@ -65,7 +148,7 @@ impl SearchState {
         res
     }
 
-    fn find_by_globs(paths: &[String], globs: &str) -> Result<Vec<String>, crate::Error> {
+    fn find_by_globs(paths: &HashSet<String>, globs: &str) -> Result<Vec<String>, crate::Error> {
         let lex = Shlex::new(globs);
         let mut set = GlobSetBuilder::new();
         for mut pat in lex {
