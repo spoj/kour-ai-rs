@@ -178,6 +178,10 @@ function App() {
             e.preventDefault();
             handleClearAll();
             break;
+          case "o":
+            e.preventDefault();
+            handleSelectFolder();
+            break;
           case "r":
             e.preventDefault();
             messageInputRef.current?.select();
