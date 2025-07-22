@@ -157,23 +157,26 @@ function App() {
           }
         }
       }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isFlapOpen, fileList]);
+
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey) {
         switch (e.key) {
-          case "l":
-            e.preventDefault();
-            rootDirInputRef.current?.select();
-            break;
           case "k":
             e.preventDefault();
-            clearHistory().then(() => setMessages([]));
+            handleClearAll();
             break;
           case "r":
             e.preventDefault();
             messageInputRef.current?.select();
-            break;
-          case "o":
-            e.preventDefault();
-            handleSelectFolder();
+            setIsFlapOpen(false);
             break;
           case "b":
             e.preventDefault();
@@ -188,11 +191,12 @@ function App() {
         }
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleGlobalKeyDown);
     };
-  }, [isFlapOpen, fileList, settings]);
+  }, []);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -373,6 +377,13 @@ function App() {
     setSelectedFiles([]);
   };
 
+  const handleClearAll = () => {
+    clearHistory().then(() => setMessages([]));
+    setSearchTerm("");
+    setSelectedFiles([]);
+    setIsFlapOpen(false);
+  };
+
   const setSelectionRange = (files: string[], mode: "add" | "remove") => {
     setSelectedFiles((prev) => {
       if (mode === "add") {
@@ -389,11 +400,7 @@ function App() {
         appVersion={appVersion}
         settings={settings}
         handleSettingsChange={handleSettingsChange}
-        onClearHistory={() => {
-          clearHistory().then(() => setMessages([]));
-          setSearchTerm("");
-          setSelectedFiles([]);
-        }}
+        onClearHistory={handleClearAll}
         onOpenSettings={() => setOpenSettingsModal(true)}
         onSelectFolder={handleSelectFolder}
         rootDirInputRef={rootDirInputRef}
