@@ -12,9 +12,6 @@ import {
   delete_message,
   delete_tool_interaction,
   search_files_by_name,
-  selection_add,
-  selection_remove,
-  selection_clear,
 } from "./commands";
 import { fileToAttachment } from "./helpers";
 import { IChatCompletionMessage, ISettings, MessageContent } from "./types";
@@ -24,11 +21,13 @@ import { Bounce, ToastContainer } from "react-toastify";
 import { TopBar } from "./components/TopBar";
 import { FilePicker } from "./components/FilePicker";
 import { ChatStream } from "./components/ChatStream";
-
+import { useAutoScroll } from "./hooks/useAutoScroll";
+import { useFileSelection } from "./hooks/useFileSelection";
+import { useDebounce } from "./hooks/useDebounce";
 
 type Attachment = {
-  type: string; // Mime type e.g. "image/png"
-  content: string; // data URL of the content
+  type: string;
+  content: string;
   filename: string;
 };
 
@@ -37,9 +36,7 @@ function App() {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [appVersion, setAppVersion] = useState("");
-  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [isFlapOpen, setIsFlapOpen] = useState(false);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
   const rootDirInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -47,7 +44,16 @@ function App() {
   const [isTyping, setIsTyping] = useState(false);
   const [fileList, setFileList] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const chatContainerRef = useAutoScroll(messages);
+  const {
+    selectedFiles,
+    handleFileSelect,
+    handleSelectAll,
+    handleClearSelection,
+    setSelectionRange,
+    setSelectedFiles,
+  } = useFileSelection(fileList);
   const [settings, setSettings] = useState<ISettings>({
     apiKey: "",
     modelName: "",
@@ -56,86 +62,85 @@ function App() {
     providerOrder: "",
   });
 
+  const handleClearAll = () => {
+    clearHistory().then(() => setMessages([]));
+    setSearchTerm("");
+    setSelectedFiles([]);
+    setIsFlapOpen(false);
+  };
+
+  const handleChatUpdate = (update: any) => {
+    switch (update.type) {
+      case "Start":
+        setIsTyping(true);
+        break;
+      case "End":
+        setIsTyping(false);
+        break;
+      case "Message":
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === update.id)) return prev;
+          return [
+            ...prev,
+            {
+              id: update.id,
+              role: update.role as "user" | "assistant",
+              content: update.content,
+            },
+          ];
+        });
+        break;
+      case "ToolCall":
+        setMessages((prev) => {
+          if (
+            prev.some(
+              (m) =>
+                m.id === update.id && m.tool_call_id === update.tool_call_id
+            )
+          )
+            return prev;
+          return [
+            ...prev,
+            {
+              id: update.id,
+              tool_call_id: update.tool_call_id,
+              role: "assistant",
+              content: [],
+              isNotification: true,
+              toolName: update.tool_name,
+              toolArgs: update.tool_args,
+            },
+          ];
+        });
+        break;
+      case "ToolDone":
+        setMessages((prev) => {
+          const newMessages = [...prev];
+          const foundIndex = newMessages.findIndex(
+            (m) => m.tool_call_id === update.tool_call_id && !m.toolResult
+          );
+          if (foundIndex !== -1) {
+            const updatedMessage = {
+              ...newMessages[foundIndex],
+              toolResult: update.tool_result,
+            };
+            newMessages[foundIndex] = updatedMessage;
+          }
+          return newMessages;
+        });
+        break;
+    }
+  };
+
   useEffect(() => {
     getVersion().then(setAppVersion);
     getSettings().then((s) => {
       setSettings(s);
     });
     messageInputRef.current?.focus();
-
-    const unlisten = onChatCompletionUpdate((update) => {
-      switch (update.type) {
-        case "Start":
-          setIsTyping(true);
-          break;
-        case "End":
-          setIsTyping(false);
-          break;
-        case "Message":
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === update.id)) return prev;
-            return [
-              ...prev,
-              {
-                id: update.id,
-                role: update.role as "user" | "assistant",
-                content: update.content,
-              },
-            ];
-          });
-          break;
-        case "ToolCall":
-          setMessages((prev) => {
-            if (
-              prev.some(
-                (m) =>
-                  m.id === update.id && m.tool_call_id === update.tool_call_id
-              )
-            )
-              return prev;
-            return [
-              ...prev,
-              {
-                id: update.id,
-                tool_call_id: update.tool_call_id,
-                role: "assistant",
-                content: [],
-                isNotification: true,
-                toolName: update.tool_name,
-                toolArgs: update.tool_args,
-              },
-            ];
-          });
-          break;
-        case "ToolDone":
-          setMessages((prev) => {
-            const newMessages = [...prev];
-            let foundIndex = -1;
-            for (let i = newMessages.length - 1; i >= 0; i--) {
-              const m = newMessages[i];
-              if (m.tool_call_id === update.tool_call_id && !m.toolResult) {
-                foundIndex = i;
-                break;
-              }
-            }
-
-            if (foundIndex !== -1) {
-              const updatedMessage = {
-                ...newMessages[foundIndex],
-                toolResult: update.tool_result,
-              };
-              newMessages[foundIndex] = updatedMessage;
-            }
-            return newMessages;
-          });
-          break;
-      }
-    });
-
-    // Clear messages before replaying history to prevent duplication
+    const unlisten = onChatCompletionUpdate(handleChatUpdate);
     setMessages([]);
     replayHistory();
-
     return () => {
       unlisten.then((f) => f());
     };
@@ -157,16 +162,6 @@ function App() {
           }
         }
       }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isFlapOpen, fileList]);
-
-
-  useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey) {
         switch (e.key) {
           case "k":
@@ -191,41 +186,19 @@ function App() {
         }
       }
     };
-
-    window.addEventListener("keydown", handleGlobalKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener("keydown", handleGlobalKeyDown);
+      window.removeEventListener("keydown", handleKeyDown);
     };
-  }, []);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
-    }, 300);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [searchTerm]);
+  }, [isFlapOpen, fileList, handleSelectAll, handleClearSelection, handleClearAll]);
 
   useEffect(() => {
     if (settings.rootDir) {
-      search_files_by_name(debouncedSearchTerm).then(setFileList).catch((_) => setFileList([]));
+      search_files_by_name(debouncedSearchTerm)
+        .then(setFileList)
+        .catch((_) => setFileList([]));
     }
   }, [settings.rootDir, debouncedSearchTerm]);
-
-  const prevMessagesLength = useRef(messages.length);
-  useEffect(() => {
-    if (messages.length > prevMessagesLength.current) {
-      setTimeout(() => {
-        if (chatContainerRef.current) {
-          chatContainerRef.current.scrollTop =
-            chatContainerRef.current.scrollHeight;
-        }
-      }, 100);
-    }
-    prevMessagesLength.current = messages.length;
-  }, [messages]);
 
   useEffect(() => {
     if (messageInputRef.current) {
@@ -233,23 +206,6 @@ function App() {
       messageInputRef.current.style.height = `${messageInputRef.current.scrollHeight}px`;
     }
   }, [input]);
-
-  const prevSelectedFiles = useRef<string[]>([]);
-  useEffect(() => {
-    const prev = prevSelectedFiles.current;
-    const next = selectedFiles;
-
-    if (next.length === 0 && prev.length > 0) {
-      selection_clear();
-    } else {
-      const addedFiles = next.filter((f) => !prev.includes(f));
-      const removedFiles = prev.filter((f) => !next.includes(f));
-      addedFiles.forEach((file) => selection_add(file));
-      removedFiles.forEach((file) => selection_remove(file));
-    }
-
-    prevSelectedFiles.current = next;
-  }, [selectedFiles]);
 
   const handleSettingsChange = (newSettings: Partial<ISettings>) => {
     const updatedSettings = { ...settings, ...newSettings };
@@ -259,13 +215,10 @@ function App() {
 
   const handleSend = async () => {
     if (isTyping) return;
-
     const messageContent: MessageContent = [];
-
     if (input.trim() !== "") {
       messageContent.push({ type: "text", text: input });
     }
-
     attachments.forEach((a) => {
       if (a.type.startsWith("image/")) {
         messageContent.push({
@@ -275,17 +228,12 @@ function App() {
       } else {
         messageContent.push({
           type: "file",
-          file: {
-            filename: a.filename,
-            file_data: a.content,
-          },
+          file: { filename: a.filename, file_data: a.content },
         });
       }
     });
-
     setInput("");
     setAttachments([]);
-
     chat(messageContent);
   };
 
@@ -296,17 +244,12 @@ function App() {
     }
   };
 
-  const saveAttachment = (item: {
-    type: string;
-    content: string;
-    filename: string;
-  }) => {
+  const saveAttachment = (item: Attachment) => {
     setAttachments((prev) => [...prev, item]);
   };
 
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const items = event.clipboardData.items;
-    for (const item of items) {
+    for (const item of event.clipboardData.items) {
       if (item.kind === "file") {
         event.preventDefault();
       }
@@ -325,11 +268,9 @@ function App() {
   const handleDelete = (id: number) => {
     const message_to_delete = messages.find((m) => m.id === id);
     if (!message_to_delete) return;
-
     const tool_call_ids_to_delete = new Set(
       message_to_delete.tool_calls?.map((tc) => tc.id)
     );
-
     setMessages((prev) =>
       prev.filter(
         (m) =>
@@ -339,6 +280,7 @@ function App() {
     );
     delete_message(id);
   };
+
   const handleDeleteTool = (llm_interaction_id: number, tool_call_id: string) => {
     setMessages((prev) =>
       prev.filter(
@@ -361,37 +303,6 @@ function App() {
     if (typeof result === "string") {
       handleSettingsChange({ rootDir: result });
     }
-  };
-
-  const handleFileSelect = (file: string) => {
-    setSelectedFiles((prev) =>
-      prev.includes(file) ? prev.filter((f) => f !== file) : [...prev, file]
-    );
-  };
-
-  const handleSelectAll = () => {
-    setSelectedFiles(fileList);
-  };
-
-  const handleClearSelection = () => {
-    setSelectedFiles([]);
-  };
-
-  const handleClearAll = () => {
-    clearHistory().then(() => setMessages([]));
-    setSearchTerm("");
-    setSelectedFiles([]);
-    setIsFlapOpen(false);
-  };
-
-  const setSelectionRange = (files: string[], mode: "add" | "remove") => {
-    setSelectedFiles((prev) => {
-      if (mode === "add") {
-        return [...new Set([...prev, ...files])];
-      } else {
-        return prev.filter((f) => !files.includes(f));
-      }
-    });
   };
 
   return (
