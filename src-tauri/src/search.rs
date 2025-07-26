@@ -242,13 +242,43 @@ mod tests {
         let paths: HashSet<String> =
             HashSet::from([r#"local work\savv2\something.xlsx"#.to_string()]);
 
-        assert_eq!(SearchState::find_by_globs(&paths, "savv something").unwrap().len(), 1);
-        assert_eq!(SearchState::find_by_globs(&paths, "something savv").unwrap().len(), 1);
-        assert_eq!(SearchState::find_by_globs(&paths, "something").unwrap().len(), 1);
-        assert_eq!(SearchState::find_by_globs(&paths, "something not").unwrap().len(), 0);
-        assert_eq!(SearchState::find_by_globs(&paths, "something !savv").unwrap().len(), 0);
+        assert_eq!(
+            SearchState::find_by_globs(&paths, "savv something")
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            SearchState::find_by_globs(&paths, "something savv")
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            SearchState::find_by_globs(&paths, "something")
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            SearchState::find_by_globs(&paths, "something not")
+                .unwrap()
+                .len(),
+            0
+        );
+        assert_eq!(
+            SearchState::find_by_globs(&paths, "something !savv")
+                .unwrap()
+                .len(),
+            0
+        );
         assert_eq!(SearchState::find_by_globs(&paths, "").unwrap().len(), 1);
         assert_eq!(SearchState::find_by_globs(&paths, "work").unwrap().len(), 1);
-        assert_eq!(SearchState::find_by_globs(&paths, r"work\\savv").unwrap().len(), 1);
+        assert_eq!(
+            SearchState::find_by_globs(&paths, r"work\\savv")
+                .unwrap()
+                .len(),
+            1
+        );
     }
 }

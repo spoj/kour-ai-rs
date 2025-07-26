@@ -1,14 +1,14 @@
-use serde::Deserialize;
-use serde::Serialize;
-use serde_json::Value;
-use serde_json::json;
-use serde_json::to_string_pretty;
 use crate::interaction::Content;
 use crate::interaction::Interaction;
 use crate::interaction::Source;
 use crate::interaction::Target;
 use crate::settings::get_settings;
 use crate::tools;
+use serde::Deserialize;
+use serde::Serialize;
+use serde_json::Value;
+use serde_json::json;
+use serde_json::to_string_pretty;
 
 pub struct Openrouter;
 
