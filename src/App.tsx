@@ -150,7 +150,7 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.altKey) {
+      if (e.ctrlKey) {
         if (isFlapOpen) {
           switch (e.key) {
             case "a":
@@ -187,7 +187,7 @@ function App() {
             messageInputRef.current?.select();
             setIsFlapOpen(false);
             break;
-          case "e":
+          case "F":
             e.preventDefault();
             setIsFlapOpen(true);
             setTimeout(() => searchInputRef.current?.select(), 0);
