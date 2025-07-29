@@ -39,7 +39,7 @@ pub fn get_tool() -> Tool {
         function: Function {
             name: "load_file".to_string(),
             description:
-                "Loads a file directly into the conversation context. Supports various file types. Use this instead of ask_files if you need in-depth understanding of a few files."
+                "Loads a file's entire content into the active context, enabling a comprehensive, holistic review. This is the only way to analyze how different parts of a document relate to each other and uncover nuanced insights.\n\n**Trade-off:** This method is more thorough and may take more processing time than a simple `ask_files` query. It is the required tool for strategic analysis, root cause investigation, and any task that requires understanding the full story behind the numbers."
                     .to_string(),
             parameters: serde_json::json!({
                 "type": "object",
