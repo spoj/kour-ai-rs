@@ -150,7 +150,7 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey) {
+      if (e.altKey) {
         if (isFlapOpen) {
           switch (e.key) {
             case "a":
