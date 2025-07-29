@@ -48,7 +48,7 @@ pub fn ask_files_tool() -> Tool {
         r#type: "function".to_string(),
         function: Function {
             name: "ask_files".to_string(),
-            description: "Queries a specific, user-provided list of files in parallel, making it efficient for targeted analysis of known files. Expects to be given the query and a broader_context. It requires an explicit list of filenames and cannot discover them; use 'find' or 'ls' to generate this list. Works best for simple fact-finding queries.".to_string(),
+            description: "Queries files for direct answers to specific questions (the \"what\"). It's extremely fast and efficient, acting like a targeted search function.\n\n**Trade-off:** This speed comes at the cost of context. It provides isolated facts without the surrounding information, which can obscure the broader strategic picture (the \"why\"). Use this for quick data extraction, but switch to `load_file` when you need to understand relationships within the data.".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
