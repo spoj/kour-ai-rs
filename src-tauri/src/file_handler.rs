@@ -136,7 +136,12 @@ fn convert_xlsx_to_csv(file_buffer: &[u8]) -> Result<String> {
         println!("enter a sheet");
         for row in range.rows() {
             writer
-                .write_record(once(sheet_name.clone()).chain(row.iter().map(|c| c.to_string())))
+                .write_record(once(sheet_name.clone()).chain(row.iter().map(|c| match c {
+                    calamine::Data::Float(n) => {
+                        format!("{n:.4}")
+                    }
+                    _ => c.to_string(),
+                })))
                 .map_err(|_| Error::Tool("error writing CSV".to_string()))?;
         }
         csv_data.extend(
