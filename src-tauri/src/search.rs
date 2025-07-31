@@ -6,6 +6,7 @@ use notify::event::{CreateKind, ModifyKind, RenameMode};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher, event, recommended_watcher};
 use rayon::prelude::*;
 use shlex::Shlex;
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::{Arc, LazyLock};
 use std::{
@@ -21,7 +22,7 @@ pub struct SearchState {
     root: Mutex<Option<Utf8PathBuf>>,
     full_list: Arc<RwLock<HashSet<String>>>,
     watcher: Mutex<Option<RecommendedWatcher>>,
-    pub last_search_result: RwLock<Vec<String>>,
+    pub last_search_result: RwLock<BTreeSet<String>>,
     pub last_search: RwLock<String>,
 }
 
@@ -136,7 +137,7 @@ impl SearchState {
         let mut res = Self::find_by_globs(&files, &globs);
         if let Ok(ref mut v) = res {
             *self.last_search.write().unwrap() = globs.to_string();
-            *self.last_search_result.write().unwrap() = v.clone();
+            *self.last_search_result.write().unwrap() = v.iter().cloned().collect();
             if v.len() > SEARCH_RESULT_LIMIT {
                 return Err(crate::Error::Limit {
                     item: "files".to_string(),
