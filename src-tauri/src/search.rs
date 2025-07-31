@@ -6,7 +6,6 @@ use notify::event::{CreateKind, ModifyKind, RenameMode};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher, event, recommended_watcher};
 use rayon::prelude::*;
 use shlex::Shlex;
-use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::{Arc, LazyLock};
 use std::{
@@ -22,7 +21,7 @@ pub struct SearchState {
     root: Mutex<Option<Utf8PathBuf>>,
     full_list: Arc<RwLock<HashSet<String>>>,
     watcher: Mutex<Option<RecommendedWatcher>>,
-    pub last_search_result: RwLock<BTreeSet<String>>,
+    pub last_search_result: Arc<RwLock<HashSet<String>>>,
     pub last_search: RwLock<String>,
 }
 
@@ -30,6 +29,7 @@ pub struct SearchState {
 pub struct SelectionState {
     pub selection: RwLock<HashSet<String>>,
 }
+
 impl SearchState {
     pub fn search_files_by_name(&self, globs: &str) -> Result<Vec<String>, crate::Error> {
         let root = get_root()?;
@@ -55,16 +55,20 @@ impl SearchState {
             let mut watcher = recommended_watcher({
                 let root = root.clone();
                 let full_list = Arc::clone(&self.full_list);
+                let last_search_result = Arc::clone(&self.last_search_result);
+                let patt = self.last_search.read().unwrap().clone();
                 move |res: Result<event::Event, notify::Error>| match res {
                     Ok(event) => match event.kind {
                         EventKind::Create(CreateKind::File) => {
                             println!("create {:?}", event.paths);
                             for path in event.paths {
                                 if let Ok(path) = path.strip_prefix(&root) {
-                                    full_list
-                                        .write()
-                                        .unwrap()
-                                        .insert(path.to_string_lossy().to_string());
+                                    add_paths(
+                                        &mut full_list.write().unwrap(),
+                                        &mut last_search_result.write().unwrap(),
+                                        &patt,
+                                        [path.to_string_lossy().to_string()],
+                                    );
                                 }
                             }
                         }
@@ -72,10 +76,11 @@ impl SearchState {
                             println!("remove {:?}", event.paths);
                             for path in event.paths {
                                 if let Ok(path) = path.strip_prefix(&root) {
-                                    full_list
-                                        .write()
-                                        .unwrap()
-                                        .remove(path.to_string_lossy().as_ref());
+                                    remove_paths(
+                                        &mut full_list.write().unwrap(),
+                                        &mut last_search_result.write().unwrap(),
+                                        [path.to_string_lossy().to_string()],
+                                    );
                                 }
                             }
                         }
@@ -84,19 +89,22 @@ impl SearchState {
                         {
                             println!("rename to {:?}", event.paths);
                             if let Ok(path) = event.paths[0].strip_prefix(&root) {
-                                full_list
-                                    .write()
-                                    .unwrap()
-                                    .insert(path.to_string_lossy().to_string());
+                                add_paths(
+                                    &mut full_list.write().unwrap(),
+                                    &mut last_search_result.write().unwrap(),
+                                    &patt,
+                                    [path.to_string_lossy().to_string()],
+                                );
                             }
                         }
                         EventKind::Modify(ModifyKind::Name(RenameMode::From)) => {
                             println!("rename from {:?}", event.paths);
                             if let Ok(path) = event.paths[0].strip_prefix(&root) {
-                                full_list
-                                    .write()
-                                    .unwrap()
-                                    .remove(path.to_string_lossy().as_ref());
+                                remove_paths(
+                                    &mut full_list.write().unwrap(),
+                                    &mut last_search_result.write().unwrap(),
+                                    [path.to_string_lossy().to_string()],
+                                );
                             }
                         }
                         EventKind::Modify(ModifyKind::Name(RenameMode::Both))
@@ -104,16 +112,19 @@ impl SearchState {
                         {
                             println!("rename both {:?}", event.paths);
                             if let Ok(path) = event.paths[0].strip_prefix(&root) {
-                                full_list
-                                    .write()
-                                    .unwrap()
-                                    .remove(path.to_string_lossy().as_ref());
+                                remove_paths(
+                                    &mut full_list.write().unwrap(),
+                                    &mut last_search_result.write().unwrap(),
+                                    [path.to_string_lossy().to_string()],
+                                );
                             }
                             if let Ok(path) = event.paths[1].strip_prefix(&root) {
-                                full_list
-                                    .write()
-                                    .unwrap()
-                                    .insert(path.to_string_lossy().to_string());
+                                add_paths(
+                                    &mut full_list.write().unwrap(),
+                                    &mut last_search_result.write().unwrap(),
+                                    &patt,
+                                    [path.to_string_lossy().to_string()],
+                                );
                             }
                         }
                         _ => {}
@@ -184,6 +195,66 @@ impl SearchState {
             })
             .collect();
         Ok(out)
+    }
+}
+
+fn dual_globsets(globs: &str) -> Result<(globset::GlobSet, globset::GlobSet), crate::error::Error> {
+    let lex = Shlex::new(globs);
+    let mut no_set = GlobSetBuilder::new();
+    let mut yes_set = GlobSetBuilder::new();
+    for pat in lex {
+        if let Some(pat) = pat.strip_prefix('!') {
+            let glob = GlobBuilder::new(&format!("*{pat}*"))
+                .case_insensitive(true)
+                .backslash_escape(false)
+                .literal_separator(false)
+                .build()?;
+            no_set.add(glob);
+        } else {
+            let glob = GlobBuilder::new(&format!("*{pat}*"))
+                .case_insensitive(true)
+                .backslash_escape(false)
+                .literal_separator(false)
+                .build()?;
+            yes_set.add(glob);
+        }
+    }
+    let yes_set = yes_set.build()?;
+    let no_set = no_set.build()?;
+    Ok((yes_set, no_set))
+}
+
+pub fn remove_paths<I, S>(coll1: &mut HashSet<String>, coll2: &mut HashSet<String>, files: I)
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    for file in files {
+        coll1.remove(file.as_ref());
+        coll2.remove(file.as_ref());
+    }
+}
+pub fn add_paths<I>(coll1: &mut HashSet<String>, coll2: &mut HashSet<String>, patt: &str, files: I)
+where
+    I: IntoIterator<Item = String>,
+{
+    let files: Vec<_> = files.into_iter().collect();
+    if let Ok((yes_set, no_set)) = dual_globsets(patt) {
+        files
+            .iter()
+            .flat_map(|path| {
+                if yes_set.matches(path).len() == yes_set.len() && no_set.matches(path).is_empty() {
+                    Some(path)
+                } else {
+                    None
+                }
+            })
+            .for_each(|p| {
+                coll2.insert(p.clone());
+            });
+    }
+    for file in files {
+        coll1.insert(file);
     }
 }
 
