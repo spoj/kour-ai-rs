@@ -23,9 +23,6 @@ pub struct SearchState {
     root: Mutex<Option<Utf8PathBuf>>,
     full_list: Arc<RwLock<HashSet<String>>>,
     watcher: Mutex<Option<RecommendedWatcher>>,
-    pub last_search_result: Arc<RwLock<HashSet<String>>>,
-    pub last_search: RwLock<String>,
-    window: Mutex<Option<Window>>,
 }
 
 #[derive(Default)]
@@ -39,140 +36,103 @@ impl SearchState {
         globs: &str,
         window: Window,
     ) -> Result<Vec<String>, crate::Error> {
-        *self.window.lock().unwrap() = Some(window);
-        let root = get_root()?;
-        if Some(&root) != (self.root.lock().unwrap()).as_ref() {
-            let files: HashSet<_> = Walk::new(&root)
-                .flatten()
-                .flat_map(|e| {
-                    if let Ok(meta) = e.metadata()
-                        && meta.is_file()
-                    {
-                        e.path()
-                            .strip_prefix(&root)
-                            .map(|r| r.to_string_lossy().to_string())
-                            .ok()
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            *self.full_list.write().unwrap() = files;
-            *self.root.lock().unwrap() = Some(root.clone());
-
-            let mut watcher = recommended_watcher({
-                let root = root.clone();
-                let full_list = Arc::clone(&self.full_list);
-                let last_search_result = Arc::clone(&self.last_search_result);
-                let opt_win = self.window.lock().unwrap().clone();
-                let patt = self.last_search.read().unwrap().clone();
-                move |res: Result<event::Event, notify::Error>| match res {
-                    Ok(event) => match event.kind {
-                        EventKind::Create(CreateKind::File) => {
-                            println!("create {:?}", event.paths);
-                            for path in event.paths {
-                                if let Ok(path) = path.strip_prefix(&root) {
+        match self.search_files_by_name(globs) {
+            Err(e) => Err(e),
+            Ok(res) => {
+                let root = get_root()?;
+                let mut watcher = recommended_watcher({
+                    let root = root.clone();
+                    let full_list = Arc::clone(&self.full_list);
+                    let win = window.clone();
+                    let patt = globs.to_owned();
+                    move |res: Result<event::Event, notify::Error>| match res {
+                        Ok(event) => match event.kind {
+                            EventKind::Create(CreateKind::File) => {
+                                println!("create {:?}", event.paths);
+                                for path in event.paths {
+                                    if let Ok(path) = path.strip_prefix(&root) {
+                                        add_paths(
+                                            &mut full_list.write().unwrap(),
+                                            &win,
+                                            &patt,
+                                            [path.to_string_lossy().to_string()],
+                                        );
+                                    }
+                                }
+                            }
+                            EventKind::Remove(_) => {
+                                println!("remove {:?}", event.paths);
+                                for path in event.paths {
+                                    if let Ok(path) = path.strip_prefix(&root) {
+                                        remove_paths(
+                                            &mut full_list.write().unwrap(),
+                                            &win,
+                                            &patt,
+                                            [path.to_string_lossy().to_string()],
+                                        );
+                                    }
+                                }
+                            }
+                            EventKind::Modify(ModifyKind::Name(RenameMode::To))
+                                if event.paths[0].is_file() =>
+                            {
+                                println!("rename to {:?}", event.paths);
+                                if let Ok(path) = event.paths[0].strip_prefix(&root) {
                                     add_paths(
                                         &mut full_list.write().unwrap(),
-                                        &mut last_search_result.write().unwrap(),
-                                        opt_win.as_ref(),
+                                        &win,
                                         &patt,
                                         [path.to_string_lossy().to_string()],
                                     );
                                 }
                             }
-                        }
-                        EventKind::Remove(_) => {
-                            println!("remove {:?}", event.paths);
-                            for path in event.paths {
-                                if let Ok(path) = path.strip_prefix(&root) {
+                            EventKind::Modify(ModifyKind::Name(RenameMode::From)) => {
+                                println!("rename from {:?}", event.paths);
+                                if let Ok(path) = event.paths[0].strip_prefix(&root) {
                                     remove_paths(
                                         &mut full_list.write().unwrap(),
-                                        &mut last_search_result.write().unwrap(),
-                                        opt_win.as_ref(),
+                                        &win,
+                                        &patt,
                                         [path.to_string_lossy().to_string()],
                                     );
                                 }
                             }
-                        }
-                        EventKind::Modify(ModifyKind::Name(RenameMode::To))
-                            if event.paths[0].is_file() =>
-                        {
-                            println!("rename to {:?}", event.paths);
-                            if let Ok(path) = event.paths[0].strip_prefix(&root) {
-                                add_paths(
-                                    &mut full_list.write().unwrap(),
-                                    &mut last_search_result.write().unwrap(),
-                                    opt_win.as_ref(),
-                                    &patt,
-                                    [path.to_string_lossy().to_string()],
-                                );
+                            EventKind::Modify(ModifyKind::Name(RenameMode::Both))
+                                if event.paths[1].is_file() =>
+                            {
+                                println!("rename both {:?}", event.paths);
+                                if let Ok(path) = event.paths[0].strip_prefix(&root) {
+                                    remove_paths(
+                                        &mut full_list.write().unwrap(),
+                                        &win,
+                                        &patt,
+                                        [path.to_string_lossy().to_string()],
+                                    );
+                                }
+                                if let Ok(path) = event.paths[1].strip_prefix(&root) {
+                                    add_paths(
+                                        &mut full_list.write().unwrap(),
+                                        &win,
+                                        &patt,
+                                        [path.to_string_lossy().to_string()],
+                                    );
+                                }
                             }
+                            _ => {}
+                        },
+                        Err(e) => {
+                            println!("Error {e:?}")
                         }
-                        EventKind::Modify(ModifyKind::Name(RenameMode::From)) => {
-                            println!("rename from {:?}", event.paths);
-                            if let Ok(path) = event.paths[0].strip_prefix(&root) {
-                                remove_paths(
-                                    &mut full_list.write().unwrap(),
-                                    &mut last_search_result.write().unwrap(),
-                                    opt_win.as_ref(),
-                                    [path.to_string_lossy().to_string()],
-                                );
-                            }
-                        }
-                        EventKind::Modify(ModifyKind::Name(RenameMode::Both))
-                            if event.paths[1].is_file() =>
-                        {
-                            println!("rename both {:?}", event.paths);
-                            if let Ok(path) = event.paths[0].strip_prefix(&root) {
-                                remove_paths(
-                                    &mut full_list.write().unwrap(),
-                                    &mut last_search_result.write().unwrap(),
-                                    opt_win.as_ref(),
-                                    [path.to_string_lossy().to_string()],
-                                );
-                            }
-                            if let Ok(path) = event.paths[1].strip_prefix(&root) {
-                                add_paths(
-                                    &mut full_list.write().unwrap(),
-                                    &mut last_search_result.write().unwrap(),
-                                    opt_win.as_ref(),
-                                    &patt,
-                                    [path.to_string_lossy().to_string()],
-                                );
-                            }
-                        }
-                        _ => {}
-                    },
-                    Err(e) => {
-                        println!("Error {e:?}")
                     }
-                }
-            })
-            .unwrap();
-
-            watcher
-                .watch(Path::new(&root), RecursiveMode::Recursive)
+                })
                 .unwrap();
-
-            *self.watcher.lock().unwrap() = Some(watcher);
-        }
-
-        let globs = globs.to_string();
-        let files = self.full_list.read().unwrap();
-        let mut res = find_by_globs(&files, &globs);
-        if let Ok(ref mut v) = res {
-            *self.last_search.write().unwrap() = globs.to_string();
-            *self.last_search_result.write().unwrap() = v.iter().cloned().collect();
-            if v.len() > SEARCH_RESULT_LIMIT {
-                return Err(crate::Error::Limit {
-                    item: "files".to_string(),
-                    requested: v.len(),
-                    limit: SEARCH_RESULT_LIMIT,
-                });
+                watcher
+                    .watch(Path::new(&root), RecursiveMode::Recursive)
+                    .unwrap();
+                *self.watcher.lock().unwrap() = Some(watcher);
+                Ok(res)
             }
         }
-        res
     }
 
     pub fn search_files_by_name(&self, globs: &str) -> Result<Vec<String>, crate::Error> {
@@ -199,7 +159,16 @@ impl SearchState {
 
         let globs = globs.to_string();
         let files = self.full_list.read().unwrap();
-        find_by_globs(&files, &globs)
+        let res = find_by_globs(&files, &globs)?;
+        if res.len() > SEARCH_RESULT_LIMIT {
+            Err(crate::Error::Limit {
+                item: "search".to_string(),
+                requested: res.len(),
+                limit: SEARCH_RESULT_LIMIT,
+            })
+        } else {
+            Ok(res)
+        }
     }
 }
 
@@ -235,55 +204,40 @@ enum SearchResultUpdate {
     Remove(String),
 }
 
-pub fn remove_paths<I, S>(
-    coll1: &mut HashSet<String>,
-    coll2: &mut HashSet<String>,
-    opt_win: Option<&Window>,
-    files: I,
-) where
-    I: IntoIterator<Item = S>,
-    S: AsRef<str>,
-{
-    for file in files {
-        coll1.remove(file.as_ref());
-        coll2.remove(file.as_ref());
-        if let Some(w) = opt_win {
-            let _ = w.emit(
-                "search_result_update",
-                SearchResultUpdate::Remove(file.as_ref().to_string()),
-            );
-        }
-    }
-}
-pub fn add_paths<I>(
-    coll1: &mut HashSet<String>,
-    coll2: &mut HashSet<String>,
-    opt_win: Option<&Window>,
-    patt: &str,
-    files: I,
-) where
+pub fn remove_paths<I>(coll1: &mut HashSet<String>, win: &Window, patt: &str, files: I)
+where
     I: IntoIterator<Item = String>,
 {
-    let files: Vec<_> = files.into_iter().collect();
-    if let Ok((yes_set, no_set)) = dual_globsets(patt) {
-        files
-            .iter()
-            .flat_map(|path| {
-                if yes_set.matches(path).len() == yes_set.len() && no_set.matches(path).is_empty() {
-                    Some(path)
-                } else {
-                    None
-                }
-            })
-            .for_each(|p| {
-                coll2.insert(p.clone());
-                if let Some(w) = opt_win {
-                    let _ = w.emit("search_result_update", SearchResultUpdate::Add(p.clone()));
-                }
-            });
+    let dgs = dual_globsets(patt);
+    for path in files {
+        if let Ok((ref yes_set, ref no_set)) = dgs
+            && yes_set.matches(&path).len() == yes_set.len()
+            && no_set.matches(&path).is_empty()
+        {
+            let _ = win.emit(
+                "search_result_update",
+                SearchResultUpdate::Remove(path.clone()),
+            );
+        };
+        coll1.remove(&path);
     }
-    for file in files {
-        coll1.insert(file);
+}
+pub fn add_paths<I>(coll1: &mut HashSet<String>, win: &Window, patt: &str, files: I)
+where
+    I: IntoIterator<Item = String>,
+{
+    let dgs = dual_globsets(patt);
+    for path in files {
+        if let Ok((ref yes_set, ref no_set)) = dgs
+            && yes_set.matches(&path).len() == yes_set.len()
+            && no_set.matches(&path).is_empty()
+        {
+            let _ = win.emit(
+                "search_result_update",
+                SearchResultUpdate::Add(path.clone()),
+            );
+        };
+        coll1.insert(path);
     }
 }
 
@@ -305,10 +259,6 @@ fn find_by_globs(paths: &HashSet<String>, globs: &str) -> Result<Vec<String>, cr
 pub static SEARCH_STATE: LazyLock<SearchState> = LazyLock::new(Default::default);
 pub static SELECTION_STATE: LazyLock<SelectionState> = LazyLock::new(Default::default);
 
-// #[tauri::command]
-// pub fn search_files_by_name_sync(globs: &str) -> Result<Vec<String>, crate::Error> {
-//     SEARCH_STATE.search_files_by_name(globs)
-// }
 pub async fn search_files_by_name(globs: &str) -> Result<Vec<String>, crate::Error> {
     spawn_blocking({
         let globs = globs.to_string();
