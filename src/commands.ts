@@ -1,6 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { IChatCompletionUpdate, ISettings, MessageContent } from "./types";
+import {
+  IChatCompletionUpdate,
+  ISearchResultUpdate,
+  ISettings,
+  MessageContent,
+} from "./types";
 
 export const getSettings = async (): Promise<ISettings> => {
   return await invoke("get_settings");
@@ -39,8 +44,10 @@ export const chat = async (content: MessageContent): Promise<void> => {
   await invoke("chat", { content: content });
 };
 
-export const search_files_by_name = async (globs: string): Promise<string[]> => {
-  return await invoke("search_files_by_name", { globs: globs });
+export const search_files_by_name_interactive = async (
+  globs: string
+): Promise<string[]> => {
+  return await invoke("search_files_by_name_interactive", { globs: globs });
 };
 
 export const onChatCompletionUpdate = async (
@@ -48,6 +55,14 @@ export const onChatCompletionUpdate = async (
 ) => {
   return await listen("chat_completion_update", (event) => {
     callback(event.payload as IChatCompletionUpdate);
+  });
+};
+
+export const onSearchResultUpdate = async (
+  callback: (update: ISearchResultUpdate) => void
+) => {
+  return await listen("search_result_update", (event) => {
+    callback(event.payload as ISearchResultUpdate);
   });
 };
 

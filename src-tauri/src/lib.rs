@@ -136,7 +136,7 @@ pub fn run() {
             cancel_outstanding_request,
             delete_message,
             delete_tool_interaction,
-            search::search_files_by_name,
+            search::search_files_by_name_interactive,
             search::selection_add,
             search::selection_remove,
             search::selection_clear,
