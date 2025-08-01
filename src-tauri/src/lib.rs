@@ -27,6 +27,7 @@ type Result<T> = std::result::Result<T, Error>;
 pub static STORE: OnceLock<Arc<Store<Wry>>> = OnceLock::new();
 pub static CACHE_DIR: OnceLock<Utf8PathBuf> = OnceLock::new();
 
+#[derive(Default)]
 struct AppStateInner {
     cancel: Mutex<Option<CancellationToken>>,
     history: Arc<Mutex<History>>,
@@ -150,9 +151,7 @@ pub fn run() {
             CACHE_DIR.get_or_init(
                 || Utf8Path::new(&app.path().app_cache_dir().unwrap().to_string_lossy()).to_owned(), // unwrap: crash if cannot find cache dir
             );
-            let history = Arc::new(Mutex::new(Default::default()));
-            let cancel = Mutex::new(None);
-            let inner_state = AppStateInner { cancel, history };
+            let inner_state = AppStateInner::default();
             app.manage(inner_state);
             Ok(())
         })
