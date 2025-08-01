@@ -72,3 +72,7 @@ export type IChatCompletionUpdate =
       tool_call_id: string;
       tool_result: string;
     };
+
+export type ISearchResultUpdate =
+  | { "Add": string }
+  | { "Remove": string };

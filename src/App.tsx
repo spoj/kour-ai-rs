@@ -11,10 +11,16 @@ import {
   cancelOutstandingRequest,
   delete_message,
   delete_tool_interaction,
-  search_files_by_name,
+  search_files_by_name_interactive,
+  onSearchResultUpdate,
 } from "./commands";
 import { fileToAttachment } from "./helpers";
-import { IChatCompletionMessage, ISettings, MessageContent } from "./types";
+import {
+  IChatCompletionMessage,
+  ISearchResultUpdate,
+  ISettings,
+  MessageContent,
+} from "./types";
 import { SettingsModal } from "./components/SettingsModal";
 import { getVersion } from "@tauri-apps/api/app";
 import { Bounce, ToastContainer } from "react-toastify";
@@ -141,10 +147,12 @@ function App() {
     });
     messageInputRef.current?.focus();
     const unlisten = onChatCompletionUpdate(handleChatUpdate);
+    const unlistenSearch = onSearchResultUpdate(handleSearchUpdate);
     setMessages([]);
     replayHistory();
     return () => {
       unlisten.then((f) => f());
+      unlistenSearch.then((f) => f());
     };
   }, []);
 
@@ -203,9 +211,9 @@ function App() {
 
   useEffect(() => {
     if (settings.rootDir) {
-      search_files_by_name(debouncedSearchTerm)
+      search_files_by_name_interactive(debouncedSearchTerm)
         .then(setFileList)
-        .catch((_) => setFileList([]));
+        .catch(() => setFileList([]));
     }
   }, [settings.rootDir, debouncedSearchTerm]);
 
@@ -215,6 +223,14 @@ function App() {
       messageInputRef.current.style.height = `${messageInputRef.current.scrollHeight}px`;
     }
   }, [input]);
+
+  const handleSearchUpdate = (update: ISearchResultUpdate) => {
+    if ("Add" in update) {
+      setFileList((prev) => [...prev, update.Add]);
+    } else if ("Remove" in update) {
+      setFileList((prev) => prev.filter((f) => f !== update.Remove));
+    }
+  };
 
   const handleSettingsChange = (newSettings: Partial<ISettings>) => {
     const updatedSettings = { ...settings, ...newSettings };
